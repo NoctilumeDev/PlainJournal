@@ -1,0 +1,69 @@
+ecommerce:
+  foundation:
+    configuration-source: nacos
+  security:
+    token:
+      issuer: ecommerce-identity
+  trade:
+    client:
+      connect-timeout: 2s
+      read-timeout: 4s
+    order:
+      default-warehouse-code: PRIMARY
+      payment-timeout: 15m
+      reservation-grace: 5m
+      recovery-enabled: true
+      recovery-delay: 5000
+      recovery-batch-size: 50
+    outbox:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-order-events
+      fixed-delay: 2000
+      retry-delay: 5s
+      batch-size: 50
+    payment-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-payment-events
+      consumer-group: trade-payment-succeeded-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s
+    fulfillment-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-logistics-events
+      consumer-group: trade-fulfillment-events-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s
+    after-sale-fulfillment-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-logistics-events
+      consumer-group: trade-after-sale-fulfillment-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s
+    after-sale-inventory-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-inventory-events
+      consumer-group: trade-after-sale-inventory-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s
+    refund-result-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-payment-events
+      consumer-group: trade-refund-events-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s

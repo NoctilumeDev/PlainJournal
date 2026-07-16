@@ -1,0 +1,5 @@
+{
+  "grpcServerPort": 18082,
+  "rocketMQClusterName": "EcommerceCluster",
+  "useEndpointPortFromRequest": true
+}

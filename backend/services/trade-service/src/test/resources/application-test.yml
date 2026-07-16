@@ -1,0 +1,68 @@
+server:
+  port: 0
+
+spring:
+  config:
+    import: "optional:nacos:"
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+  datasource:
+    url: jdbc:h2:mem:trade;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=30000
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 30
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+ecommerce:
+  foundation:
+    configuration-source: local-default
+  security:
+    token:
+      secret: test-only-trade-jwt-secret-with-at-least-32-characters
+      issuer: ecommerce-identity-test
+    internal:
+      token: test-internal-service-token-1234567890
+      caller: trade-service
+      allowed-callers:
+        - payment-service
+  trade:
+    client:
+      connect-timeout: 1s
+      read-timeout: 2s
+    order:
+      default-warehouse-code: PRIMARY
+      payment-timeout: 15m
+      reservation-grace: 5m
+      recovery-enabled: false
+      recovery-delay: 5000
+      recovery-batch-size: 50
+    outbox:
+      enabled: false
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-order-events
+      fixed-delay: 2000
+      retry-delay: 0s
+      batch-size: 100
+    payment-consumer:
+      enabled: false
+    fulfillment-consumer:
+      enabled: false
+    after-sale-fulfillment-consumer:
+      enabled: false
+    after-sale-inventory-consumer:
+      enabled: false
+    refund-result-consumer:
+      enabled: false
+
+logging:
+  level:
+    root: warn
+    com.alibaba.nacos: error

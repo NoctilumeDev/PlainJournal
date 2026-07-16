@@ -1,0 +1,83 @@
+server:
+  port: ${IDENTITY_SERVICE_PORT:18101}
+
+spring:
+  application:
+    name: identity-service
+  config:
+    import:
+      - optional:nacos:identity-service.yml?group=ECOMMERCE&refreshEnabled=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_HOST:127.0.0.1}:${NACOS_CLIENT_PORT:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_ADMIN_PASSWORD:}
+      discovery:
+        group: ECOMMERCE
+        ip: ${SERVICE_IP:127.0.0.1}
+      config:
+        group: ECOMMERCE
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${IDENTITY_DB_NAME:ecom_identity}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${IDENTITY_DB_USER:ecom_identity_app}
+    password: ${IDENTITY_DB_PASSWORD:}
+    hikari:
+      connection-timeout: 5000
+      maximum-pool-size: 10
+      minimum-idle: 2
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16379}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 500ms
+      timeout: 500ms
+      lettuce:
+        shutdown-timeout: 100ms
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: assign_id
+
+ecommerce:
+  security:
+    internal:
+      token: ${INTERNAL_SERVICE_TOKEN:}
+      allowed-callers:
+        - trade-service
+    login-attempt:
+      namespace: ${APP_ENV:local}
+      redis-enabled: ${IDENTITY_LOGIN_REDIS_ENABLED:true}
+      max-failures: 5
+      failure-window: 15m
+      lock-duration: 30m
+      local-maximum-size: 100000
+    token:
+      secret: ${IDENTITY_JWT_SECRET:}
+      issuer: ecommerce-identity
+      access-ttl: 15m
+      refresh-ttl: 7d
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
+  level:
+    com.alibaba.nacos: warn

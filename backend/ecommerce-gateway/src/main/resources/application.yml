@@ -1,0 +1,98 @@
+server:
+  port: ${GATEWAY_PORT:18000}
+
+spring:
+  application:
+    name: ecommerce-gateway
+  config:
+    import:
+      - optional:nacos:ecommerce-gateway.yml?group=ECOMMERCE&refreshEnabled=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_HOST:127.0.0.1}:${NACOS_CLIENT_PORT:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_ADMIN_PASSWORD:}
+      discovery:
+        group: ECOMMERCE
+        ip: ${SERVICE_IP:127.0.0.1}
+      config:
+        group: ECOMMERCE
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 3000
+            response-timeout: 5s
+          routes:
+            - id: identity-service
+              uri: lb://identity-service
+              predicates:
+                - Path=/api/v1/identity/**
+            - id: catalog-service
+              uri: lb://catalog-service
+              predicates:
+                - Path=/api/v1/catalog/**
+            - id: inventory-service
+              uri: lb://inventory-service
+              predicates:
+                - Path=/api/v1/inventory/**
+            - id: trade-service
+              uri: lb://trade-service
+              predicates:
+                - Path=/api/v1/trade/**
+            - id: payment-service
+              uri: lb://payment-service
+              predicates:
+                - Path=/api/v1/payment/**
+            - id: fulfillment-service
+              uri: lb://fulfillment-service
+              predicates:
+                - Path=/api/v1/fulfillment/**
+            - id: marketing-service
+              uri: lb://marketing-service
+              predicates:
+                - Path=/api/v1/marketing/**
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16379}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 500ms
+      timeout: 500ms
+      lettuce:
+        shutdown-timeout: 100ms
+
+ecommerce:
+  gateway:
+    rate-limit:
+      namespace: ${APP_ENV:local}
+      enabled: true
+      redis-enabled: ${GATEWAY_RATE_LIMIT_REDIS_ENABLED:true}
+      redis-timeout: 600ms
+      local-maximum-size: 100000
+      login:
+        limit: 10
+        window: 1m
+      registration:
+        limit: 5
+        window: 1m
+      refresh:
+        limit: 30
+        window: 1m
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
+  level:
+    com.alibaba.nacos: warn

@@ -1,0 +1,16 @@
+ecommerce:
+  foundation:
+    configuration-source: nacos
+  security:
+    token:
+      issuer: ecommerce-identity
+  marketing:
+    order-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-order-events
+      consumer-group: marketing-order-lifecycle-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s

@@ -1,0 +1,13 @@
+.idea/
+.vscode/
+.DS_Store
+
+# Local middleware credentials and generated runtime files
+deploy/docker/.env
+deploy/docker/*.log
+
+# Application build outputs (reserved for later development)
+**/target/
+**/node_modules/
+**/dist/
+**/.run/

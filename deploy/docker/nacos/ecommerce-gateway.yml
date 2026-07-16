@@ -1,0 +1,18 @@
+ecommerce:
+  foundation:
+    configuration-source: nacos
+  gateway:
+    rate-limit:
+      enabled: true
+      redis-enabled: true
+      redis-timeout: 600ms
+      local-maximum-size: 100000
+      login:
+        limit: 10
+        window: 1m
+      registration:
+        limit: 5
+        window: 1m
+      refresh:
+        limit: 30
+        window: 1m

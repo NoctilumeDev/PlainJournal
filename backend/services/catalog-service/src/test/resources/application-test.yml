@@ -1,0 +1,42 @@
+server:
+  port: 0
+
+spring:
+  config:
+    import: "optional:nacos:"
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+  datasource:
+    url: jdbc:h2:mem:catalog;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+ecommerce:
+  foundation:
+    configuration-source: local-default
+  security:
+    token:
+      secret: test-only-catalog-jwt-secret-with-at-least-32-characters
+      issuer: ecommerce-identity-test
+  catalog:
+    media:
+      endpoint: http://127.0.0.1:19000
+      username: test-user
+      password: test-password
+      bucket: product-media
+      upload-expiry: 15m
+      download-expiry: 15m
+      maximum-size: 10MB
+
+logging:
+  level:
+    root: warn
+    com.alibaba.nacos: error

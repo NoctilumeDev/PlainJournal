@@ -1,0 +1,87 @@
+server:
+  port: ${PAYMENT_SERVICE_PORT:18105}
+
+spring:
+  application:
+    name: payment-service
+  config:
+    import:
+      - optional:nacos:payment-service.yml?group=ECOMMERCE&refreshEnabled=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_HOST:127.0.0.1}:${NACOS_CLIENT_PORT:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_ADMIN_PASSWORD:}
+      discovery:
+        group: ECOMMERCE
+        ip: ${SERVICE_IP:127.0.0.1}
+      config:
+        group: ECOMMERCE
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${PAYMENT_DB_NAME:ecom_payment}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${PAYMENT_DB_USER:ecom_payment_app}
+    password: ${PAYMENT_DB_PASSWORD:}
+    hikari:
+      connection-timeout: 5000
+      maximum-pool-size: 20
+      minimum-idle: 2
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: assign_id
+
+ecommerce:
+  security:
+    token:
+      secret: ${IDENTITY_JWT_SECRET:}
+      issuer: ecommerce-identity
+    internal:
+      token: ${INTERNAL_SERVICE_TOKEN:}
+      caller: payment-service
+  payment:
+    client:
+      connect-timeout: 2s
+      read-timeout: 4s
+    mock-channel:
+      callback-secret: ${MOCK_PAYMENT_CALLBACK_SECRET:}
+      callback-max-skew: 5m
+    outbox:
+      enabled: ${PAYMENT_OUTBOX_ENABLED:true}
+      endpoints: ${ROCKETMQ_PROXY_ENDPOINT:127.0.0.1:18082}
+      topic: ecommerce-payment-events
+      fixed-delay: 2000
+      retry-delay: 5s
+      batch-size: 50
+    refund-consumer:
+      enabled: ${PAYMENT_REFUND_CONSUMER_ENABLED:true}
+      endpoints: ${ROCKETMQ_PROXY_ENDPOINT:127.0.0.1:18082}
+      topic: ecommerce-order-events
+      consumer-group: payment-refund-requested-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
+  level:
+    com.alibaba.nacos: warn

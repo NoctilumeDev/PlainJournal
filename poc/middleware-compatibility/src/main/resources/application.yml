@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: middleware-compatibility-poc
+  main:
+    banner-mode: "off"
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${MYSQL_DATABASE:ecommerce}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:ecommerce_app}
+    password: ${MYSQL_PASSWORD}
+    hikari:
+      connection-timeout: 5000
+      maximum-pool-size: 3
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16379}
+      password: ${REDIS_PASSWORD}
+      connect-timeout: 3s
+      timeout: 3s
+  cloud:
+    nacos:
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_ADMIN_PASSWORD}
+      discovery:
+        server-addr: ${NACOS_HOST:127.0.0.1}:${NACOS_CLIENT_PORT:8848}
+        register-enabled: false
+      config:
+        enabled: false
+        server-addr: ${NACOS_HOST:127.0.0.1}:${NACOS_CLIENT_PORT:8848}
+        import-check:
+          enabled: false
+
+poc:
+  nacos:
+    server-addr: ${NACOS_HOST:127.0.0.1}:${NACOS_CLIENT_PORT:8848}
+    username: ${NACOS_USERNAME:nacos}
+    password: ${NACOS_ADMIN_PASSWORD}
+  rocketmq:
+    endpoints: ${ROCKETMQ_HOST:127.0.0.1}:${ROCKETMQ_PROXY_GRPC_PORT:18082}
+    topic: ecommerce-notification-events
+  minio:
+    endpoint: http://${MINIO_HOST:127.0.0.1}:${MINIO_API_PORT:19000}
+    username: ${MINIO_ROOT_USER}
+    password: ${MINIO_ROOT_PASSWORD}
+    bucket: product-media
+
+logging:
+  level:
+    com.alibaba.nacos: warn
+    org.apache.rocketmq: warn
+

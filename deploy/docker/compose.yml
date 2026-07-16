@@ -1,0 +1,150 @@
+name: ${COMPOSE_PROJECT_NAME}
+
+services:
+  mysql:
+    profiles: ["core"]
+    image: mysql:${MYSQL_IMAGE_TAG}
+    container_name: ecom-mysql
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+      - --max-connections=300
+      - --innodb-buffer-pool-size=256M
+    ports:
+      - "127.0.0.1:${MYSQL_PORT}:3306"
+    volumes:
+      - "${MIDDLEWARE_DATA_ROOT}/mysql/data:/var/lib/mysql"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    mem_limit: 768m
+    networks: [ecommerce]
+
+  redis:
+    profiles: ["core"]
+    image: redis:${REDIS_IMAGE_TAG}
+    container_name: ecom-redis
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_PASSWORD}"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT}:6379"
+    volumes:
+      - "${MIDDLEWARE_DATA_ROOT}/redis/data:/data"
+      - "./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 256m
+    networks: [ecommerce]
+
+  nacos:
+    profiles: ["core"]
+    image: nacos/nacos-server:${NACOS_IMAGE_TAG}
+    container_name: ecom-nacos
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MODE: standalone
+      PREFER_HOST_MODE: hostname
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE}
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+      JVM_XMN: 128m
+    ports:
+      - "127.0.0.1:${NACOS_CONSOLE_PORT}:8080"
+      - "127.0.0.1:${NACOS_CLIENT_PORT}:8848"
+      - "127.0.0.1:${NACOS_GRPC_PORT}:9848"
+    volumes:
+      - "${MIDDLEWARE_DATA_ROOT}/nacos/data:/home/nacos/data"
+      - "${MIDDLEWARE_DATA_ROOT}/nacos/logs:/home/nacos/logs"
+    mem_limit: 768m
+    networks: [ecommerce]
+
+  rocketmq-namesrv:
+    profiles: ["core"]
+    image: apache/rocketmq:${ROCKETMQ_IMAGE_TAG}
+    container_name: ecom-rocketmq-namesrv
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPT_EXT: "-Xms128m -Xmx256m -Xmn64m"
+    command: sh mqnamesrv
+    ports:
+      - "127.0.0.1:${ROCKETMQ_NAMESRV_PORT}:9876"
+    volumes:
+      - "${MIDDLEWARE_DATA_ROOT}/rocketmq/namesrv-logs:/home/rocketmq/logs"
+    mem_limit: 384m
+    networks: [ecommerce]
+
+  rocketmq-broker:
+    profiles: ["core"]
+    image: apache/rocketmq:${ROCKETMQ_IMAGE_TAG}
+    container_name: ecom-rocketmq-broker
+    restart: unless-stopped
+    depends_on:
+      - rocketmq-namesrv
+    environment:
+      TZ: Asia/Shanghai
+      NAMESRV_ADDR: ecom-rocketmq-namesrv:9876
+      JAVA_OPT_EXT: "-Xms512m -Xmx768m -Xmn256m"
+    command:
+      - sh
+      - mqbroker
+      - --enable-proxy
+      - -c
+      - /home/rocketmq/rocketmq-5.3.2/conf/broker.conf
+    ports:
+      - "127.0.0.1:10909:10909"
+      - "127.0.0.1:${ROCKETMQ_BROKER_PORT}:10911"
+      - "127.0.0.1:10912:10912"
+      - "127.0.0.1:${ROCKETMQ_PROXY_REMOTING_PORT}:8080"
+      - "127.0.0.1:${ROCKETMQ_PROXY_GRPC_PORT}:18082"
+    volumes:
+      - "./rocketmq/broker.conf:/home/rocketmq/rocketmq-5.3.2/conf/broker.conf:ro"
+      - "./rocketmq/rmq-proxy.json:/home/rocketmq/rocketmq-5.3.2/conf/rmq-proxy.json:ro"
+      - "${MIDDLEWARE_DATA_ROOT}/rocketmq/broker-logs:/home/rocketmq/logs"
+      - "${MIDDLEWARE_DATA_ROOT}/rocketmq/broker-store:/home/rocketmq/store"
+    mem_limit: 1g
+    networks: [ecommerce]
+
+  minio:
+    profiles: ["core"]
+    image: quay.io/minio/minio:${MINIO_IMAGE_TAG}
+    container_name: ecom-minio
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT}:9001"
+    volumes:
+      - "${MIDDLEWARE_DATA_ROOT}/minio/data:/data"
+    mem_limit: 512m
+    networks: [ecommerce]
+
+networks:
+  ecommerce:
+    name: ecommerce-platform-network
+    driver: bridge

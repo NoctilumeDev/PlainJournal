@@ -1,0 +1,28 @@
+ecommerce:
+  foundation:
+    configuration-source: nacos
+  security:
+    token:
+      issuer: ecommerce-identity
+  payment:
+    client:
+      connect-timeout: 2s
+      read-timeout: 4s
+    mock-channel:
+      callback-max-skew: 5m
+    outbox:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-payment-events
+      fixed-delay: 2000
+      retry-delay: 5s
+      batch-size: 50
+    refund-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-order-events
+      consumer-group: payment-refund-requested-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s

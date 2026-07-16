@@ -1,0 +1,14 @@
+ecommerce:
+  foundation:
+    configuration-source: nacos
+  security:
+    login-attempt:
+      redis-enabled: true
+      max-failures: 5
+      failure-window: 15m
+      lock-duration: 30m
+      local-maximum-size: 100000
+    token:
+      issuer: ecommerce-identity
+      access-ttl: 15m
+      refresh-ttl: 7d

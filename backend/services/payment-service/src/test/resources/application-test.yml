@@ -1,0 +1,54 @@
+server:
+  port: 0
+
+spring:
+  config:
+    import: "optional:nacos:"
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+  datasource:
+    url: jdbc:h2:mem:payment;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=30000
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 30
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+ecommerce:
+  foundation:
+    configuration-source: local-default
+  security:
+    token:
+      secret: test-only-payment-jwt-secret-with-at-least-32-characters
+      issuer: ecommerce-identity-test
+    internal:
+      token: test-internal-service-token-1234567890
+      caller: payment-service
+  payment:
+    client:
+      connect-timeout: 1s
+      read-timeout: 2s
+    mock-channel:
+      callback-secret: test-mock-callback-secret-with-at-least-32-characters
+      callback-max-skew: 5m
+    outbox:
+      enabled: false
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-payment-events
+      fixed-delay: 2000
+      retry-delay: 0s
+      batch-size: 100
+    refund-consumer:
+      enabled: false
+
+logging:
+  level:
+    root: warn
+    com.alibaba.nacos: error

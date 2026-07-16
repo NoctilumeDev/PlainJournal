@@ -1,0 +1,32 @@
+ecommerce:
+  foundation:
+    configuration-source: nacos
+  security:
+    token:
+      issuer: ecommerce-identity
+  fulfillment:
+    outbox:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-logistics-events
+      fixed-delay: 2000
+      retry-delay: 5s
+      batch-size: 50
+    order-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-order-events
+      consumer-group: fulfillment-order-paid-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s
+    after-sale-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-order-events
+      consumer-group: fulfillment-after-sale-approved-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s

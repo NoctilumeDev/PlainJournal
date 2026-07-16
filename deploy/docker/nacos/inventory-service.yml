@@ -1,0 +1,37 @@
+ecommerce:
+  foundation:
+    configuration-source: nacos
+  security:
+    token:
+      issuer: ecommerce-identity
+  inventory:
+    reservation:
+      default-ttl: 30m
+      expiry-enabled: true
+      expiry-scan-delay: 5000
+      expiry-batch-size: 100
+    outbox:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-inventory-events
+      fixed-delay: 2000
+      retry-delay: 5s
+      batch-size: 50
+    order-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-order-events
+      consumer-group: inventory-order-paid-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s
+    return-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-logistics-events
+      consumer-group: inventory-return-inspected-v1
+      fixed-delay: 1000
+      batch-size: 16
+      invisible-duration: 30s
+      await-duration: 5s

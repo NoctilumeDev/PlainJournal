@@ -1,0 +1,12 @@
+ecommerce:
+  foundation:
+    configuration-source: nacos
+  security:
+    token:
+      issuer: ecommerce-identity
+  catalog:
+    media:
+      bucket: product-media
+      upload-expiry: 15m
+      download-expiry: 15m
+      maximum-size: 10MB
