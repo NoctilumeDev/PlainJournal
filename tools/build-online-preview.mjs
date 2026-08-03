@@ -11,6 +11,7 @@ await fs.rm(outputRoot, { recursive: true, force: true });
 await fs.mkdir(assetRoot, { recursive: true });
 await fs.copyFile(path.join(sourceRoot, "index.html"), path.join(outputRoot, "index.html"));
 await fs.copyFile(path.join(sourceRoot, "styles.css"), path.join(outputRoot, "styles.css"));
+await fs.copyFile(path.join(sourceRoot, "favicon.svg"), path.join(outputRoot, "favicon.svg"));
 
 for (const image of [
   "storefront-home.jpg",
