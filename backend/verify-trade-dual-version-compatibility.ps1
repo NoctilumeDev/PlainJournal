@@ -623,9 +623,9 @@ try {
     $stableJar = if ($SkipBuild) {
         ''
     } else {
-        Join-Path $stableBackend 'services\trade-service\target\trade-service-0.1.0-SNAPSHOT.jar'
+        Join-Path $stableBackend 'services\trade-service\target\trade-service-1.0.1-SNAPSHOT.jar'
     }
-    $candidateJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service-0.1.0-SNAPSHOT.jar'
+    $candidateJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service-1.0.1-SNAPSHOT.jar'
     if ($stableJar) {
         $stableJarHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $stableJar).Hash.ToLowerInvariant()
     }

@@ -242,7 +242,7 @@ function Get-ChatVerifierProcesses {
         Get-CimInstance Win32_Process -Filter "Name = 'java.exe'" `
             -ErrorAction SilentlyContinue |
             Where-Object {
-                $_.CommandLine -like '*PlainJournal*chat-service-0.1.0-SNAPSHOT.jar*' -and
+                $_.CommandLine -like '*PlainJournal*chat-service-1.0.1-SNAPSHOT.jar*' -and
                 $_.CommandLine -like '*-Dplainjournal.chat-consumer-failure-verifier=*'
             }
     )
@@ -267,7 +267,7 @@ function Stop-Chat {
     $process = Get-CimInstance Win32_Process -Filter "ProcessId=$processId" `
         -ErrorAction SilentlyContinue
     if ($null -ne $process) {
-        $jarName = 'chat-service-0.1.0-SNAPSHOT.jar'
+        $jarName = 'chat-service-1.0.1-SNAPSHOT.jar'
         if ($process.CommandLine -notlike "*PlainJournal*$jarName*" -or
             $process.CommandLine -notlike "*$($script:verifierMarker)*") {
             throw "Refused to stop PID $processId; command line does not match the Chat verifier."
@@ -614,7 +614,7 @@ $networkPreflight = 'D:\DevTools\Network\check-dev-network.ps1'
 $envPath = Join-Path $script:repositoryRoot 'deploy/docker/.env'
 $bootstrapPath = Join-Path $script:repositoryRoot 'deploy/docker/bootstrap-resources.ps1'
 $chatJar = Join-Path $script:backendRoot `
-    'services/chat-service/target/chat-service-0.1.0-SNAPSHOT.jar'
+    'services/chat-service/target/chat-service-1.0.1-SNAPSHOT.jar'
 $script:javaPath = Resolve-JavaExecutable
 $verificationSucceeded = $false
 

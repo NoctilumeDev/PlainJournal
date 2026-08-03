@@ -16,3 +16,7 @@ deploy/docker/.runtime-secrets/
 **/coverage/
 **/test-results/
 **/playwright-report/
+
+# Generated release and GitHub Pages artifacts
+/release/
+/.pages/

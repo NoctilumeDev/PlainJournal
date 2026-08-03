@@ -16,7 +16,7 @@ if ($EventCount % 2 -ne 0) {
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $envFile = Join-Path $repositoryRoot 'deploy\docker\.env'
-$tradeJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service-0.1.0-SNAPSHOT.jar'
+$tradeJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service-1.0.1-SNAPSHOT.jar'
 $runDirectory = Join-Path $PSScriptRoot '.run'
 $networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
 $topic = 'plainjournal-m3-outbox-probe-v1'

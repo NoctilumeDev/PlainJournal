@@ -1,15 +1,7 @@
-import path from "node:path";
-
 import { defineConfig } from "@playwright/test";
 
-const chromeExecutable = process.env.PLAYWRIGHT_CHROME_EXECUTABLE
-  ?? path.join(
-    process.env.LOCALAPPDATA ?? "",
-    "Google",
-    "Chrome",
-    "Application",
-    "chrome.exe",
-  );
+import { chromiumLaunchOptions } from "./playwright.shared";
+
 
 export default defineConfig({
   testDir: "./e2e/specs",
@@ -25,9 +17,7 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:18200",
     browserName: "chromium",
     headless: true,
-    launchOptions: {
-      executablePath: chromeExecutable,
-    },
+    launchOptions: chromiumLaunchOptions(),
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },

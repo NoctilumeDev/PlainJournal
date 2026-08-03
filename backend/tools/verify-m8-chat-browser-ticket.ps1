@@ -231,10 +231,10 @@ function Stop-AllApplications {
         Stop-Application -Name $name
     }
     $expectedByPort = @{
-        18000 = 'ecommerce-gateway-0.1.0-SNAPSHOT.jar'
-        18108 = 'chat-service-0.1.0-SNAPSHOT.jar'
-        18118 = 'chat-service-0.1.0-SNAPSHOT.jar'
-        18128 = 'chat-service-0.1.0-SNAPSHOT.jar'
+        18000 = 'ecommerce-gateway-1.0.1-SNAPSHOT.jar'
+        18108 = 'chat-service-1.0.1-SNAPSHOT.jar'
+        18118 = 'chat-service-1.0.1-SNAPSHOT.jar'
+        18128 = 'chat-service-1.0.1-SNAPSHOT.jar'
     }
     foreach ($port in $expectedByPort.Keys) {
         foreach ($listener in @(Get-NetTCPConnection -State Listen -LocalPort $port `
@@ -519,8 +519,8 @@ else {
 $networkPreflight = 'D:\DevTools\Network\check-dev-network.ps1'
 $envPath = Join-Path $script:repositoryRoot 'deploy/docker/.env'
 $bootstrapPath = Join-Path $script:repositoryRoot 'deploy/docker/bootstrap-resources.ps1'
-$chatJar = Join-Path $script:backendRoot 'services/chat-service/target/chat-service-0.1.0-SNAPSHOT.jar'
-$gatewayJar = Join-Path $script:backendRoot 'ecommerce-gateway/target/ecommerce-gateway-0.1.0-SNAPSHOT.jar'
+$chatJar = Join-Path $script:backendRoot 'services/chat-service/target/chat-service-1.0.1-SNAPSHOT.jar'
+$gatewayJar = Join-Path $script:backendRoot 'ecommerce-gateway/target/ecommerce-gateway-1.0.1-SNAPSHOT.jar'
 $javaHomePath = [Environment]::GetEnvironmentVariable('JAVA_HOME', 'Process')
 $javaHomeExecutable = if ($javaHomePath) {
     Join-Path $javaHomePath 'bin/java.exe'
@@ -777,8 +777,8 @@ SELECT
                 $_.Name -eq 'java.exe' -and
                 $_.CommandLine -like '*PlainJournal*' -and
                 (
-                    $_.CommandLine -like '*chat-service-0.1.0-SNAPSHOT.jar*' -or
-                    $_.CommandLine -like '*ecommerce-gateway-0.1.0-SNAPSHOT.jar*'
+                    $_.CommandLine -like '*chat-service-1.0.1-SNAPSHOT.jar*' -or
+                    $_.CommandLine -like '*ecommerce-gateway-1.0.1-SNAPSHOT.jar*'
                 )
             }).Count
     Assert-Equal -Actual $cleanupRows -Expected 0L `

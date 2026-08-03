@@ -42,7 +42,7 @@ $ports = [ordered]@{
     catalog1 = 18102
     catalog2 = 18112
 }
-$catalogJar = Join-Path $script:backendRoot 'services\catalog-service\target\catalog-service-0.1.0-SNAPSHOT.jar'
+$catalogJar = Join-Path $script:backendRoot 'services\catalog-service\target\catalog-service-1.0.1-SNAPSHOT.jar'
 $envFile = Join-Path $repositoryRoot 'deploy\docker\.env'
 $fixtureFile = Join-Path $script:backendRoot '.run\m5-baseline-data.json'
 
@@ -184,7 +184,7 @@ function Stop-CatalogInstances {
     foreach ($managed in @($script:catalogProcesses)) {
         $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($managed.process.Id)" `
             -ErrorAction SilentlyContinue
-        if ($process -and $process.CommandLine -like "*catalog-service-0.1.0-SNAPSHOT.jar*") {
+        if ($process -and $process.CommandLine -like "*catalog-service-1.0.1-SNAPSHOT.jar*") {
             Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
         }
     }
@@ -193,7 +193,7 @@ function Stop-CatalogInstances {
         foreach ($listener in $listeners) {
             $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" `
                 -ErrorAction SilentlyContinue
-            if ($process -and $process.CommandLine -like '*catalog-service-0.1.0-SNAPSHOT.jar*') {
+            if ($process -and $process.CommandLine -like '*catalog-service-1.0.1-SNAPSHOT.jar*') {
                 Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
             }
         }

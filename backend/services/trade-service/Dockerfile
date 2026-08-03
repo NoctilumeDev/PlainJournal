@@ -11,7 +11,7 @@ RUN addgroup -S -g 10001 plainjournal \
 WORKDIR /opt/plainjournal
 
 COPY --chown=plainjournal:plainjournal \
-    services/trade-service/target/trade-service-0.1.0-SNAPSHOT.jar \
+    services/trade-service/target/trade-service-1.0.1-SNAPSHOT.jar \
     app.jar
 COPY --chown=plainjournal:plainjournal \
     services/trade-service/docker/entrypoint.sh \

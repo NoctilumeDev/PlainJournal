@@ -1262,13 +1262,13 @@ if (-not $SkipPackage) {
 }
 
 $jars = [ordered]@{
-    identity = Join-Path $script:backendRoot 'services\identity-service\target\identity-service-0.1.0-SNAPSHOT.jar'
-    catalog = Join-Path $script:backendRoot 'services\catalog-service\target\catalog-service-0.1.0-SNAPSHOT.jar'
-    inventory = Join-Path $script:backendRoot 'services\inventory-service\target\inventory-service-0.1.0-SNAPSHOT.jar'
-    trade = Join-Path $script:backendRoot 'services\trade-service\target\trade-service-0.1.0-SNAPSHOT.jar'
-    payment = Join-Path $script:backendRoot 'services\payment-service\target\payment-service-0.1.0-SNAPSHOT.jar'
-    marketing = Join-Path $script:backendRoot 'services\marketing-service\target\marketing-service-0.1.0-SNAPSHOT.jar'
-    gateway = Join-Path $script:backendRoot 'ecommerce-gateway\target\ecommerce-gateway-0.1.0-SNAPSHOT.jar'
+    identity = Join-Path $script:backendRoot 'services\identity-service\target\identity-service-1.0.1-SNAPSHOT.jar'
+    catalog = Join-Path $script:backendRoot 'services\catalog-service\target\catalog-service-1.0.1-SNAPSHOT.jar'
+    inventory = Join-Path $script:backendRoot 'services\inventory-service\target\inventory-service-1.0.1-SNAPSHOT.jar'
+    trade = Join-Path $script:backendRoot 'services\trade-service\target\trade-service-1.0.1-SNAPSHOT.jar'
+    payment = Join-Path $script:backendRoot 'services\payment-service\target\payment-service-1.0.1-SNAPSHOT.jar'
+    marketing = Join-Path $script:backendRoot 'services\marketing-service\target\marketing-service-1.0.1-SNAPSHOT.jar'
+    gateway = Join-Path $script:backendRoot 'ecommerce-gateway\target\ecommerce-gateway-1.0.1-SNAPSHOT.jar'
 }
 
 $summaries = [Collections.Generic.List[object]]::new()
