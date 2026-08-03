@@ -106,11 +106,13 @@ test("V7 admin serves the shared catalog AVIF variants without duplicating sourc
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto("http://127.0.0.1:18201/login");
+  await page.goto(
+    "http://127.0.0.1:18201/login?redirect=%2Fcatalog",
+  );
   await page.getByLabel("员工邮箱").fill("admin@example.com");
   await page.getByLabel("密码").fill("AdminPass123");
   await page.getByRole("button", { name: "登录工作区 →" }).click();
-  await page.goto("http://127.0.0.1:18201/catalog");
+  await expect(page).toHaveURL("http://127.0.0.1:18201/catalog");
 
   const image = page.locator(".catalog-product__media img").first();
   await expect(image).toBeVisible();
