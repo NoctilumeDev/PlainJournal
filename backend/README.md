@@ -46,8 +46,8 @@ ClamAV streaming scans, scan leases, finite retries, terminal attention state,
   bounded reconciliation, audited idempotent rebuilds, dedicated metrics, and
   an operations dashboard without cross-service production-table joins. The
   twelve M8 mechanism slices and the project-wide M8 audit/regression are
-  complete. M9 is admitted with a strict three-merchant and one Go statistics
-  service boundary.
+  complete. The former M9 multi-merchant and Go service proposal has moved out
+  of this repository and is not part of the current product boundary.
 
 ## Modules
 
@@ -73,13 +73,18 @@ communicate through API/event contracts and never share mapper classes.
 
 ## Build
 
-```powershell
-cd C:\Users\lenovo\Desktop\PlainJournal\backend
-mvn clean verify
-mvn org.apache.maven.plugins:maven-pmd-plugin:3.28.0:check
+```bash
+cd backend
+./mvnw clean verify
+./mvnw -DskipTests install org.apache.maven.plugins:maven-pmd-plugin:3.28.0:check
 ```
 
-2026-07-30 最近一次全量 `mvn clean verify` 通过 100 份 Surefire 报告、435 个测试并打包全部应用；其中 `platform-common` 21 tests、`catalog-service` 44 tests、`trade-service` 121 tests、`chat-service` 59 tests 与 `analytics-service` 7 tests。独立 PMD 产生 12 份报告、0 违规；使用当前已安装的 Reactor 产物重跑 SpotBugs 低阈值扫描产生 12 份报告、313 条分类诊断，其中 Priority 1 为 0、Priority 2 为 247、Priority 3 为 66、缺失分析类为 0。服务测试使用 H2 MySQL compatibility mode；PMD 与 SpotBugs 没有绑定到 `verify`，因此需要单独执行。真实 MySQL、Redis、Nacos、RocketMQ、MinIO、ClamAV、SMTP、MySQL Spatial、OpenSearch、故障注入和容量验证使用本页后续的冒烟脚本，不能由 H2 回归结果替代。最终 Broker 清理门禁同时检查订阅组配置、`consumerOffset.json` 和 `%RETRY%/%DLQ%` Topic，不能再仅凭 `getConsumerConfig` 判定零残留。最终 M0–M8 三层证据见 `../docs/69-m0-m8-pre-m9-three-layer-audit-20260728.md`，最新订单/Payment 浏览器证据见 `../docs/77-frontend-order-payment-layering-seventh-slice-20260730.md`。
+当前测试、PMD、SpotBugs 和真实机制数字统一见
+[`../docs/verification-summary.md`](../docs/verification-summary.md)。服务测试使用 H2
+MySQL compatibility mode；真实 MySQL、Redis、Nacos、RocketMQ、MinIO、ClamAV、
+SMTP、MySQL Spatial、OpenSearch、故障注入和容量验证使用本页后续脚本，不能由 H2
+回归结果替代。最终 Broker 清理同时检查订阅组配置、`consumerOffset.json` 和
+`%RETRY%/%DLQ%` Topic，不能只凭 `getConsumerConfig` 判定零残留。
 
 M8.1–M8.12 针对性门禁：
 

@@ -12,7 +12,8 @@
 | Docker Engine | 29.6.1 | 已验证 |
 | Docker Compose | 5.3.0 | 已验证 |
 
-Node.js 永久机器配置为 `NODE_HOME=D:\Node.js\current`，Machine PATH 只包含 `D:\Node.js\current`，该 Junction 指向 `node-v24.14.0-win-x64`；没有第二个 `NODEJS_HOME`。2026-07-22 当前 Codex 进程已解析到 `D:\Node.js\current\node.exe` 24.14.0，pnpm 用户级 shim 使用同一 PATH 中的 Node，不需要下载第三份 Node 或叠加新的全局变量。
+本机和 GitHub Actions 都以 Node.js 24.14.0 / pnpm 11.9.0 为当前验证坐标。仓库入口
+只依赖 `PATH` 与 Corepack，不依赖某台机器的 `NODE_HOME`、盘符或 Junction。
 
 ## 2. 已运行的中间件
 
@@ -110,14 +111,13 @@ Playwright 自动化 E2E 已纳入 `pnpm check`，当前覆盖顾客主题/权�
 
 最小中间件兼容性 POC 的 6 项验证是早期技术准入证据，不代表整个项目测试数量。
 
-当前项目级门禁：
+当前项目级门禁不再在版本矩阵中手工维护。后端、前端、PMD、SpotBugs 和真实机制的
+当前数字统一见 [验证摘要](verification-summary.md)，分层运行入口见
+[验证索引](verification-index.md)。本节以下只冻结技术兼容性，不承担测试计数。
 
-- 后端 `mvn clean verify`：100 份 Surefire 报告、435 个测试，0 失败、0 错误、0 跳过；
-- 独立 PMD 3.28.0 / PMD 7.17.0 全 Reactor：0 违规；
-- SpotBugs Maven Plugin 4.9.8.2 / SpotBugs 4.9.8：先安装当前 Reactor 产物再扫描，低阈值共 313 条分类诊断，其中 Priority 1 为 0、Priority 2 为 247、Priority 3 为 66；
-- 前端在 Node.js 24.14.0 / pnpm 11.9.0 下串行执行完整门禁：141 个 Vitest（Foundation 42、Storefront 87、Admin 12）、14 个 Playwright E2E、12 条分层规则、三端类型检查、两端生产构建和 axe 检查通过；
-- M8.12 当前代码定向门禁：`platform-common` 14 tests、`trade-service` 104 tests、`analytics-service` 6 tests，0 失败、0 错误、0 跳过；
-- 真实中间件、多实例、故障、容量与 M0–M7 链路证据分别记录在 `docs/26` 至 `docs/55`；M8.1–M8.12 的 Chat、Notification、Fulfillment GEO、商品评价、商品搜索和运营统计证据记录在 `docs/56` 至 `docs/67`。M0–M7 最终门禁和 M8.1–M8.12 针对性门禁均已通过，但不能用 H2 自动化回归或浏览器 Mock 夹具替代真实证据。
+历史 M0–M7 链路证据记录在 `docs/26` 至 `docs/55`；M8.1–M8.12 的 Chat、
+Notification、Fulfillment GEO、商品评价、商品搜索和运营统计证据记录在 `docs/56`
+至 `docs/67`。H2 自动化回归和浏览器 Mock 夹具不能替代真实基础设施证据。
 
 任意一项失败时，Spring Boot、Spring Cloud 和 Spring Cloud Alibaba 必须按发布列车整体调整，禁止只强行覆盖其中一个依赖版本。
 

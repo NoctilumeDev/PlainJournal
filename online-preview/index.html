@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="PlainJournal 素简记开源项目在线预览与可复现入口"
+    />
+    <title>素简记 · PlainJournal</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero__shade"></div>
+      <nav class="nav" aria-label="项目导航">
+        <a class="brand" href="https://github.com/NoctilumeDev/PlainJournal">
+          素简记 · PlainJournal
+        </a>
+        <a class="nav__link" href="https://github.com/NoctilumeDev/PlainJournal">
+          GitHub 仓库
+        </a>
+      </nav>
+      <div class="hero__content">
+        <p class="eyebrow">自营 B2C · 分布式机制 · 真实证据</p>
+        <h1>素简记</h1>
+        <p class="hero__summary">
+          使用 Spring Boot 3、Vue 3、MySQL、Redis、Nacos 与 RocketMQ，
+          验证交易一致性、结果未知恢复、多实例竞争和故障治理。
+        </p>
+        <div class="hero__actions">
+          <a class="button button--primary" href="https://github.com/NoctilumeDev/PlainJournal">
+            查看源码
+          </a>
+          <a
+            class="button button--secondary"
+            href="https://github.com/NoctilumeDev/PlainJournal/blob/main/docs/verification-summary.md"
+          >
+            验证摘要
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="band band--light">
+        <div class="content">
+          <div class="section-heading">
+            <p class="eyebrow">顾客端</p>
+            <h2>连续、克制的购买旅程</h2>
+          </div>
+          <img
+            class="product-shot"
+            src="assets/storefront-product.jpg"
+            alt="素简记商品详情页面"
+          />
+        </div>
+      </section>
+
+      <section class="band band--ink">
+        <div class="content evidence">
+          <div class="section-heading">
+            <p class="eyebrow">工程边界</p>
+            <h2>在线页面只展示成品，不冒充真实后端</h2>
+          </div>
+          <p>
+            该 GitHub Pages 页面是零服务器成本的公开预览。交互式 UI Demo
+            使用仓库内固定夹具在本地运行；MySQL、RocketMQ、Nacos、多实例与故障恢复
+            由专项脚本和证据文档验证。
+          </p>
+          <pre><code>git clone https://github.com/NoctilumeDev/PlainJournal.git
+cd PlainJournal/frontend
+corepack enable
+pnpm install --frozen-lockfile
+pnpm demo:start</code></pre>
+        </div>
+      </section>
+
+      <section class="band band--light">
+        <div class="content">
+          <div class="section-heading">
+            <p class="eyebrow">管理端</p>
+            <h2>按所有者事实治理异常</h2>
+          </div>
+          <img
+            class="product-shot"
+            src="assets/admin-governance.jpg"
+            alt="素简记管理端补偿与对账页面"
+          />
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>PlainJournal · Apache-2.0</span>
+      <a href="https://github.com/NoctilumeDev/PlainJournal/blob/main/SECURITY.md">
+        安全策略
+      </a>
+    </footer>
+  </body>
+</html>

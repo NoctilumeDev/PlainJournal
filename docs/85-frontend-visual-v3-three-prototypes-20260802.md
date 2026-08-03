@@ -137,7 +137,7 @@ Catalog API、SKU 选择和游客购物袋逻辑保持不变。
 | 管理端生产构建 | 通过 |
 | axe serious / critical | 0 |
 
-`frontend/tools/run-e2e.ps1` 现在统一串行执行：
+本阶段当时由 `frontend/tools/run-e2e.ps1` 统一串行执行：
 
 ```text
 Mock API
@@ -149,6 +149,9 @@ Mock API
 
 这避免多个测试入口并行争用端口、Node 运行时和机器资源。V3 另提供
 `playwright.v3.config.ts`，只运行三个原型用例，便于后续视觉迭代做最小回归。
+
+> `v1.0.1` 已将该 Windows 专用入口替换为跨平台
+> `frontend/tools/run-e2e.mjs`；当前命令以 `frontend/package.json` 为准。
 
 ## 5. 内置浏览器与 F12 证据
 

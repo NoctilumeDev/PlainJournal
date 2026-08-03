@@ -1,7 +1,7 @@
-# PlainJournal v1.0 发布清单
+# PlainJournal 发布清单
 
-本清单用于仓库所有者人工发布。自动化脚本不得自行提交、推送、创建标签或发布
-GitHub Release。
+本清单用于仓库所有者冻结版本。自动化不得自行提交、推送或创建标签；Release
+Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 
 ## 1. 法律与仓库身份
 
@@ -13,7 +13,7 @@ GitHub Release。
 ## 2. 代码冻结
 
 - [x] 后端执行 `mvn clean verify`：100 份 Surefire 报告、436 tests 全通过。
-- [x] 前端使用 `D:\Node.js\current\node.exe` 和 pnpm 11 执行 `pnpm check`。
+- [x] 前端使用 Node.js 24.14.0 和 pnpm 11.9.0 执行 `pnpm check`。
 - [x] 执行 Markdown 链接、PowerShell AST、Compose 解析和 `git diff --check`。
 - [x] 核对没有 Java、Vite、Mock、Playwright 或 PlainJournal 容器残留。
 
@@ -33,10 +33,18 @@ GitHub Release。
 - [x] 公开演示账号明确标注为夹具，不冒充生产账号。
 - [x] 多商户与 Go 异构服务明确转入未来独立《素简记 Pro》。
 
-## 5. 人工发布
+## 5. v1.0.0 公开发布
 
-- [ ] 从冻结提交构建最终 `v1.0.0` 镜像，并核对 OCI revision。
-- [ ] 创建带注释 Git 标签 `v1.0.0`。
-- [ ] 推送默认分支和标签。
-- [ ] 创建 GitHub Release，附上 CHANGELOG 摘要、截图、启动说明和已知边界。
-- [ ] 发布后从空目录重新克隆并完成一次文档驱动的冷启动验收。
+- [x] 从冻结提交构建最终 `v1.0.0` 镜像，并核对 OCI revision。
+- [x] 创建并推送 Git 标签 `v1.0.0`。
+- [x] 推送默认分支。
+- [x] 创建 GitHub Release，包含 CHANGELOG 摘要、截图、启动说明和已知边界。
+- [ ] 发布后从空目录重新克隆并完成一次文档驱动的 Core Smoke 冷启动验收。
+
+## 6. v1.0.1 工程加固
+
+- [ ] CI、Security、Pages 和 Release Workflow 在公开仓库通过。
+- [x] 后端/前端版本、验证摘要和文档入口保持一致。
+- [x] Maven Wrapper、跨平台 UI Demo/E2E 和后端架构门禁通过。
+- [ ] Release 附带自定义 ZIP、SHA-256、manifest 和 SPDX SBOM。
+- [x] 从冻结提交完成最终本地回归、浏览器/F12 和资源清理。

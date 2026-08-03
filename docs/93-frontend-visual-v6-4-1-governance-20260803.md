@@ -192,7 +192,7 @@ V6.2 专项在修复后连续两轮 3/3 通过。
 
 ### 6.4 单机资源控制
 
-`tools/run-e2e.ps1` 新增 `-AdminOnly`，V6.4 专项只启动：
+本阶段当时由 `tools/run-e2e.ps1 -AdminOnly` 只启动：
 
 ```text
 Mock API 18090
@@ -201,6 +201,9 @@ Admin Vite 18201
 
 不再为管理端专项同时启动顾客端。人工浏览器验证结束后，两个进程按监听端口和命令行
 核对后停止。
+
+> `v1.0.1` 已将该 Windows 专用入口替换为跨平台
+> `tools/run-e2e.mjs --admin-only`；当前端口和命令以 `frontend/package.json` 为准。
 
 ## 7. 最终自动化门禁
 

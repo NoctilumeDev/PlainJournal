@@ -1,0 +1,52 @@
+name: 缺陷报告
+description: 报告可稳定复现的业务、接口、构建或运行问题
+title: "[Bug] "
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先确认问题不包含密码、Token、Cookie、真实订单或其他敏感信息。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题摘要
+      description: 说明实际行为与预期行为。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 最小复现步骤
+      description: 提供从干净状态开始的命令、请求或页面操作。
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: 影响范围
+      options:
+        - Backend
+        - Storefront
+        - Admin
+        - Infrastructure
+        - Documentation
+        - Release automation
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      description: 操作系统、JDK、Node、pnpm、浏览器和中间件版本。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 非敏感证据
+      description: 可附脱敏日志、状态码、trace_id 或截图。

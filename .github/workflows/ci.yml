@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  repository:
+    name: Repository gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.14.0
+      - name: Verify generated documents and architecture
+        run: |
+          node --test tools/*.test.mjs
+          node tools/check-backend-boundaries.mjs
+          node tools/check-markdown-links.mjs
+          node tools/render-verification-summary.mjs --check
+      - name: Parse Compose configurations
+        env:
+          IDENTITY_JWT_SECRET: ci-only-identity-jwt-secret-not-for-runtime
+          TRADE_DB_PASSWORD: ci-only-trade-database-password
+          TRADE_INTERNAL_SERVICE_TOKEN: ci-only-trade-service-token
+          PAYMENT_INTERNAL_SERVICE_TOKEN: ci-only-payment-service-token
+          METRICS_SCRAPE_TOKEN: ci-only-metrics-token
+          GRAFANA_ADMIN_PASSWORD: ci-only-grafana-password
+        run: |
+          docker compose --file deploy/docker/compose.yml --env-file deploy/docker/.env.example --profile core config --quiet
+          docker compose --file frontend/deploy/nginx/compose.yml config --quiet
+      - name: Check patch whitespace
+        run: git diff --check
+
+  backend:
+    name: Backend verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - name: Run backend tests
+        working-directory: backend
+        run: ./mvnw --batch-mode --no-transfer-progress clean verify
+      - name: Run PMD
+        working-directory: backend
+        run: >
+          ./mvnw --batch-mode --no-transfer-progress
+          -DskipTests install
+          org.apache.maven.plugins:maven-pmd-plugin:3.28.0:check
+      - name: Upload Surefire reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-surefire-reports
+          path: backend/**/target/surefire-reports/
+          if-no-files-found: ignore
+
+  frontend:
+    name: Frontend verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.14.0
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.9.0 --activate
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run frontend gates
+        working-directory: frontend
+        run: pnpm check
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-browser-diagnostics
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+            frontend/.run/*.log
+          if-no-files-found: ignore

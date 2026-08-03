@@ -9,8 +9,9 @@ Redis、Nacos、RocketMQ、MinIO、Gateway 或所有者服务的真实链路证�
 
 ## 启动
 
-```powershell
-cd PlainJournal\frontend
+```bash
+cd PlainJournal/frontend
+corepack enable
 pnpm demo:start
 ```
 
@@ -23,7 +24,7 @@ pnpm demo:start
 
 状态与停止：
 
-```powershell
+```bash
 pnpm demo:status
 pnpm demo:stop
 ```
@@ -42,8 +43,9 @@ pnpm demo:stop
 Mock API 只接受表内邮箱与对应密码。未知邮箱或错误密码返回 401，不能因为是演示环境
 而伪造登录成功。
 
-这些密码是仓库公开夹具数据，禁止复制到任何公网部署、真实数据库或个人账号。若以后
-发布在线演示，必须使用独立临时环境、限权账号、可重置数据和速率限制。
+这些密码是仓库公开夹具数据，禁止复制到任何公网部署、真实数据库或个人账号。当前
+GitHub Pages 只提供静态在线预览，不承载这些账号。未来若发布交互式公网演示，必须
+使用独立临时环境、限权账号、可重置数据和速率限制。
 
 ## 建议演示路径
 

@@ -18,14 +18,14 @@ frontend/
 - pnpm 11。
 - TypeScript 6.0.3；当前 `vue-tsc 3.3.7` 尚不能使用 TypeScript 7 的新包导出结构。
 - 本地开发默认通过 Vite 代理访问 `http://127.0.0.1:18000` Gateway。
-- 本机应从 `PATH` 使用 `D:\Node.js\current\node.exe`；不要硬编码仍为 Node 18 的
-  `D:\Node.js\node.exe`，也不要把两个目录同时设为同优先级。
+- 使用 `PATH` 和 Corepack 解析 Node/pnpm，不依赖本机盘符或固定安装目录。
 
 常用命令：
 
-```powershell
-cd PlainJournal\frontend
-pnpm install
+```bash
+cd PlainJournal/frontend
+corepack enable
+pnpm install --frozen-lockfile
 pnpm dev:storefront
 pnpm dev:admin
 pnpm check:boundaries
@@ -116,5 +116,7 @@ RocketMQ、MinIO、Gateway 和所有者服务证据。
 [`docs/104-frontend-visual-v7-3-demo-static-deployment-20260803.md`](../docs/104-frontend-visual-v7-3-demo-static-deployment-20260803.md)。
 以及
 [`docs/105-frontend-visual-v7-4-release-candidate-20260803.md`](../docs/105-frontend-visual-v7-4-release-candidate-20260803.md)。
-当前代码与文档已经达到 `v1.0.0` 开源发布基线，仓库采用 Apache-2.0；
-后续只处理明确缺陷，不再扩大当前自营业务边界。
+当前前端在 `v1.0.0` 开源发布基线上进入包版本 `1.0.1`，基础演示和 E2E 编排已改为
+跨平台 Node 入口；复杂 Docker 和真实故障脚本继续使用 PowerShell 7。仓库采用
+Apache-2.0，后续只处理明确缺陷，不扩大当前自营业务边界；视觉系统重构留给后续
+`v1.1.0`。

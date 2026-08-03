@@ -1,0 +1,944 @@
+{
+  "schemaVersion": 1,
+  "scanner": {
+    "plugin": "com.github.spotbugs:spotbugs-maven-plugin:4.9.8.2",
+    "effort": "Max",
+    "threshold": "Low"
+  },
+  "summary": {
+    "reports": 12,
+    "total": 313,
+    "priority1": 0,
+    "priority2": 247,
+    "priority3": 66,
+    "missingClasses": 0,
+    "analysisErrors": 0
+  },
+  "modules": [
+    {
+      "module": "ecommerce-gateway",
+      "total": 1,
+      "priority1": 0,
+      "priority2": 1,
+      "priority3": 0
+    },
+    {
+      "module": "platform-common",
+      "total": 8,
+      "priority1": 0,
+      "priority2": 6,
+      "priority3": 2
+    },
+    {
+      "module": "services/analytics-service",
+      "total": 8,
+      "priority1": 0,
+      "priority2": 5,
+      "priority3": 3
+    },
+    {
+      "module": "services/catalog-service",
+      "total": 32,
+      "priority1": 0,
+      "priority2": 28,
+      "priority3": 4
+    },
+    {
+      "module": "services/chat-service",
+      "total": 46,
+      "priority1": 0,
+      "priority2": 36,
+      "priority3": 10
+    },
+    {
+      "module": "services/fulfillment-service",
+      "total": 30,
+      "priority1": 0,
+      "priority2": 22,
+      "priority3": 8
+    },
+    {
+      "module": "services/identity-service",
+      "total": 6,
+      "priority1": 0,
+      "priority2": 6,
+      "priority3": 0
+    },
+    {
+      "module": "services/inventory-service",
+      "total": 32,
+      "priority1": 0,
+      "priority2": 24,
+      "priority3": 8
+    },
+    {
+      "module": "services/marketing-service",
+      "total": 43,
+      "priority1": 0,
+      "priority2": 37,
+      "priority3": 6
+    },
+    {
+      "module": "services/notification-service",
+      "total": 7,
+      "priority1": 0,
+      "priority2": 5,
+      "priority3": 2
+    },
+    {
+      "module": "services/payment-service",
+      "total": 30,
+      "priority1": 0,
+      "priority2": 24,
+      "priority3": 6
+    },
+    {
+      "module": "services/trade-service",
+      "total": 70,
+      "priority1": 0,
+      "priority2": 53,
+      "priority3": 17
+    }
+  ],
+  "patterns": [
+    {
+      "type": "EI_EXPOSE_REP",
+      "category": "MALICIOUS_CODE",
+      "total": 20,
+      "priority1": 0,
+      "priority2": 20,
+      "priority3": 0,
+      "modules": [
+        "platform-common",
+        "services/catalog-service",
+        "services/chat-service",
+        "services/inventory-service",
+        "services/marketing-service",
+        "services/trade-service"
+      ],
+      "classes": [
+        {
+          "class": "com.ecommerce.catalog.interfaces.rest.AdminCatalogController$CreateProductRequest",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.realtime.ChatRealtimeProperties",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.inventory.interfaces.rest.InternalInventoryController$ReserveRequest",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.application.model.MarketingModels$LockPricingCommand",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.marketing.application.model.MarketingModels$PreviewPricingCommand",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.marketing.interfaces.rest.AdminMarketingController$CreateRuleRequest",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.interfaces.rest.CustomerMarketingController$PricingPreviewRequest",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.marketing.interfaces.rest.InternalMarketingController$LockPricingRequest",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.platform.common.observability.BusinessProcessObservability$BusinessProcessReport",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.platform.common.observability.ConsumerFailureObservability$ConsumerFailureReport",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.application.model.TradeModels$CreateOrderCommand",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.interfaces.rest.DistributedIdVerificationController$DistributedIdSnapshot",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.interfaces.rest.TradeController$CreateOrderRequest",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.interfaces.rest.TradeController$GuestBagMergeRequest",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "type": "EI_EXPOSE_REP2",
+      "category": "MALICIOUS_CODE",
+      "total": 227,
+      "priority1": 0,
+      "priority2": 227,
+      "priority3": 0,
+      "modules": [
+        "ecommerce-gateway",
+        "platform-common",
+        "services/analytics-service",
+        "services/catalog-service",
+        "services/chat-service",
+        "services/fulfillment-service",
+        "services/identity-service",
+        "services/inventory-service",
+        "services/marketing-service",
+        "services/notification-service",
+        "services/payment-service",
+        "services/trade-service"
+      ],
+      "classes": [
+        {
+          "class": "com.ecommerce.analytics.application.service.AnalyticsApplicationService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.analytics.infrastructure.messaging.AnalyticsConsumerFailureRecorder",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.analytics.infrastructure.messaging.AnalyticsDomainEventConsumer",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.analytics.infrastructure.observability.AnalyticsObservability",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.analytics.infrastructure.persistence.AnalyticsRepository",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.application.service.CatalogProductSearchService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.application.service.CatalogSearchOutboxService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.application.service.CatalogSearchRebuildCutoverService",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.catalog.application.service.CatalogSearchRebuildService",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.catalog.application.service.CatalogSearchReconciliationService",
+          "count": 4
+        },
+        {
+          "class": "com.ecommerce.catalog.application.service.CatalogService",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.catalog.application.service.ProductReviewService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.infrastructure.cache.RedisCatalogCacheStore",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.infrastructure.cache.TwoLevelProductDetailCache",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.catalog.infrastructure.messaging.CatalogConsumerFailureRecorder",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.infrastructure.messaging.OrderCompletedConsumer",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.infrastructure.persistence.ProductReviewRepository",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.infrastructure.search.CatalogSearchProjectionJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.infrastructure.search.CatalogSearchRebuildJob",
+          "count": 3
+        },
+        {
+          "class": "com.ecommerce.catalog.infrastructure.search.OpenSearchProductSearchIndex",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.infrastructure.storage.MinioObjectStorage",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.interfaces.rest.AdminCatalogController$CreateProductRequest",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.interfaces.rest.AdminSearchController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.application.service.ChatApplicationService",
+          "count": 4
+        },
+        {
+          "class": "com.ecommerce.chat.application.service.ChatAttachmentCleanupService",
+          "count": 3
+        },
+        {
+          "class": "com.ecommerce.chat.application.service.ChatAttachmentScanService",
+          "count": 4
+        },
+        {
+          "class": "com.ecommerce.chat.application.service.ChatAttachmentService",
+          "count": 4
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.messaging.ChatConsumerFailureRetryJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.messaging.ChatDeliveryEventConsumer",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.messaging.ChatOutboxPublisherJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.messaging.ChatStoredEventConsumer",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.messaging.ConsumerFailureRecorder",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.realtime.ChatDeliveryStateService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.realtime.ChatPresenceHeartbeatJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.realtime.ChatRealtimeDeliveryService",
+          "count": 4
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.realtime.ChatWebSocketHandler",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.realtime.ChatWebSocketTicketService",
+          "count": 3
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.realtime.RedisChatPresenceStore",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.storage.MinioChatAttachmentStorage",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.interfaces.rest.ChatController",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.fulfillment.application.service.FulfillmentReconciliationService",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.fulfillment.application.service.FulfillmentService",
+          "count": 3
+        },
+        {
+          "class": "com.ecommerce.fulfillment.application.service.OrderPaidHandler",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.fulfillment.application.service.ReturnReceiptService",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.fulfillment.application.service.ShipmentGeoService",
+          "count": 3
+        },
+        {
+          "class": "com.ecommerce.fulfillment.infrastructure.geo.MySqlShipmentPositionRepository",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.fulfillment.infrastructure.geo.RedisShipmentPositionCache",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.fulfillment.infrastructure.messaging.AfterSaleApprovedConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.fulfillment.infrastructure.messaging.ConsumerFailureRecorder",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.fulfillment.infrastructure.messaging.OrderPaidConsumer",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.fulfillment.interfaces.rest.AdminFulfillmentController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.fulfillment.interfaces.rest.AdminReturnController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.fulfillment.interfaces.rest.CustomerFulfillmentController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.fulfillment.interfaces.rest.CustomerReturnController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.gateway.ratelimit.ResilientGatewayRateLimiter",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.identity.application.service.AddressService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.identity.application.service.AuthenticationService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.identity.infrastructure.persistence.MyBatisIdentityStore",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.identity.infrastructure.security.ResilientLoginAttemptStore",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.identity.interfaces.rest.AddressController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.identity.interfaces.rest.InternalAddressController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.inventory.application.service.InventoryReconciliationService",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.inventory.application.service.InventoryService",
+          "count": 4
+        },
+        {
+          "class": "com.ecommerce.inventory.application.service.OrderPaidHandler",
+          "count": 3
+        },
+        {
+          "class": "com.ecommerce.inventory.application.service.ReservationExpiryJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.inventory.application.service.ReturnStockService",
+          "count": 5
+        },
+        {
+          "class": "com.ecommerce.inventory.infrastructure.messaging.ConsumerFailureRecorder",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.inventory.infrastructure.messaging.OrderPaidConsumer",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.inventory.infrastructure.messaging.ReturnInspectedConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.inventory.interfaces.rest.AdminInventoryController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.inventory.interfaces.rest.InternalInventoryController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.inventory.interfaces.rest.InternalInventoryController$ReserveRequest",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.inventory.interfaces.rest.PublicInventoryController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.application.service.FlashSaleAdmissionRecoveryJob",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.marketing.application.service.FlashSaleAdmissionTimeoutJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.application.service.FlashSaleResultHandler",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.marketing.application.service.FlashSaleService",
+          "count": 3
+        },
+        {
+          "class": "com.ecommerce.marketing.application.service.MarketingService",
+          "count": 3
+        },
+        {
+          "class": "com.ecommerce.marketing.application.service.OrderLifecycleHandler",
+          "count": 3
+        },
+        {
+          "class": "com.ecommerce.marketing.infrastructure.flashsale.RedisFlashSaleAdmissionStore",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.infrastructure.messaging.ConsumerFailureRecorder",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.infrastructure.messaging.FlashSaleResultConsumer",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.infrastructure.messaging.OrderLifecycleConsumer",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.interfaces.rest.AdminFlashSaleController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.interfaces.rest.AdminMarketingController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.interfaces.rest.AdminMarketingController$CreateRuleRequest",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.interfaces.rest.CustomerMarketingController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.interfaces.rest.CustomerMarketingController$PricingPreviewRequest",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.marketing.interfaces.rest.FlashSaleController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.interfaces.rest.InternalMarketingController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.marketing.interfaces.rest.InternalMarketingController$LockPricingRequest",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.notification.application.service.NotificationApplicationService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.notification.application.service.NotificationDeliveryService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.notification.infrastructure.messaging.NotificationConsumerFailureRecorder",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.notification.infrastructure.messaging.NotificationDomainEventConsumer",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.notification.infrastructure.persistence.NotificationRepository",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.payment.application.service.PaymentReconciliationService",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.payment.application.service.PaymentService",
+          "count": 4
+        },
+        {
+          "class": "com.ecommerce.payment.application.service.RefundService",
+          "count": 8
+        },
+        {
+          "class": "com.ecommerce.payment.infrastructure.messaging.ConsumerFailureRecorder",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.payment.infrastructure.messaging.OutboxPublisherJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.payment.infrastructure.messaging.RefundRequestedConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.payment.infrastructure.observability.PaymentBusinessProcessStore",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.payment.infrastructure.refund.RefundDispatchJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.payment.interfaces.rest.PaymentController",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.payment.interfaces.rest.RefundController",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.platform.common.observability.BusinessProcessObservability$BusinessProcessReport",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.platform.common.observability.ConsumerFailureObservability$ConsumerFailureReport",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.application.service.AfterSaleService",
+          "count": 5
+        },
+        {
+          "class": "com.ecommerce.trade.application.service.CartService",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.application.service.FlashSaleOrderRecoveryJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.application.service.FlashSaleOrderService",
+          "count": 5
+        },
+        {
+          "class": "com.ecommerce.trade.application.service.OrderRecoveryJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.application.service.TradeOrderService",
+          "count": 4
+        },
+        {
+          "class": "com.ecommerce.trade.application.service.TradeReconciliationService",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.id.DistributedIdWorkerLeaseStore",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.AfterSaleFulfillmentEventConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.AfterSaleInventoryEventConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.ConsumerFailureRecorder",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.FlashSaleAdmissionConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.FulfillmentEventConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.PaymentSucceededConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.RefundResultConsumer",
+          "count": 3
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.TradeConsumerFailureRetryStore",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.observability.FlashSaleQueueMetrics",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.observability.TradeBusinessProcessStore",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.interfaces.rest.AdminAfterSaleController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.interfaces.rest.CustomerAfterSaleController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.interfaces.rest.DistributedIdVerificationController$DistributedIdSnapshot",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.interfaces.rest.InternalTradeController",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.interfaces.rest.TradeController",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.interfaces.rest.TradeController$CreateOrderRequest",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.interfaces.rest.TradeController$GuestBagMergeRequest",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "type": "THROWS_METHOD_THROWS_CLAUSE_BASIC_EXCEPTION",
+      "category": "BAD_PRACTICE",
+      "total": 56,
+      "priority1": 0,
+      "priority2": 0,
+      "priority3": 56,
+      "modules": [
+        "platform-common",
+        "services/analytics-service",
+        "services/catalog-service",
+        "services/chat-service",
+        "services/fulfillment-service",
+        "services/inventory-service",
+        "services/marketing-service",
+        "services/notification-service",
+        "services/payment-service",
+        "services/trade-service"
+      ],
+      "classes": [
+        {
+          "class": "com.ecommerce.analytics.infrastructure.messaging.AnalyticsDomainEventConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.catalog.infrastructure.messaging.OrderCompletedConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.messaging.ChatDeliveryEventConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.messaging.ChatOutboxPublisherJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.messaging.ChatStoredEventConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.messaging.RocketMqChatEventPublisher",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.realtime.ChatWebSocketHandler",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.fulfillment.application.port.DomainEventPublisher",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.fulfillment.infrastructure.messaging.AfterSaleApprovedConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.fulfillment.infrastructure.messaging.OrderPaidConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.fulfillment.infrastructure.messaging.RocketMqDomainEventPublisher",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.inventory.application.port.DomainEventPublisher",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.inventory.infrastructure.messaging.OrderPaidConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.inventory.infrastructure.messaging.ReturnInspectedConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.inventory.infrastructure.messaging.RocketMqDomainEventPublisher",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.marketing.infrastructure.messaging.FlashSaleEventPublisher",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.marketing.infrastructure.messaging.FlashSaleResultConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.marketing.infrastructure.messaging.OrderLifecycleConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.notification.infrastructure.messaging.NotificationDomainEventConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.payment.application.port.DomainEventPublisher",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.payment.infrastructure.messaging.RefundRequestedConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.payment.infrastructure.messaging.RocketMqDomainEventPublisher",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.platform.common.observability.ConsumerFailureRetryHandler",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.platform.common.observability.MessagingTracing$CheckedRunnable",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.application.port.DomainEventPublisher",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.AfterSaleFulfillmentEventConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.AfterSaleInventoryEventConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.FlashSaleAdmissionConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.FulfillmentEventConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.PaymentSucceededConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.RefundResultConsumer",
+          "count": 2
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.messaging.RocketMqDomainEventPublisher",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "type": "THROWS_METHOD_THROWS_RUNTIMEEXCEPTION",
+      "category": "BAD_PRACTICE",
+      "total": 10,
+      "priority1": 0,
+      "priority2": 0,
+      "priority3": 10,
+      "modules": [
+        "services/analytics-service",
+        "services/catalog-service",
+        "services/chat-service",
+        "services/fulfillment-service",
+        "services/inventory-service",
+        "services/payment-service",
+        "services/trade-service"
+      ],
+      "classes": [
+        {
+          "class": "com.ecommerce.analytics.application.service.AnalyticsApplicationService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.application.service.CatalogSearchRebuildCutoverService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.catalog.infrastructure.cache.TwoLevelProductDetailCache",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.application.service.ChatAttachmentService",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.chat.infrastructure.realtime.ChatWebSocketHandler",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.fulfillment.infrastructure.messaging.OutboxPublisherJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.inventory.infrastructure.messaging.OutboxPublisherJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.payment.infrastructure.messaging.OutboxPublisherJob",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.observability.TradeOrderRecoveryObservability",
+          "count": 1
+        },
+        {
+          "class": "com.ecommerce.trade.infrastructure.resilience.TradeMarketingPricingLockResilience",
+          "count": 1
+        }
+      ]
+    }
+  ]
+}

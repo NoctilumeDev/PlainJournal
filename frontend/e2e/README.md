@@ -5,7 +5,7 @@ MySQL、Nacos、Gateway、Identity、Trade 与 Marketing 链路。
 
 启动顺序：
 
-```powershell
+```bash
 pnpm dev:mock-api
 pnpm dev:storefront
 pnpm dev:admin
@@ -24,10 +24,11 @@ pnpm dev:admin
 夹具固定使用超过 JavaScript 安全整数范围的业务 ID，以便在真实浏览器中持续验证
 `BusinessId = string` 边界。
 
-自动门禁使用 Playwright 驱动本机 Chrome，并通过 axe-core 检查关键页面的
-serious / critical 可访问性违规：
+自动门禁优先使用显式配置的浏览器或 Windows 本机 Chrome；两者都不存在时使用
+Playwright 安装的 Chromium。axe-core 检查关键页面的 serious / critical
+可访问性违规：
 
-```powershell
+```bash
 pnpm e2e
 ```
 
