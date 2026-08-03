@@ -18,7 +18,7 @@ spring:
       config:
         group: ECOMMERCE
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${INVENTORY_DB_NAME:ecom_inventory}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${INVENTORY_DB_NAME:ecom_inventory}?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true
     username: ${INVENTORY_DB_USER:ecom_inventory_app}
     password: ${INVENTORY_DB_PASSWORD:}
     hikari:
@@ -38,15 +38,27 @@ mybatis-plus:
       id-type: assign_id
 
 ecommerce:
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: 16
+    consumer-failure-retry:
+      scheduler: inventoryControlScheduler
   security:
     token:
       secret: ${IDENTITY_JWT_SECRET:}
       issuer: ecommerce-identity
+    metrics:
+      token: ${METRICS_SCRAPE_TOKEN:}
     internal:
-      token: ${INTERNAL_SERVICE_TOKEN:}
+      token: ${TRADE_INTERNAL_SERVICE_TOKEN:}
       allowed-callers:
         - trade-service
   inventory:
+    scheduling:
+      default-pool-size: 2
+      outbox-pool-size: 1
+      control-pool-size: 1
+      shutdown-await: 10s
     reservation:
       default-ttl: 30m
       expiry-enabled: true
@@ -56,9 +68,13 @@ ecommerce:
       enabled: ${INVENTORY_OUTBOX_ENABLED:true}
       endpoints: ${ROCKETMQ_PROXY_ENDPOINT:127.0.0.1:18082}
       topic: ecommerce-inventory-events
-      fixed-delay: 2000
+      fixed-delay: 500
       retry-delay: 5s
-      batch-size: 50
+      batch-size: 200
+      parallelism: 8
+      publisher-id: ${INVENTORY_OUTBOX_PUBLISHER_ID:${random.uuid}}
+      lease-duration: ${INVENTORY_OUTBOX_LEASE_DURATION:60s}
+      shutdown-await: 10s
     order-consumer:
       enabled: ${INVENTORY_ORDER_CONSUMER_ENABLED:true}
       endpoints: ${ROCKETMQ_PROXY_ENDPOINT:127.0.0.1:18082}
@@ -77,17 +93,37 @@ ecommerce:
       batch-size: 16
       invisible-duration: 30s
       await-duration: 5s
+    reconciliation:
+      enabled: ${INVENTORY_RECONCILIATION_ENABLED:true}
+      fixed-delay: 10000
+      initial-delay: 10000
+      scan-limit: 500
 
 management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   endpoints:
     web:
       exposure:
-        include: health,info
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+          - consumerfailures
   endpoint:
     health:
       probes:
         enabled: true
       show-details: never
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only
 
 logging:
   pattern:

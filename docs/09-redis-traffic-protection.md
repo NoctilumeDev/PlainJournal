@@ -18,15 +18,16 @@
 | 登录接口 | 每 IP 每分钟 10 次 | `429 GATEWAY_RATE_LIMITED` |
 | 注册接口 | 每 IP 每分钟 5 次 | `429 GATEWAY_RATE_LIMITED` |
 | 刷新接口 | 每 IP 每分钟 30 次 | `429 GATEWAY_RATE_LIMITED` |
+| 秒杀准入接口 | 默认每 IP 每秒 60 次，活动验证可独立覆盖 | `429 GATEWAY_RATE_LIMITED` |
 | 邮箱密码失败 | 15 分钟内 5 次，锁定 30 分钟 | `429 LOGIN_TEMPORARILY_LOCKED` |
 
 网关响应包含 `Retry-After` 和 `X-RateLimit-Policy`。邮箱锁定对存在和不存在的账号使用相同行为，避免通过响应差异枚举用户。
 
 ## 3. Redis 与本地降级
 
-- Redis 正常时，Lua 脚本原子完成 `INCR`、TTL 设置和锁 key 创建，多实例共享计数。
-- 每个实例同时维护有容量上限的 Caffeine 镜像。Redis 超时或断开时自动使用本地结果，不让认证接口因中间件故障返回 `500`。
-- Redis 恢复后重新使用全局计数，但本机尚未过期的限制仍然有效，避免恢复瞬间放开流量。
+- Redis 正常时，Lua 脚本原子完成 `INCR` 和 TTL 设置，多实例共享计数；此时只以 Redis 结果为准。
+- 每个实例保留有容量上限的 Caffeine 本地窗口，但只在 Redis 禁用、超时或断开时启用，避免两套独立计数在并发下因到达顺序不同而错误损失名额。
+- Redis 恢复后重新使用全局计数，并清除对应本地窗口。
 - 本地缓存最多 100000 个标识并自动过期，防止随机邮箱或 IP 导致无界内存增长。
 - 降级和恢复只在状态切换时记录日志，不重复刷屏。
 
@@ -38,6 +39,10 @@
 ecommerce:{APP_ENV}:gateway:rate:{policy}:{sha256(ip)}
 ecommerce:{APP_ENV}:identity:login:failures:{sha256(email)}
 ecommerce:{APP_ENV}:identity:login:lock:{sha256(email)}
+ecommerce:{APP_ENV}:marketing:flash-sale:activity:{activityNo}:meta
+ecommerce:{APP_ENV}:marketing:flash-sale:activity:{activityNo}:user:{userId}
+ecommerce:{APP_ENV}:marketing:flash-sale:activity:{activityNo}:request:{sha256(userId:idempotencyKey)}
+ecommerce:{APP_ENV}:marketing:flash-sale:token:{requestToken}
 ```
 
 Key 包含环境命名空间，且不写入邮箱和 IP 明文。所有计数与锁都有 TTL，Redis 不保存账号或权限最终状态。
@@ -49,9 +54,17 @@ Key 包含环境命名空间，且不写入邮箱和 IP 明文。所有计数与
 ## 6. 验证
 
 ```powershell
-cd C:\Users\lenovo\Desktop\ecommerce-platform\backend
+cd C:\Users\lenovo\Desktop\PlainJournal\backend
 mvn clean verify
 ./run-foundation-smoke.ps1
 ```
 
-自动测试覆盖本地窗口、接口匹配、稳定 `429` 响应、第五次邮箱失败锁定和重置恢复。真实烟测覆盖 Redis key、Lua 主路径、网关限流，并实际暂停 `ecom-redis` 验证登录降级，最后自动恢复容器、删除 key 与烟测数据。
+自动测试覆盖本地窗口、接口匹配、稳定 `429` 响应、第五次邮箱失败锁定和重置恢复。真实烟测覆盖 Redis key、Lua 主路径、网关限流，并实际暂停 `plainjournal-redis` 验证登录降级，最后自动恢复容器、删除 key 与烟测数据。
+
+M6 活动准入使用不同的失败策略：Gateway Redis 故障仍可使用有界本地限流，但 Marketing 的活动准入门闩必须返回 `503`，不能本地放行或把 Redis 数量当成最终库存。专项验证命令为：
+
+```powershell
+./tools/verify-m6-flash-sale-admission.ps1 -EnableRedisFaultInjection
+```
+
+正式结果见 [M6 第一批：秒杀活动准入基线](46-m6-flash-sale-admission-baseline.md)。

@@ -16,6 +16,7 @@ import com.ecommerce.catalog.application.model.CatalogModels.UpdateProductComman
 import com.ecommerce.catalog.application.model.CatalogModels.UpdateSkuCommand;
 import com.ecommerce.catalog.application.model.CatalogModels.UploadIntent;
 import com.ecommerce.catalog.application.port.ObjectStorage;
+import com.ecommerce.catalog.application.port.ProductDetailCache;
 import com.ecommerce.catalog.domain.ProductStatus;
 import com.ecommerce.catalog.domain.RecordStatus;
 import com.ecommerce.catalog.infrastructure.persistence.entity.BrandEntity;
@@ -29,15 +30,17 @@ import com.ecommerce.catalog.infrastructure.persistence.mapper.ProductMediaMappe
 import com.ecommerce.catalog.infrastructure.persistence.mapper.ProductSkuMapper;
 import com.ecommerce.catalog.infrastructure.persistence.mapper.ProductSpuMapper;
 import com.ecommerce.catalog.infrastructure.storage.MediaStorageProperties;
+import com.ecommerce.platform.common.api.CursorPageResponse;
+import com.ecommerce.platform.common.api.KeysetCursor;
 import com.ecommerce.platform.common.api.PageResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -47,6 +50,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -64,8 +69,10 @@ public class CatalogService {
     private final ProductSkuMapper skuMapper;
     private final ProductMediaMapper mediaMapper;
     private final ObjectStorage objectStorage;
+    private final ProductDetailCache productDetailCache;
+    private final CatalogSearchOutboxService searchOutboxService;
     private final MediaStorageProperties mediaProperties;
-    private final Clock clock;
+    private final TransactionTemplate transactionTemplate;
 
     public CatalogService(
             CategoryMapper categoryMapper,
@@ -74,16 +81,20 @@ public class CatalogService {
             ProductSkuMapper skuMapper,
             ProductMediaMapper mediaMapper,
             ObjectStorage objectStorage,
+            ProductDetailCache productDetailCache,
+            CatalogSearchOutboxService searchOutboxService,
             MediaStorageProperties mediaProperties,
-            Clock clock) {
+            TransactionTemplate transactionTemplate) {
         this.categoryMapper = categoryMapper;
         this.brandMapper = brandMapper;
         this.spuMapper = spuMapper;
         this.skuMapper = skuMapper;
         this.mediaMapper = mediaMapper;
         this.objectStorage = objectStorage;
+        this.productDetailCache = productDetailCache;
+        this.searchOutboxService = searchOutboxService;
         this.mediaProperties = mediaProperties;
-        this.clock = clock;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -111,7 +122,7 @@ public class CatalogService {
         if (parentId != null) {
             requireActiveCategory(parentId);
         }
-        Instant now = clock.instant();
+        Instant now = spuMapper.currentTime();
         CategoryEntity entity = new CategoryEntity();
         entity.setParentId(parentId);
         entity.setName(name);
@@ -127,7 +138,7 @@ public class CatalogService {
 
     @Transactional
     public BrandView createBrand(String name, String slug) {
-        Instant now = clock.instant();
+        Instant now = spuMapper.currentTime();
         BrandEntity entity = new BrandEntity();
         entity.setName(name);
         entity.setSlug(slug);
@@ -145,7 +156,7 @@ public class CatalogService {
         BrandEntity brand = requireActiveBrand(command.brandId());
         validateSkuCommands(command.skus());
 
-        Instant now = clock.instant();
+        Instant now = spuMapper.currentTime();
         ProductSpuEntity spu = new ProductSpuEntity();
         spu.setCategoryId(command.categoryId());
         spu.setBrandId(command.brandId());
@@ -154,6 +165,7 @@ public class CatalogService {
         spu.setDescription(command.description());
         spu.setStatus(ProductStatus.DRAFT.name());
         spu.setVersion(0);
+        spu.setSearchRevision(1L);
         spu.setCreatedAt(now);
         spu.setUpdatedAt(now);
         spuMapper.insert(spu);
@@ -178,19 +190,68 @@ public class CatalogService {
         return productDetail(spu, category, brand, skus, List.of());
     }
 
-    @Transactional(readOnly = true)
     public PageResponse<ProductSummary> listProducts(long page, long size, Long categoryId, String keyword) {
-        LambdaQueryWrapper<ProductSpuEntity> query = new LambdaQueryWrapper<ProductSpuEntity>()
-                .eq(ProductSpuEntity::getStatus, ProductStatus.ACTIVE.name())
-                .eq(categoryId != null, ProductSpuEntity::getCategoryId, categoryId)
-                .like(StringUtils.hasText(keyword), ProductSpuEntity::getTitle, keyword)
-                .orderByDesc(ProductSpuEntity::getCreatedAt);
-        Page<ProductSpuEntity> result = spuMapper.selectPage(Page.of(page, size), query);
-        List<ProductSpuEntity> products = result.getRecords();
-        if (products.isEmpty()) {
-            return new PageResponse<>(List.of(), page, size, result.getTotal());
-        }
+        PageResponse<ProductSummarySnapshot> snapshot = Objects.requireNonNull(
+                transactionTemplate.execute(ignored -> {
+                    LambdaQueryWrapper<ProductSpuEntity> query = new LambdaQueryWrapper<ProductSpuEntity>()
+                            .eq(ProductSpuEntity::getStatus, ProductStatus.ACTIVE.name())
+                            .eq(categoryId != null, ProductSpuEntity::getCategoryId, categoryId)
+                            .like(StringUtils.hasText(keyword), ProductSpuEntity::getTitle, keyword)
+                            .orderByDesc(ProductSpuEntity::getCreatedAt)
+                            .orderByDesc(ProductSpuEntity::getId);
+                    Page<ProductSpuEntity> result = spuMapper.selectPage(Page.of(page, size), query);
+                    return new PageResponse<>(
+                            productSummarySnapshots(result.getRecords()),
+                            page,
+                            size,
+                            result.getTotal());
+                }));
+        return new PageResponse<>(
+                signProductSummaries(snapshot.items()),
+                snapshot.page(),
+                snapshot.size(),
+                snapshot.total());
+    }
 
+    public CursorPageResponse<ProductSummary> listProductsByCursor(
+            int size,
+            Long categoryId,
+            String keyword,
+            String encodedCursor) {
+        CursorPageResponse<ProductSummarySnapshot> snapshot = Objects.requireNonNull(
+                transactionTemplate.execute(ignored -> {
+                    KeysetCursor cursor = decodeCursor(encodedCursor);
+                    String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim() : null;
+                    List<ProductSpuEntity> fetched = spuMapper.selectPublicCursorPage(
+                            categoryId,
+                            normalizedKeyword,
+                            cursor == null ? null : cursor.createdAt(),
+                            cursor == null ? null : cursor.id(),
+                            size + 1);
+                    boolean hasMore = fetched.size() > size;
+                    List<ProductSpuEntity> products = hasMore
+                            ? List.copyOf(fetched.subList(0, size))
+                            : List.copyOf(fetched);
+                    String nextCursor = hasMore
+                            ? new KeysetCursor(
+                                    products.get(products.size() - 1).getCreatedAt(),
+                                    products.get(products.size() - 1).getId()).encode()
+                            : null;
+                    return new CursorPageResponse<>(
+                            productSummarySnapshots(products),
+                            nextCursor,
+                            hasMore);
+                }));
+        return new CursorPageResponse<>(
+                signProductSummaries(snapshot.items()),
+                snapshot.nextCursor(),
+                snapshot.hasMore());
+    }
+
+    private List<ProductSummarySnapshot> productSummarySnapshots(List<ProductSpuEntity> products) {
+        if (products.isEmpty()) {
+            return List.of();
+        }
         Set<Long> productIds = ids(products, ProductSpuEntity::getId);
         Map<Long, CategoryEntity> categories = entitiesById(
                 categoryMapper.selectByIds(ids(products, ProductSpuEntity::getCategoryId)), CategoryEntity::getId);
@@ -207,85 +268,126 @@ public class CatalogService {
                                 .orderByAsc(ProductMediaEntity::getSortOrder, ProductMediaEntity::getId))
                 .stream().collect(Collectors.groupingBy(ProductMediaEntity::getSpuId, LinkedHashMap::new, Collectors.toList()));
 
-        List<ProductSummary> summaries = products.stream().map(product -> {
+        return products.stream().map(product -> {
             List<ProductSkuEntity> skus = skusByProduct.getOrDefault(product.getId(), List.of());
             BigDecimal minimumPrice = skus.stream()
                     .map(ProductSkuEntity::getSalePrice)
                     .min(Comparator.naturalOrder())
                     .orElse(null);
-            String coverUrl = mediaByProduct.getOrDefault(product.getId(), List.of()).stream()
+            String coverObjectKey = mediaByProduct.getOrDefault(product.getId(), List.of()).stream()
                     .findFirst()
                     .map(ProductMediaEntity::getObjectKey)
-                    .map(this::safeDownloadUrl)
                     .orElse(null);
-            return new ProductSummary(
+            return new ProductSummarySnapshot(
                     product.getId(),
                     product.getTitle(),
                     product.getSubtitle(),
                     categoryView(categories.get(product.getCategoryId())),
                     brandView(brands.get(product.getBrandId())),
                     minimumPrice,
-                    coverUrl
+                    coverObjectKey
             );
         }).toList();
-        return new PageResponse<>(summaries, page, size, result.getTotal());
     }
 
-    @Transactional(readOnly = true)
+    public List<ProductSummary> listActiveProductSummaries(List<Long> productIds) {
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+        List<ProductSummarySnapshot> snapshot = Objects.requireNonNull(
+                transactionTemplate.execute(ignored -> {
+                    Map<Long, ProductSpuEntity> activeById = spuMapper.selectByIds(productIds).stream()
+                            .filter(product -> ProductStatus.ACTIVE.name().equals(product.getStatus()))
+                            .collect(Collectors.toMap(ProductSpuEntity::getId, Function.identity()));
+                    List<ProductSpuEntity> ordered = productIds.stream()
+                            .map(activeById::get)
+                            .filter(Objects::nonNull)
+                            .toList();
+                    return productSummarySnapshots(ordered);
+                }));
+        return signProductSummaries(snapshot);
+    }
+
+    private KeysetCursor decodeCursor(String encodedCursor) {
+        if (!StringUtils.hasText(encodedCursor)) {
+            return null;
+        }
+        try {
+            return KeysetCursor.decode(encodedCursor);
+        } catch (IllegalArgumentException exception) {
+            throw new CatalogException(CatalogError.INVALID_CURSOR, exception);
+        }
+    }
+
     public ProductDetail getProduct(Long productId) {
-        ProductSpuEntity spu = spuMapper.selectById(productId);
-        if (spu == null || !ProductStatus.ACTIVE.name().equals(spu.getStatus())) {
-            throw new CatalogException(CatalogError.RESOURCE_NOT_FOUND);
-        }
-        return loadProductDetail(spu);
+        ProductDetail product = productDetailCache.get(
+                        productId,
+                        () -> loadActiveProductDetail(productId))
+                .orElseThrow(() -> new CatalogException(CatalogError.RESOURCE_NOT_FOUND));
+        return signMediaUrls(product);
     }
 
-    @Transactional
     public ProductDetail updateProduct(Long productId, UpdateProductCommand command) {
-        ProductSpuEntity spu = requireProduct(productId);
-        requireVersion(spu.getVersion(), command.expectedVersion());
-        requireActiveCategory(command.categoryId());
-        requireActiveBrand(command.brandId());
-        spu.setCategoryId(command.categoryId());
-        spu.setBrandId(command.brandId());
-        spu.setTitle(command.title());
-        spu.setSubtitle(command.subtitle());
-        spu.setDescription(command.description());
-        spu.setUpdatedAt(clock.instant());
-        requireUpdated(spuMapper.updateById(spu));
-        return loadProductDetail(spuMapper.selectById(productId));
+        ProductDetail product = Objects.requireNonNull(transactionTemplate.execute(ignored -> {
+            ProductSpuEntity spu = requireProduct(productId);
+            requireVersion(spu.getVersion(), command.expectedVersion());
+            requireActiveCategory(command.categoryId());
+            requireActiveBrand(command.brandId());
+            spu.setCategoryId(command.categoryId());
+            spu.setBrandId(command.brandId());
+            spu.setTitle(command.title());
+            spu.setSubtitle(command.subtitle());
+            spu.setDescription(command.description());
+            spu.setUpdatedAt(spuMapper.currentTime());
+            requireUpdated(spuMapper.updateById(spu));
+            searchOutboxService.recordProductChanged(productId);
+            ProductDetail detail = loadProductDetail(spuMapper.selectById(productId));
+            productDetailCache.invalidateAfterCommit(productId);
+            return detail;
+        }));
+        return signMediaUrls(product);
     }
 
-    @Transactional
     public ProductDetail publishProduct(Long productId, int expectedVersion) {
-        ProductSpuEntity spu = requireProduct(productId);
-        requireVersion(spu.getVersion(), expectedVersion);
-        if (ProductStatus.ACTIVE.name().equals(spu.getStatus())) {
-            throw new CatalogException(CatalogError.INVALID_STATE);
-        }
-        Long activeSkuCount = skuMapper.selectCount(new LambdaQueryWrapper<ProductSkuEntity>()
-                .eq(ProductSkuEntity::getSpuId, productId)
-                .eq(ProductSkuEntity::getStatus, RecordStatus.ACTIVE.name()));
-        if (activeSkuCount == 0) {
-            throw new CatalogException(CatalogError.INVALID_STATE);
-        }
-        spu.setStatus(ProductStatus.ACTIVE.name());
-        spu.setUpdatedAt(clock.instant());
-        requireUpdated(spuMapper.updateById(spu));
-        return loadProductDetail(spuMapper.selectById(productId));
+        ProductDetail product = Objects.requireNonNull(transactionTemplate.execute(ignored -> {
+            ProductSpuEntity spu = requireProduct(productId);
+            requireVersion(spu.getVersion(), expectedVersion);
+            if (ProductStatus.ACTIVE.name().equals(spu.getStatus())) {
+                throw new CatalogException(CatalogError.INVALID_STATE);
+            }
+            Long activeSkuCount = skuMapper.selectCount(new LambdaQueryWrapper<ProductSkuEntity>()
+                    .eq(ProductSkuEntity::getSpuId, productId)
+                    .eq(ProductSkuEntity::getStatus, RecordStatus.ACTIVE.name()));
+            if (activeSkuCount == 0) {
+                throw new CatalogException(CatalogError.INVALID_STATE);
+            }
+            spu.setStatus(ProductStatus.ACTIVE.name());
+            spu.setUpdatedAt(spuMapper.currentTime());
+            requireUpdated(spuMapper.updateById(spu));
+            searchOutboxService.recordProductChanged(productId);
+            ProductDetail detail = loadProductDetail(spuMapper.selectById(productId));
+            productDetailCache.invalidateAfterCommit(productId);
+            return detail;
+        }));
+        return signMediaUrls(product);
     }
 
-    @Transactional
     public ProductDetail unpublishProduct(Long productId, int expectedVersion) {
-        ProductSpuEntity spu = requireProduct(productId);
-        requireVersion(spu.getVersion(), expectedVersion);
-        if (!ProductStatus.ACTIVE.name().equals(spu.getStatus())) {
-            throw new CatalogException(CatalogError.INVALID_STATE);
-        }
-        spu.setStatus(ProductStatus.INACTIVE.name());
-        spu.setUpdatedAt(clock.instant());
-        requireUpdated(spuMapper.updateById(spu));
-        return loadProductDetail(spuMapper.selectById(productId));
+        ProductDetail product = Objects.requireNonNull(transactionTemplate.execute(ignored -> {
+            ProductSpuEntity spu = requireProduct(productId);
+            requireVersion(spu.getVersion(), expectedVersion);
+            if (!ProductStatus.ACTIVE.name().equals(spu.getStatus())) {
+                throw new CatalogException(CatalogError.INVALID_STATE);
+            }
+            spu.setStatus(ProductStatus.INACTIVE.name());
+            spu.setUpdatedAt(spuMapper.currentTime());
+            requireUpdated(spuMapper.updateById(spu));
+            searchOutboxService.recordProductChanged(productId);
+            ProductDetail detail = loadProductDetail(spuMapper.selectById(productId));
+            productDetailCache.invalidateAfterCommit(productId);
+            return detail;
+        }));
+        return signMediaUrls(product);
     }
 
     @Transactional
@@ -308,12 +410,14 @@ public class CatalogService {
         sku.setSalePrice(command.salePrice());
         sku.setMarketPrice(command.marketPrice());
         sku.setStatus(status.name());
-        sku.setUpdatedAt(clock.instant());
+        sku.setUpdatedAt(spuMapper.currentTime());
         requireUpdated(skuMapper.updateById(sku));
-        return skuView(skuMapper.selectById(skuId));
+        searchOutboxService.recordProductChanged(productId);
+        SkuView view = skuView(skuMapper.selectById(skuId));
+        productDetailCache.invalidateAfterCommit(productId);
+        return view;
     }
 
-    @Transactional(readOnly = true)
     public UploadIntent createUploadIntent(Long productId, String contentType, long sizeBytes) {
         requireProduct(productId);
         String normalizedType = normalizeMediaType(contentType);
@@ -327,32 +431,50 @@ public class CatalogService {
         return new UploadIntent(objectKey, uploadUrl, mediaProperties.uploadExpiry().toSeconds());
     }
 
-    @Transactional
     public MediaView confirmMedia(Long productId, Long skuId, String objectKey, int sortOrder) {
-        requireProduct(productId);
         if (!objectKey.startsWith("products/" + productId + "/")) {
             throw new CatalogException(CatalogError.INVALID_MEDIA);
         }
-        if (skuId != null) {
-            ProductSkuEntity sku = skuMapper.selectById(skuId);
-            if (sku == null || !productId.equals(sku.getSpuId())) {
-                throw new CatalogException(CatalogError.INVALID_MEDIA);
-            }
-        }
+        requireMediaOwner(productId, skuId);
         ObjectStorage.StoredObject storedObject = objectStorage.stat(mediaProperties.bucket(), objectKey);
         String contentType = normalizeMediaType(storedObject.contentType());
         validateMedia(contentType, storedObject.sizeBytes());
 
-        ProductMediaEntity media = new ProductMediaEntity();
-        media.setSpuId(productId);
-        media.setSkuId(skuId);
-        media.setObjectKey(objectKey);
-        media.setMimeType(contentType);
-        media.setSizeBytes(storedObject.sizeBytes());
-        media.setSortOrder(sortOrder);
-        media.setCreatedAt(clock.instant());
-        mediaMapper.insert(media);
-        return mediaView(media);
+        ProductMediaEntity media = Objects.requireNonNull(transactionTemplate.execute(ignored -> {
+            requireMediaOwner(productId, skuId);
+            ProductMediaEntity candidate = new ProductMediaEntity();
+            candidate.setSpuId(productId);
+            candidate.setSkuId(skuId);
+            candidate.setObjectKey(objectKey);
+            candidate.setMimeType(contentType);
+            candidate.setSizeBytes(storedObject.sizeBytes());
+            candidate.setSortOrder(sortOrder);
+            candidate.setCreatedAt(spuMapper.currentTime());
+            mediaMapper.insert(candidate);
+            searchOutboxService.recordProductChanged(productId);
+            return candidate;
+        }));
+        productDetailCache.invalidateAfterCommit(productId);
+        return signMediaUrl(mediaView(media));
+    }
+
+    private void requireMediaOwner(Long productId, Long skuId) {
+        requireProduct(productId);
+        if (skuId == null) {
+            return;
+        }
+        ProductSkuEntity sku = skuMapper.selectById(skuId);
+        if (sku == null || !productId.equals(sku.getSpuId())) {
+            throw new CatalogException(CatalogError.INVALID_MEDIA);
+        }
+    }
+
+    private Optional<ProductDetail> loadActiveProductDetail(Long productId) {
+        ProductSpuEntity spu = spuMapper.selectById(productId);
+        if (spu == null || !ProductStatus.ACTIVE.name().equals(spu.getStatus())) {
+            return Optional.empty();
+        }
+        return Optional.of(loadProductDetail(spu));
     }
 
     private ProductDetail loadProductDetail(ProductSpuEntity spu) {
@@ -425,9 +547,16 @@ public class CatalogService {
 
     private void validatePrices(BigDecimal salePrice, BigDecimal marketPrice) {
         if (salePrice == null || salePrice.signum() <= 0 ||
-                (marketPrice != null && (marketPrice.signum() <= 0 || marketPrice.compareTo(salePrice) < 0))) {
+                hasMoreThanTwoFractionDigits(salePrice) ||
+                (marketPrice != null && (marketPrice.signum() <= 0
+                        || hasMoreThanTwoFractionDigits(marketPrice)
+                        || marketPrice.compareTo(salePrice) < 0))) {
             throw new CatalogException(CatalogError.INVALID_STATE);
         }
+    }
+
+    private boolean hasMoreThanTwoFractionDigits(BigDecimal amount) {
+        return amount.stripTrailingZeros().scale() > 2;
     }
 
     private void validateMedia(String contentType, long sizeBytes) {
@@ -465,6 +594,45 @@ public class CatalogService {
         }
     }
 
+    private ProductDetail signMediaUrls(ProductDetail product) {
+        return new ProductDetail(
+                product.id(),
+                product.title(),
+                product.subtitle(),
+                product.description(),
+                product.status(),
+                product.version(),
+                product.category(),
+                product.brand(),
+                product.skus(),
+                product.media().stream().map(this::signMediaUrl).toList());
+    }
+
+    private List<ProductSummary> signProductSummaries(List<ProductSummarySnapshot> products) {
+        return products.stream().map(product -> new ProductSummary(
+                product.id(),
+                product.title(),
+                product.subtitle(),
+                product.category(),
+                product.brand(),
+                product.minimumPrice(),
+                product.coverObjectKey() == null
+                        ? null
+                        : safeDownloadUrl(product.coverObjectKey())))
+                .toList();
+    }
+
+    private MediaView signMediaUrl(MediaView media) {
+        return new MediaView(
+                media.id(),
+                media.skuId(),
+                media.objectKey(),
+                media.mimeType(),
+                media.sizeBytes(),
+                media.sortOrder(),
+                safeDownloadUrl(media.objectKey()));
+    }
+
     private void requireVersion(Integer actualVersion, int expectedVersion) {
         if (actualVersion == null || actualVersion != expectedVersion) {
             throw new CatalogException(CatalogError.CONCURRENT_MODIFICATION);
@@ -499,7 +667,7 @@ public class CatalogService {
 
     private MediaView mediaView(ProductMediaEntity media) {
         return new MediaView(media.getId(), media.getSkuId(), media.getObjectKey(), media.getMimeType(),
-                media.getSizeBytes(), media.getSortOrder(), safeDownloadUrl(media.getObjectKey()));
+                media.getSizeBytes(), media.getSortOrder(), null);
     }
 
     private <T> Set<Long> ids(List<T> entities, Function<T, Long> idExtractor) {
@@ -512,5 +680,15 @@ public class CatalogService {
             result.put(idExtractor.apply(entity), entity);
         }
         return result;
+    }
+
+    private record ProductSummarySnapshot(
+            Long id,
+            String title,
+            String subtitle,
+            CategoryView category,
+            BrandView brand,
+            BigDecimal minimumPrice,
+            String coverObjectKey) {
     }
 }

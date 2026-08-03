@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.Locale;
 
 public final class MockCallbackSignature {
 
@@ -17,7 +18,7 @@ public final class MockCallbackSignature {
 
     public static boolean verify(CallbackCommand command, String secret) {
         byte[] expected = sign(command, secret).getBytes(StandardCharsets.US_ASCII);
-        byte[] supplied = command.signature().toLowerCase().getBytes(StandardCharsets.US_ASCII);
+        byte[] supplied = command.signature().toLowerCase(Locale.ROOT).getBytes(StandardCharsets.US_ASCII);
         return MessageDigest.isEqual(expected, supplied);
     }
 
@@ -27,7 +28,7 @@ public final class MockCallbackSignature {
 
     public static boolean verify(RefundCallbackCommand command, String secret) {
         byte[] expected = sign(command, secret).getBytes(StandardCharsets.US_ASCII);
-        byte[] supplied = command.signature().toLowerCase().getBytes(StandardCharsets.US_ASCII);
+        byte[] supplied = command.signature().toLowerCase(Locale.ROOT).getBytes(StandardCharsets.US_ASCII);
         return MessageDigest.isEqual(expected, supplied);
     }
 

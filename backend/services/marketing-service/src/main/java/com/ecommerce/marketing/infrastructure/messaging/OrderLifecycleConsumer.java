@@ -2,6 +2,7 @@ package com.ecommerce.marketing.infrastructure.messaging;
 
 import com.ecommerce.marketing.application.model.OrderLifecycleCommand;
 import com.ecommerce.marketing.application.service.OrderLifecycleHandler;
+import com.ecommerce.platform.common.observability.ConsumerFailureRetryHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -24,7 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @ConditionalOnProperty(prefix = "ecommerce.marketing.order-consumer", name = "enabled", havingValue = "true")
-public class OrderLifecycleConsumer {
+public class OrderLifecycleConsumer implements ConsumerFailureRetryHandler {
 
     private static final Logger log = LoggerFactory.getLogger(OrderLifecycleConsumer.class);
     private static final Set<String> EVENT_TYPES = Set.of("OrderPaid", "OrderCanceled", "OrderClosed");
@@ -32,6 +33,7 @@ public class OrderLifecycleConsumer {
     private final OrderEventConsumerProperties properties;
     private final OrderLifecycleHandler handler;
     private final ObjectMapper objectMapper;
+    private final ConsumerFailureRecorder failureRecorder;
     private final ClientServiceProvider provider = ClientServiceProvider.loadService();
     private final AtomicLong nextWarningAt = new AtomicLong();
     private volatile SimpleConsumer consumer;
@@ -39,10 +41,12 @@ public class OrderLifecycleConsumer {
     public OrderLifecycleConsumer(
             OrderEventConsumerProperties properties,
             OrderLifecycleHandler handler,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ConsumerFailureRecorder failureRecorder) {
         this.properties = properties;
         this.handler = handler;
         this.objectMapper = objectMapper;
+        this.failureRecorder = failureRecorder;
     }
 
     @Scheduled(fixedDelayString = "${ecommerce.marketing.order-consumer.fixed-delay:1000}")
@@ -54,9 +58,23 @@ public class OrderLifecycleConsumer {
                 try {
                     handler.handle(parse(message));
                     active.ack(message);
-                } catch (Exception exception) {
-                    log.warn("Order lifecycle processing failed and will be retried: messageId={}",
+                } catch (IllegalArgumentException exception) {
+                    failureRecorder.recordTerminal(message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    log.error("Order lifecycle payload requires attention: messageId={}",
                             message.getMessageId(), exception);
+                } catch (Exception exception) {
+                    boolean terminal = failureRecorder.record(
+                            message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    if (terminal) {
+                        log.error("Order lifecycle processing exhausted retries: messageId={}",
+                                message.getMessageId(), exception);
+                    } else {
+                        log.warn("Order lifecycle processing failed; durable MySQL retry now owns "
+                                        + "recovery: messageId={}",
+                                message.getMessageId(), exception);
+                    }
                 }
             }
             nextWarningAt.set(0);
@@ -67,7 +85,23 @@ public class OrderLifecycleConsumer {
     }
 
     private OrderLifecycleCommand parse(MessageView message) throws Exception {
-        JsonNode envelope = objectMapper.readTree(readBody(message.getBody()));
+        return parseEnvelope(objectMapper.readTree(readBody(message.getBody())));
+    }
+
+    @Override
+    public String consumerGroup() {
+        return properties.consumerGroup();
+    }
+
+    @Override
+    public void retry(String rawPayload) throws Exception {
+        handler.handle(parseEnvelope(objectMapper.readTree(rawPayload)));
+    }
+
+    private OrderLifecycleCommand parseEnvelope(JsonNode envelope) {
+        if (envelope.path("payloadVersion").asInt(-1) != 1) {
+            throw new IllegalArgumentException("Unsupported order lifecycle payload version");
+        }
         String eventType = requiredText(envelope, "eventType");
         if (!EVENT_TYPES.contains(eventType)) {
             throw new IllegalArgumentException("Unexpected order event type");

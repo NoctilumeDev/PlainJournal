@@ -2,6 +2,7 @@ package com.ecommerce.trade.infrastructure.messaging;
 
 import com.ecommerce.trade.application.model.TradeModels.ReturnStockedCommand;
 import com.ecommerce.trade.application.service.AfterSaleService;
+import com.ecommerce.platform.common.observability.ConsumerFailureRetryHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -24,13 +25,14 @@ import java.util.concurrent.atomic.AtomicLong;
 @Component
 @ConditionalOnProperty(
         prefix = "ecommerce.trade.after-sale-inventory-consumer", name = "enabled", havingValue = "true")
-public class AfterSaleInventoryEventConsumer {
+public class AfterSaleInventoryEventConsumer implements ConsumerFailureRetryHandler {
 
     private static final Logger log = LoggerFactory.getLogger(AfterSaleInventoryEventConsumer.class);
 
     private final AfterSaleInventoryConsumerProperties properties;
     private final AfterSaleService afterSaleService;
     private final ObjectMapper objectMapper;
+    private final ConsumerFailureRecorder failureRecorder;
     private final ClientServiceProvider provider = ClientServiceProvider.loadService();
     private final AtomicLong nextWarningAt = new AtomicLong();
     private volatile SimpleConsumer consumer;
@@ -38,10 +40,12 @@ public class AfterSaleInventoryEventConsumer {
     public AfterSaleInventoryEventConsumer(
             AfterSaleInventoryConsumerProperties properties,
             AfterSaleService afterSaleService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ConsumerFailureRecorder failureRecorder) {
         this.properties = properties;
         this.afterSaleService = afterSaleService;
         this.objectMapper = objectMapper;
+        this.failureRecorder = failureRecorder;
     }
 
     @Scheduled(fixedDelayString = "${ecommerce.trade.after-sale-inventory-consumer.fixed-delay:1000}")
@@ -50,12 +54,32 @@ public class AfterSaleInventoryEventConsumer {
         try {
             active = consumer();
             for (MessageView message : active.receive(properties.batchSize(), properties.invisibleDuration())) {
+                ReturnStockedCommand command;
                 try {
-                    afterSaleService.applyReturnStocked(parse(message));
+                    command = parse(message);
+                } catch (Exception exception) {
+                    failureRecorder.recordTerminal(message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    log.error("After-sale inventory payload requires attention: messageId={}",
+                            message.getMessageId(), exception);
+                    continue;
+                }
+                try {
+                    afterSaleService.applyReturnStocked(command);
+                    failureRecorder.markRecovered(message, properties.consumerGroup());
                     active.ack(message);
                 } catch (Exception exception) {
-                    log.warn("After-sale inventory event failed and will be retried: messageId={}",
-                            message.getMessageId(), exception);
+                    boolean terminal = failureRecorder.record(
+                            message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    if (terminal) {
+                        log.error("After-sale inventory event moved to the local compensation queue: messageId={}",
+                                message.getMessageId(), exception);
+                    } else {
+                        log.warn("After-sale inventory event failed; durable MySQL retry now owns "
+                                        + "recovery: messageId={}",
+                                message.getMessageId(), exception);
+                    }
                 }
             }
             nextWarningAt.set(0);
@@ -66,7 +90,24 @@ public class AfterSaleInventoryEventConsumer {
     }
 
     private ReturnStockedCommand parse(MessageView message) throws Exception {
-        JsonNode envelope = objectMapper.readTree(readBody(message.getBody()));
+        return parseEnvelope(objectMapper.readTree(readBody(message.getBody())));
+    }
+
+    @Override
+    public String consumerGroup() {
+        return properties.consumerGroup();
+    }
+
+    @Override
+    public void retry(String rawPayload) throws Exception {
+        afterSaleService.applyReturnStocked(
+                parseEnvelope(objectMapper.readTree(rawPayload)));
+    }
+
+    private ReturnStockedCommand parseEnvelope(JsonNode envelope) {
+        if (envelope.path("payloadVersion").asInt(-1) != 1) {
+            throw new IllegalArgumentException("Unsupported ReturnStocked payload version");
+        }
         if (!"ReturnStocked".equals(envelope.path("eventType").asText())) {
             throw new IllegalArgumentException("Unexpected inventory return event type");
         }

@@ -20,11 +20,11 @@ $env:MINIO_HOST = '127.0.0.1'
 $env:ROCKETMQ_HOST = '127.0.0.1'
 
 $requiredContainers = @(
-    'ecom-mysql',
-    'ecom-redis',
-    'ecom-nacos',
-    'ecom-rocketmq-broker',
-    'ecom-minio'
+    'plainjournal-mysql',
+    'plainjournal-redis',
+    'plainjournal-nacos',
+    'plainjournal-rocketmq-broker',
+    'plainjournal-minio'
 )
 
 foreach ($container in $requiredContainers) {

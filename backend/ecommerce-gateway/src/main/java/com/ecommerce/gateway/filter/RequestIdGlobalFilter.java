@@ -29,10 +29,10 @@ public class RequestIdGlobalFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return Ordered.HIGHEST_PRECEDENCE;
+        return HIGHEST_PRECEDENCE;
     }
 
-    private String resolveRequestId(String candidate) {
+    public static String resolveRequestId(String candidate) {
         if (candidate != null && VALID_REQUEST_ID.matcher(candidate).matches()) {
             return candidate;
         }

@@ -1,10 +1,43 @@
 ecommerce:
   foundation:
     configuration-source: nacos
+  messaging:
+    consumer-failure-retry:
+      scheduler: marketingControlScheduler
   security:
     token:
       issuer: ecommerce-identity
   marketing:
+    scheduling:
+      default-pool-size: 2
+      outbox-pool-size: 1
+      control-pool-size: 1
+      shutdown-await: 10s
+    flash-sale:
+      namespace: ${APP_ENV:local}
+      redis-enabled: true
+      result-retention: 24h
+      processing-timeout: 2m
+      timeout-scan-delay: 5000
+      timeout-scan-batch-size: 100
+    flash-sale-outbox:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-flash-sale-events
+      fixed-delay: 500
+      retry-delay: 2s
+      batch-size: 100
+      publisher-id: ${MARKETING_FLASH_SALE_OUTBOX_PUBLISHER_ID:${random.uuid}}
+      lease-duration: 30s
+    flash-sale-result-consumer:
+      enabled: true
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-flash-sale-events
+      consumer-group: marketing-flash-sale-result-v1
+      fixed-delay: 500
+      batch-size: 32
+      invisible-duration: 30s
+      await-duration: 5s
     order-consumer:
       enabled: true
       endpoints: 127.0.0.1:18082

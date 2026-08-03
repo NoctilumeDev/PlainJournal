@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 @Validated
-@ConfigurationProperties("ecommerce.security.internal")
+@ConfigurationProperties("ecommerce.clients.internal")
 public record InternalClientProperties(
         @NotBlank @Size(min = 32) String token,
         @NotBlank String caller

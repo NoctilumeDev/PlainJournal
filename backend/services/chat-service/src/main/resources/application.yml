@@ -1,0 +1,176 @@
+server:
+  port: ${CHAT_SERVICE_PORT:18108}
+  shutdown: ${SERVER_SHUTDOWN:graceful}
+
+spring:
+  application:
+    name: chat-service
+  lifecycle:
+    timeout-per-shutdown-phase: ${SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE:20s}
+  config:
+    import:
+      - optional:nacos:chat-service.yml?group=ECOMMERCE&refreshEnabled=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_HOST:127.0.0.1}:${NACOS_CLIENT_PORT:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_ADMIN_PASSWORD:}
+      discovery:
+        group: ECOMMERCE
+        ip: ${SERVICE_IP:127.0.0.1}
+        metadata:
+          instance-id: ${SERVICE_INSTANCE_ID:local}
+          release-id: ${SERVICE_RELEASE_ID:local}
+      config:
+        group: ECOMMERCE
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${CHAT_DB_NAME:ecom_chat}?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${CHAT_DB_USER:ecom_chat_app}
+    password: ${CHAT_DB_PASSWORD:}
+    hikari:
+      connection-timeout: 5000
+      maximum-pool-size: 10
+      minimum-idle: 1
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+      connect-timeout: 2s
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: assign_id
+
+ecommerce:
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: ${CHAT_CONSUMER_FAILURE_MAX_DELIVERY_ATTEMPTS:16}
+  security:
+    token:
+      secret: ${IDENTITY_JWT_SECRET:}
+      issuer: ecommerce-identity
+    metrics:
+      token: ${METRICS_SCRAPE_TOKEN:}
+  chat:
+    consumer-failure-retry:
+      initial-delay: ${CHAT_CONSUMER_FAILURE_RETRY_INITIAL_DELAY:2000}
+      fixed-delay: ${CHAT_CONSUMER_FAILURE_RETRY_FIXED_DELAY:1000}
+      retry-delay: ${CHAT_CONSUMER_FAILURE_RETRY_DELAY:15s}
+      batch-size: ${CHAT_CONSUMER_FAILURE_RETRY_BATCH_SIZE:20}
+      worker-id: ${SERVICE_INSTANCE_ID:chat-local}
+      lease-duration: ${CHAT_CONSUMER_FAILURE_RETRY_LEASE_DURATION:30s}
+    websocket-ticket:
+      enabled: ${CHAT_WEBSOCKET_TICKET_ENABLED:true}
+      namespace: ${APP_ENV:local}
+      ttl: ${CHAT_WEBSOCKET_TICKET_TTL:30s}
+      target-path: /ws/chat
+      entropy-bytes: ${CHAT_WEBSOCKET_TICKET_ENTROPY_BYTES:32}
+    attachments:
+      namespace: ${APP_ENV:local}
+      endpoint: ${MINIO_ENDPOINT:http://127.0.0.1:19000}
+      username: ${MINIO_ROOT_USER:}
+      password: ${MINIO_ROOT_PASSWORD:}
+      bucket: chat-attachments
+      upload-expiry: ${CHAT_ATTACHMENT_UPLOAD_EXPIRY:10m}
+      download-expiry: ${CHAT_ATTACHMENT_DOWNLOAD_EXPIRY:5m}
+      intent-ttl: ${CHAT_ATTACHMENT_INTENT_TTL:30m}
+      maximum-size: ${CHAT_ATTACHMENT_MAXIMUM_SIZE:10MB}
+      inspection-bytes: ${CHAT_ATTACHMENT_INSPECTION_BYTES:1024}
+      cleanup-enabled: ${CHAT_ATTACHMENT_CLEANUP_ENABLED:true}
+      cleanup-initial-delay: ${CHAT_ATTACHMENT_CLEANUP_INITIAL_DELAY:30000}
+      cleanup-fixed-delay: ${CHAT_ATTACHMENT_CLEANUP_FIXED_DELAY:30000}
+      cleanup-batch-size: ${CHAT_ATTACHMENT_CLEANUP_BATCH_SIZE:20}
+      cleanup-recovery-age: ${CHAT_ATTACHMENT_CLEANUP_RECOVERY_AGE:5m}
+      scan:
+        enabled: ${CHAT_ATTACHMENT_SCAN_ENABLED:true}
+        host: ${CLAMAV_HOST:127.0.0.1}
+        port: ${CLAMAV_PORT:13310}
+        connect-timeout: ${CHAT_ATTACHMENT_SCAN_CONNECT_TIMEOUT:2s}
+        read-timeout: ${CHAT_ATTACHMENT_SCAN_READ_TIMEOUT:30s}
+        initial-delay: ${CHAT_ATTACHMENT_SCAN_INITIAL_DELAY:5000}
+        fixed-delay: ${CHAT_ATTACHMENT_SCAN_FIXED_DELAY:2000}
+        batch-size: ${CHAT_ATTACHMENT_SCAN_BATCH_SIZE:5}
+        lease-duration: ${CHAT_ATTACHMENT_SCAN_LEASE_DURATION:45s}
+        maximum-attempts: ${CHAT_ATTACHMENT_SCAN_MAXIMUM_ATTEMPTS:5}
+        scanner-id: ${SERVICE_INSTANCE_ID:chat-local}
+        maximum-response-bytes: ${CHAT_ATTACHMENT_SCAN_MAXIMUM_RESPONSE_BYTES:4096}
+    outbox:
+      enabled: ${CHAT_OUTBOX_ENABLED:true}
+      endpoints: ${ROCKETMQ_ENDPOINTS:127.0.0.1:18082}
+      topic: ecommerce-chat-events
+      initial-delay: ${CHAT_OUTBOX_INITIAL_DELAY:2000}
+      fixed-delay: ${CHAT_OUTBOX_FIXED_DELAY:1000}
+      retry-delay: ${CHAT_OUTBOX_RETRY_DELAY:5s}
+      batch-size: ${CHAT_OUTBOX_BATCH_SIZE:50}
+      publisher-id: ${SERVICE_INSTANCE_ID:chat-local}
+      lease-duration: ${CHAT_OUTBOX_LEASE_DURATION:30s}
+    realtime:
+      enabled: ${CHAT_REALTIME_ENABLED:true}
+      allowed-origins: ${CHAT_REALTIME_ALLOWED_ORIGINS:http://127.0.0.1:18200,http://127.0.0.1:18201,http://localhost:18200,http://localhost:18201}
+      namespace: ${APP_ENV:local}
+      node-id: ${SERVICE_INSTANCE_ID:chat-local}
+      endpoints: ${ROCKETMQ_ENDPOINTS:127.0.0.1:18082}
+      source-topic: ecommerce-chat-events
+      delivery-topic: ecommerce-chat-delivery-events
+      dispatcher-consumer-group: ${CHAT_DISPATCHER_CONSUMER_GROUP:ecommerce-chat-dispatcher}
+      delivery-consumer-group-prefix: ${CHAT_DELIVERY_CONSUMER_GROUP_PREFIX:ecommerce-chat-delivery}
+      initial-delay: ${CHAT_REALTIME_INITIAL_DELAY:2000}
+      fixed-delay: ${CHAT_REALTIME_FIXED_DELAY:500}
+      await-duration: ${CHAT_REALTIME_AWAIT_DURATION:5s}
+      invisible-duration: ${CHAT_REALTIME_INVISIBLE_DURATION:15s}
+      batch-size: ${CHAT_REALTIME_BATCH_SIZE:20}
+      presence-ttl: ${CHAT_PRESENCE_TTL:12s}
+      refresh-interval: ${CHAT_PRESENCE_REFRESH_INTERVAL:4s}
+      offline-replay-batch-size: ${CHAT_OFFLINE_REPLAY_BATCH_SIZE:100}
+
+management:
+  tracing:
+    enabled: true
+    baggage:
+      enabled: false
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+    propagation:
+      type: W3C
+  otlp:
+    tracing:
+      export:
+        enabled: ${OTLP_TRACING_EXPORT_ENABLED:false}
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://127.0.0.1:14318/v1/traces}
+      transport: http
+      connect-timeout: 1s
+      timeout: 3s
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,consumerfailures
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
+  level:
+    com.alibaba.nacos: warn

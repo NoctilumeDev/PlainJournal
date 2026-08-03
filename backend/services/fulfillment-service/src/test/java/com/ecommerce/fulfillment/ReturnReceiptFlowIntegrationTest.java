@@ -4,6 +4,8 @@ import com.ecommerce.fulfillment.application.model.FulfillmentModels.AfterSaleAp
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.AfterSaleApprovedItem;
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.ReturnReceiptView;
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.SubmitReturnShipmentCommand;
+import com.ecommerce.fulfillment.application.exception.FulfillmentError;
+import com.ecommerce.fulfillment.application.exception.FulfillmentException;
 import com.ecommerce.fulfillment.application.service.ReturnReceiptService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -21,6 +23,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -79,6 +82,50 @@ class ReturnReceiptFlowIntegrationTest {
                 .isEqualTo(2);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM consumed_event", Integer.class))
                 .isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT CHAR_LENGTH(payload_fingerprint) FROM consumed_event", Integer.class))
+                .isEqualTo(64);
+    }
+
+    @Test
+    void rejectsApprovalEventIdReuseWithDifferentPayload() {
+        AfterSaleApprovedCommand original = approvedCommand();
+        returnReceiptService.createFromAfterSaleApproved(original);
+
+        AfterSaleApprovedCommand changed = new AfterSaleApprovedCommand(
+                original.eventId(),
+                original.afterSaleNo(),
+                original.orderNo(),
+                original.userId(),
+                original.warehouseId(),
+                original.reservationNo(),
+                new BigDecimal("36.00"),
+                List.of(
+                        new AfterSaleApprovedItem(1, 101L, 1, new BigDecimal("19.00")),
+                        new AfterSaleApprovedItem(2, 102L, 1, new BigDecimal("17.00"))));
+        assertThatThrownBy(() -> returnReceiptService.createFromAfterSaleApproved(changed))
+                .isInstanceOf(FulfillmentException.class)
+                .satisfies(error -> assertThat(((FulfillmentException) error).error())
+                        .isEqualTo(FulfillmentError.IDEMPOTENCY_CONFLICT));
+
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM return_receipt", Integer.class))
+                .isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM return_item", Integer.class))
+                .isEqualTo(2);
+    }
+
+    @Test
+    void rejectsUnverifiableLegacyApprovalEventIdentity() {
+        AfterSaleApprovedCommand command = approvedCommand();
+        returnReceiptService.createFromAfterSaleApproved(command);
+        jdbcTemplate.update(
+                "UPDATE consumed_event SET payload_fingerprint = NULL WHERE event_id = ?",
+                command.eventId());
+
+        assertThatThrownBy(() -> returnReceiptService.createFromAfterSaleApproved(command))
+                .isInstanceOf(FulfillmentException.class)
+                .satisfies(error -> assertThat(((FulfillmentException) error).error())
+                        .isEqualTo(FulfillmentError.IDEMPOTENCY_CONFLICT));
     }
 
     @Test

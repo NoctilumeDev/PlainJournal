@@ -1,0 +1,53 @@
+ecommerce:
+  foundation:
+    configuration-source: nacos
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: 16
+  security:
+    token:
+      issuer: ecommerce-identity
+  chat:
+    consumer-failure-retry:
+      initial-delay: 2000
+      fixed-delay: 1000
+      retry-delay: 15s
+      batch-size: 20
+      lease-duration: 30s
+    websocket-ticket:
+      enabled: true
+      ttl: 30s
+      target-path: /ws/chat
+      entropy-bytes: 32
+    attachments:
+      bucket: chat-attachments
+      upload-expiry: 10m
+      download-expiry: 5m
+      intent-ttl: 30m
+      maximum-size: 10MB
+      inspection-bytes: 1024
+      cleanup-enabled: true
+      cleanup-initial-delay: 30000
+      cleanup-fixed-delay: 30000
+      cleanup-batch-size: 20
+      cleanup-recovery-age: 5m
+      scan:
+        enabled: true
+        connect-timeout: 2s
+        read-timeout: 30s
+        initial-delay: 5000
+        fixed-delay: 2000
+        batch-size: 5
+        lease-duration: 45s
+        maximum-attempts: 5
+        maximum-response-bytes: 4096
+    outbox:
+      topic: ecommerce-chat-events
+    realtime:
+      allowed-origins:
+        - http://127.0.0.1:18200
+        - http://127.0.0.1:18201
+        - http://localhost:18200
+        - http://localhost:18201
+      source-topic: ecommerce-chat-events
+      delivery-topic: ecommerce-chat-delivery-events

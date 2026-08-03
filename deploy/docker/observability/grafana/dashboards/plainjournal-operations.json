@@ -1,0 +1,155 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showPercentChange": false, "textMode": "auto", "wideLayout": true},
+      "targets": [{"expr": "up{job=\"plainjournal-backend\"}", "legendFormat": "{{service}}", "refId": "A"}],
+      "title": "Operational service scrape status",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "id": 2,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "ecommerce_outbox_pending_events", "legendFormat": "{{service}}", "refId": "A"}],
+      "title": "Outbox unpublished events",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+      "id": 3,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "ecommerce_outbox_oldest_age_seconds", "legendFormat": "{{service}}", "refId": "A"}],
+      "title": "Oldest unpublished Outbox event",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+      "id": 4,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "ecommerce_consumer_failure_active_events", "legendFormat": "{{service}} / {{status}}", "refId": "A"}],
+      "title": "Active consumer failures",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+      "id": 5,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "ecommerce_consumer_failure_oldest_age_seconds", "legendFormat": "{{service}}", "refId": "A"}],
+      "title": "Oldest active consumer failure",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 21},
+      "id": 6,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "ecommerce_business_process_active_processes", "legendFormat": "{{service}} / {{domain}} / {{status}}", "refId": "A"}],
+      "title": "Active business processes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 21},
+      "id": 7,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "ecommerce_business_process_oldest_age_seconds", "legendFormat": "{{service}} / {{domain}} / {{status}}", "refId": "A"}],
+      "title": "Oldest active business process",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 30},
+      "id": 8,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (service, outcome) (rate(ecommerce_outbox_publications_total[5m]))", "legendFormat": "{{service}} / {{outcome}}", "refId": "A"}],
+      "title": "Outbox publication outcomes per second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 24, "x": 0, "y": 38},
+      "id": 9,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showPercentChange": false, "textMode": "auto", "wideLayout": true},
+      "targets": [{"expr": "ecommerce_reconciliation_issue_open", "legendFormat": "{{service}}", "refId": "A"}],
+      "title": "Open owner-domain reconciliation issues",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 43},
+      "id": 10,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showPercentChange": false, "textMode": "auto", "wideLayout": true},
+      "targets": [{"expr": "resilience4j_circuitbreaker_state{name=~\"paymentTradePaymentContext|tradeMarketingPricingLock\",state=~\"open|half_open\"}", "legendFormat": "{{name}} {{state}}", "refId": "A"}],
+      "title": "Governed synchronous circuit states",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 43},
+      "id": 11,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (service, dependency, guard) (rate(ecommerce_http_client_resilience_rejections_total[5m]))", "legendFormat": "{{service}} -> {{dependency}} {{guard}}", "refId": "A"}],
+      "title": "Synchronous resilience rejections",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 49},
+      "id": 12,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "ecommerce_task_scheduler_completion_age_seconds{service=\"trade-service\",task=\"order_recovery\"}", "legendFormat": "seconds since completion", "refId": "A"}],
+      "title": "Trade order-recovery completion age",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "plainjournal-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 49},
+      "id": 13,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"expr": "executor_active_threads{name=\"tradeOrderRecoveryScheduler\"}", "legendFormat": "active", "refId": "A"},
+        {"expr": "executor_queued_tasks{name=\"tradeOrderRecoveryScheduler\"}", "legendFormat": "queued", "refId": "B"},
+        {"expr": "executor_pool_size_threads{name=\"tradeOrderRecoveryScheduler\"}", "legendFormat": "pool size", "refId": "C"}
+      ],
+      "title": "Trade order-recovery scheduler saturation",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 41,
+  "tags": ["plainjournal", "operations"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "PlainJournal Operations",
+  "uid": "plainjournal-operations",
+  "version": 1,
+  "weekStart": ""
+}

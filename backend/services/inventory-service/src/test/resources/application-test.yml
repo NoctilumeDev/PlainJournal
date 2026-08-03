@@ -3,7 +3,7 @@ server:
 
 spring:
   config:
-    import: "optional:nacos:"
+    import: []
   cloud:
     nacos:
       discovery:
@@ -28,11 +28,17 @@ ecommerce:
     token:
       secret: test-only-inventory-jwt-secret-with-at-least-32-characters
       issuer: ecommerce-identity-test
+    metrics:
+      token: test-only-metrics-scrape-token-with-at-least-32-characters
     internal:
-      token: test-internal-service-token-1234567890
+      token: test-trade-internal-token-with-at-least-32-characters
       allowed-callers:
         - trade-service
   inventory:
+    scheduling:
+      default-pool-size: 2
+      outbox-pool-size: 1
+      shutdown-await: 5s
     reservation:
       default-ttl: 30m
       expiry-enabled: false
@@ -45,12 +51,43 @@ ecommerce:
       fixed-delay: 2000
       retry-delay: 5s
       batch-size: 50
+      parallelism: 2
+      publisher-id: inventory-test
+      lease-duration: 30s
+      shutdown-await: 5s
     order-consumer:
       enabled: false
     return-consumer:
       enabled: false
+    reconciliation:
+      enabled: false
+      fixed-delay: 10000
+      initial-delay: 10000
+      scan-limit: 500
 
 logging:
   level:
     root: warn
     com.alibaba.nacos: error
+
+management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+          - consumerfailures
+  endpoint:
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only

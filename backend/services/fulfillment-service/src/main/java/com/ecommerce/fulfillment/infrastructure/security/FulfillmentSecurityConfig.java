@@ -1,6 +1,8 @@
 package com.ecommerce.fulfillment.infrastructure.security;
 
 import com.ecommerce.platform.common.api.ApiResponse;
+import com.ecommerce.platform.common.security.MetricsScrapeAuthenticationFilter;
+import com.ecommerce.platform.common.security.MetricsScrapeProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +20,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -25,7 +28,7 @@ import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(FulfillmentTokenProperties.class)
+@EnableConfigurationProperties({FulfillmentTokenProperties.class, MetricsScrapeProperties.class})
 public class FulfillmentSecurityConfig {
 
     @Bean
@@ -47,7 +50,8 @@ public class FulfillmentSecurityConfig {
     @Bean
     public SecurityFilterChain fulfillmentSecurityFilterChain(
             HttpSecurity http,
-            ObjectMapper objectMapper) throws Exception {
+            ObjectMapper objectMapper,
+            MetricsScrapeProperties metricsScrapeProperties) throws Exception {
         JwtGrantedAuthoritiesConverter authorities = new JwtGrantedAuthoritiesConverter();
         authorities.setAuthoritiesClaimName("roles");
         authorities.setAuthorityPrefix("ROLE_");
@@ -62,8 +66,18 @@ public class FulfillmentSecurityConfig {
                         .requestMatchers(
                                 "/api/v1/fulfillment/status",
                                 "/actuator/health",
+                                "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
+                        .requestMatchers("/actuator/prometheus").hasAnyRole("ADMIN", "METRICS")
+                        .requestMatchers(
+                                "/actuator/metrics", "/actuator/metrics/**",
+                                "/actuator/consumerfailures", "/actuator/consumerfailures/**"
+                        ).hasRole("ADMIN")
+                        .requestMatchers("/api/v1/fulfillment/admin/reconciliation/**").hasRole("ADMIN")
+                        .requestMatchers(
+                                "/api/v1/fulfillment/admin/orders/*/exception/resolve"
+                        ).hasRole("ADMIN")
                         .requestMatchers("/api/v1/fulfillment/admin/**").hasAnyRole("ADMIN", "WAREHOUSE")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer
@@ -81,6 +95,9 @@ public class FulfillmentSecurityConfig {
                             objectMapper.writeValue(response.getOutputStream(),
                                     ApiResponse.failure("FORBIDDEN", "Access is denied"));
                         }));
+        http.addFilterBefore(
+                new MetricsScrapeAuthenticationFilter(metricsScrapeProperties),
+                BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 }

@@ -1,0 +1,30 @@
+{
+  "name": "@plain-journal/storefront-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 18200",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@plain-journal/design-system": "workspace:*",
+    "@plain-journal/foundation": "workspace:*",
+    "@plain-journal/ui": "workspace:*",
+    "pinia": "4.0.2",
+    "vue": "3.5.40",
+    "vue-router": "5.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.8",
+    "@vue/test-utils": "2.4.11",
+    "jsdom": "29.1.1",
+    "typescript": "6.0.3",
+    "vite": "8.1.5",
+    "vitest": "4.1.10",
+    "vue-tsc": "3.3.7"
+  }
+}

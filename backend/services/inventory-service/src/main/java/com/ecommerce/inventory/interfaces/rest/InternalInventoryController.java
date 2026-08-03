@@ -5,7 +5,6 @@ import com.ecommerce.inventory.application.model.InventoryModels.ReservationView
 import com.ecommerce.inventory.application.model.InventoryModels.ReserveInventoryCommand;
 import com.ecommerce.inventory.application.model.InventoryModels.WarehouseView;
 import com.ecommerce.inventory.application.service.InventoryService;
-import com.ecommerce.inventory.infrastructure.config.ReservationProperties;
 import com.ecommerce.platform.common.api.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Future;
@@ -23,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
@@ -34,28 +32,18 @@ public class InternalInventoryController {
     private static final String BUSINESS_NO_PATTERN = "[A-Za-z0-9._:-]+";
 
     private final InventoryService inventoryService;
-    private final ReservationProperties reservationProperties;
-    private final Clock clock;
 
-    public InternalInventoryController(
-            InventoryService inventoryService,
-            ReservationProperties reservationProperties,
-            Clock clock) {
+    public InternalInventoryController(InventoryService inventoryService) {
         this.inventoryService = inventoryService;
-        this.reservationProperties = reservationProperties;
-        this.clock = clock;
     }
 
     @PostMapping("/reservations")
     public ApiResponse<ReservationView> reserve(@Valid @RequestBody ReserveRequest request) {
-        Instant expiresAt = request.expiresAt() != null
-                ? request.expiresAt()
-                : clock.instant().plus(reservationProperties.defaultTtl());
         List<ReservationLineCommand> items = request.items().stream()
                 .map(item -> new ReservationLineCommand(item.skuId(), item.quantity()))
                 .toList();
         return ApiResponse.success(inventoryService.reserve(new ReserveInventoryCommand(
-                request.reservationNo(), request.orderNo(), request.warehouseId(), expiresAt, items)));
+                request.reservationNo(), request.orderNo(), request.warehouseId(), request.expiresAt(), items)));
     }
 
     @GetMapping("/warehouses/{code}")
@@ -92,7 +80,7 @@ public class InternalInventoryController {
             @NotBlank @Size(max = 64) @Pattern(regexp = BUSINESS_NO_PATTERN) String reservationNo,
             @NotBlank @Size(max = 64) @Pattern(regexp = BUSINESS_NO_PATTERN) String orderNo,
             @NotNull @Positive Long warehouseId,
-            @Future Instant expiresAt,
+            @NotNull @Future Instant expiresAt,
             @NotEmpty @Size(max = 100) List<@Valid ReserveItemRequest> items
     ) {
     }

@@ -6,11 +6,13 @@
 | --- | --- | --- |
 | JDK | 17.0.12 LTS | 固定，可用于 Spring Boot 3 |
 | Maven | 3.9.11 | 固定 |
-| Git | 2.53.0 | 固定 |
-| Node.js | 18.20.8 | 仅保留旧项目；新前端启动前升级 |
-| pnpm | 11.7.0 | 可用，需配合新 Node 验证 |
+| Git | 2.53.0.windows.2 | 固定 |
+| Node.js | 24.14.0 | M4/M5.5 前端与容量工具已验证 |
+| pnpm | 11.9.0 | M4/M5.5 workspace 已验证 |
 | Docker Engine | 29.6.1 | 已验证 |
 | Docker Compose | 5.3.0 | 已验证 |
+
+Node.js 永久机器配置为 `NODE_HOME=D:\Node.js\current`，Machine PATH 只包含 `D:\Node.js\current`，该 Junction 指向 `node-v24.14.0-win-x64`；没有第二个 `NODEJS_HOME`。2026-07-22 当前 Codex 进程已解析到 `D:\Node.js\current\node.exe` 24.14.0，pnpm 用户级 shim 使用同一 PATH 中的 Node，不需要下载第三份 Node 或叠加新的全局变量。
 
 ## 2. 已运行的中间件
 
@@ -23,6 +25,36 @@
 | MinIO | `RELEASE.2025-06-13T11-33-47Z` | 商品、聊天、物流和售后文件 |
 
 以上版本已在本机完成启动和功能检查，配置见 `deploy/docker`。
+
+按需观测 profile 使用以下固定版本，不作为交易服务常驻依赖：
+
+| 组件 | 版本/镜像 | 用途 |
+| --- | --- | --- |
+| Prometheus | 3.12.0 | 安全拉取五个核心服务指标、7 天本地保留、规则计算 |
+| Alertmanager | 0.32.1 | 本地告警分组、去重、静默和状态展示 |
+| Grafana | 13.1.0 | 自动配置 Prometheus/Tempo 数据源与运维看板 |
+| Tempo | 2.10.5 | OTLP/HTTP trace 接收、查询与 24 小时本地保留 |
+
+Prometheus 与 Alertmanager 配置已分别通过同版本官方 `promtool` 和 `amtool` 校验；完整容器采集由 `verify-observability.ps1` 验证，不能以配置校验代替运行证据。
+
+按需附件安全 profile：
+
+| 组件 | 版本/镜像 | 用途 |
+| --- | --- | --- |
+| ClamAV | `clamav/clamav:1.5.3-debian13-slim` | M8.7 私有附件隔离区的流式恶意文件扫描、真实 EICAR 与停机恢复验证 |
+
+ClamAV 使用 `m8-malware-scan` Profile，3 GiB 内存上限，不属于七个核心中间件常驻
+基线。病毒库保存在仓库外的中间件数据目录。
+
+按需商品搜索 profile：
+
+| 组件 | 版本/镜像 | 用途 |
+| --- | --- | --- |
+| OpenSearch | `public.ecr.aws/opensearchproject/opensearch:3.7.0` | M8.11 Catalog 可重建商品搜索投影、蓝绿重建、故障降级和版本对账 |
+
+OpenSearch 使用 `m8-search` Profile、512 MiB 堆和 1408 MiB 容器上限，不属于七个
+核心中间件常驻基线。Catalog 使用 JDK `HttpClient` 调用 HTTP API，没有额外绑定
+OpenSearch Java SDK。
 
 ## 3. 已冻结应用基线
 
@@ -38,25 +70,31 @@
 | MinIO Java SDK | 9.0.3 | 已按 9.x API 完成上传和签名 URL 验证 |
 | Spring Security | 由 Boot BOM 管理 | 不手工覆盖版本 |
 | Resilience4j | 由兼容 BOM/Starter 管理 | 超时、隔离、熔断，不用于掩盖业务错误 |
+| Micrometer Tracing / OpenTelemetry bridge | 由 Boot BOM 管理 | W3C 传播与 OTLP 导出；只保留一个 bridge，不绑定第二套 SDK |
 | springdoc-openapi | 与 Boot 3 匹配的稳定版 | 生成服务 OpenAPI 文档 |
 | Testcontainers | 由 BOM 管理 | MySQL、Redis、RocketMQ 集成测试 |
 
 RocketMQ Spring Starter 2.3.6 可以完成收发，但在 Spring Boot 3.5 下会产生 BeanPostProcessor 提前初始化告警。本项目不依赖其注解编程模型，因此采用直接 Java Client + 自有基础设施适配层，边界更清楚。
 
-## 4. 前端候选基线
+## 4. 已冻结前端基线
 
-| 技术 | 目标 |
-| --- | --- |
-| Node.js | 22.x LTS 候选，替换当前 Node 18 |
-| Vue | Vue 3 + TypeScript |
-| 构建工具 | Vite，精确版本随 Node 一起验证 |
-| 状态管理 | Pinia |
-| 路由 | Vue Router |
-| UI | Element Plus，业务主题轻量定制 |
-| 请求层 | Axios 或基于 OpenAPI 生成的类型化客户端 |
-| 测试 | Vitest + Vue Test Utils + Playwright |
+| 技术 | 当前版本/方案 | 边界 |
+| --- | --- | --- |
+| Node.js | 24.14.0 | 工程最低要求 22.12.0 |
+| pnpm | 11.9.0 | workspace 包管理器 |
+| Vue | 3.5.40 | 顾客端与管理端 |
+| Vue Router | 5.2.0 | URL 状态与刷新恢复 |
+| Pinia | 4.0.2 | 会话、购物袋、地址、订单、支付、履约、售后与结果未知状态 |
+| Vite | 8.1.5 | 两端 CSR 构建 |
+| TypeScript | 6.0.3 | `vue-tsc 3.3.7` 暂不兼容 TypeScript 7 包导出；启用未使用符号门禁 |
+| Vitest | 4.1.10 | 单元与组件测试 |
+| Vue Test Utils | 2.4.11 | 顾客端组件测试 |
+| Playwright | 1.61.1 | 两端关键浏览器流程、路由恢复与 axe 检查 |
+| axe-core/playwright | 4.12.1 | serious / critical 可访问性门禁 |
+| 请求层 | 原生 `fetch` + 自有类型化 API 客户端 | 不引入 Axios 双实现 |
+| UI | 自有设计令牌与语义组件 | 不引入 Element Plus，不继承旧项目视觉 |
 
-后台重点是效率和信息密度；商城前台贴合电商主题即可，不复用“暗室藏书”的沉浸式设计成本。
+Playwright 自动化 E2E 已纳入 `pnpm check`，当前覆盖顾客主题/权益/售后/退货事实、管理端角色/履约/对账工作区，以及顾客/客服 Chat 工作区的幂等恢复和实时状态；并使用 axe-core 检查关键页面。Payment 创建响应丢失、Fulfillment 确认收货响应丢失和 Chat 真实 WebSocket/中间件闭环仍由专用真实故障脚本验证；Mock 浏览器夹具和真实中间件脚本是不同证据，不能互相替代。商城和管理端均以《素简记商城平台设计与实施计划书》为视觉与交互基线。
 
 ## 5. 精确版本冻结结果
 
@@ -70,15 +108,25 @@ RocketMQ Spring Starter 2.3.6 可以完成收发，但在 Spring Boot 3.5 下会
 6. RocketMQ 5.3.2 Proxy 可完成 gRPC 生产、消费和确认。
 7. MinIO 可完成私有上传、签名 URL、下载和对象删除。
 
-`mvn clean verify` 已连续运行通过；当前测试结果为 6 项、0 失败、0 错误。
+最小中间件兼容性 POC 的 6 项验证是早期技术准入证据，不代表整个项目测试数量。
+
+当前项目级门禁：
+
+- 后端 `mvn clean verify`：100 份 Surefire 报告、435 个测试，0 失败、0 错误、0 跳过；
+- 独立 PMD 3.28.0 / PMD 7.17.0 全 Reactor：0 违规；
+- SpotBugs Maven Plugin 4.9.8.2 / SpotBugs 4.9.8：先安装当前 Reactor 产物再扫描，低阈值共 313 条分类诊断，其中 Priority 1 为 0、Priority 2 为 247、Priority 3 为 66；
+- 前端在 Node.js 24.14.0 / pnpm 11.9.0 下串行执行完整门禁：141 个 Vitest（Foundation 42、Storefront 87、Admin 12）、14 个 Playwright E2E、12 条分层规则、三端类型检查、两端生产构建和 axe 检查通过；
+- M8.12 当前代码定向门禁：`platform-common` 14 tests、`trade-service` 104 tests、`analytics-service` 6 tests，0 失败、0 错误、0 跳过；
+- 真实中间件、多实例、故障、容量与 M0–M7 链路证据分别记录在 `docs/26` 至 `docs/55`；M8.1–M8.12 的 Chat、Notification、Fulfillment GEO、商品评价、商品搜索和运营统计证据记录在 `docs/56` 至 `docs/67`。M0–M7 最终门禁和 M8.1–M8.12 针对性门禁均已通过，但不能用 H2 自动化回归或浏览器 Mock 夹具替代真实证据。
 
 任意一项失败时，Spring Boot、Spring Cloud 和 Spring Cloud Alibaba 必须按发布列车整体调整，禁止只强行覆盖其中一个依赖版本。
 
 ## 6. 暂不引入
 
 - Seata/TCC：首期使用本地事务、Outbox、幂等和补偿。
-- Elasticsearch：商品基本查询完成后再引入，避免过早维护双写。
-- Prometheus/Grafana/OpenTelemetry：核心服务能运行后增加，届时单独确定版本组合。
+- Elasticsearch：当前不与 OpenSearch 双重引入；M8.11 已选择单一 OpenSearch
+  投影验证搜索机制。
+- OpenTelemetry Collector、Zipkin、SkyWalking：当前 Tempo 单后端已满足本机代表链路，不为组件清单增加第二条管线。
 - Kubernetes：本地 Compose 和服务边界稳定后再评估。
 
 ## 7. 官方核验入口
@@ -89,3 +137,6 @@ RocketMQ Spring Starter 2.3.6 可以完成收发，但在 Spring Boot 3.5 下会
 - [MyBatis-Plus documentation](https://baomidou.com/)
 - [Apache RocketMQ documentation](https://rocketmq.apache.org/docs/)
 - [Nacos documentation](https://nacos.io/en/docs/latest/)
+- [Prometheus configuration](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)
+- [Grafana documentation](https://grafana.com/docs/grafana/latest/)
+- [Grafana Tempo documentation](https://grafana.com/docs/tempo/latest/)

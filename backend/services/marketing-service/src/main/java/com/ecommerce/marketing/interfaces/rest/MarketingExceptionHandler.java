@@ -46,9 +46,12 @@ public class MarketingExceptionHandler {
     private HttpStatus statusFor(MarketingError error) {
         return switch (error) {
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case INVALID_RULE, INVALID_PRICING_REQUEST -> HttpStatus.BAD_REQUEST;
+            case INVALID_RULE, INVALID_PRICING_REQUEST, INVALID_FLASH_SALE -> HttpStatus.BAD_REQUEST;
+            case FLASH_SALE_NOT_READY, FLASH_SALE_ADMISSION_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+            case FLASH_SALE_ENDED -> HttpStatus.GONE;
             case BENEFIT_NOT_ELIGIBLE, DUPLICATE_BENEFIT_TYPE, IDEMPOTENCY_CONFLICT,
-                    INVALID_STATE, CONCURRENT_MODIFICATION -> HttpStatus.CONFLICT;
+                    INVALID_STATE, CONCURRENT_MODIFICATION, FLASH_SALE_INVALID_STATE,
+                    FLASH_SALE_NOT_STARTED, FLASH_SALE_SOLD_OUT -> HttpStatus.CONFLICT;
         };
     }
 }

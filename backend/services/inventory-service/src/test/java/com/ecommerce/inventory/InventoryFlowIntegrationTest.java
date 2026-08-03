@@ -13,6 +13,7 @@ import com.ecommerce.inventory.application.service.OrderPaidHandler;
 import com.ecommerce.inventory.application.service.OrderPaidHandler.OrderPaidCommand;
 import com.ecommerce.inventory.infrastructure.messaging.OutboxProperties;
 import com.ecommerce.inventory.infrastructure.messaging.OutboxPublisherJob;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.ecommerce.inventory.infrastructure.persistence.mapper.OutboxEventMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -35,6 +36,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -43,6 +45,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -100,33 +103,75 @@ class InventoryFlowIntegrationTest {
 
         mockMvc.perform(post("/api/v1/inventory/admin/warehouses")
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_WAREHOUSE")))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").isString())
                 .andExpect(jsonPath("$.data.code").value("NORTH"));
+    }
+
+    @Test
+    void exposesPublicStockIdentifiersAsBrowserSafeStrings() throws Exception {
+        WarehouseView warehouse = inventoryService.createWarehouse("PUBLIC", "Public Warehouse");
+        inventoryService.adjustStock("INIT-PUBLIC", warehouse.id(), 98001L, 5, "Initial stock");
+
+        mockMvc.perform(get("/api/v1/inventory/stocks/{skuId}", 98001L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.skuId").isString())
+                .andExpect(jsonPath("$.data.skuId").value("98001"))
+                .andExpect(jsonPath("$.data.available").value(5));
     }
 
     @Test
     void acceptsOnlyTrustedServiceIdentityOnInternalCommands() throws Exception {
         WarehouseView warehouse = inventoryService.createWarehouse("INTERNAL", "Internal Warehouse");
+        String bodyWithoutExpiry = objectMapper.writeValueAsString(Map.of(
+                "reservationNo", "RES-INTERNAL",
+                "orderNo", "ORDER-INTERNAL",
+                "warehouseId", warehouse.id(),
+                "items", List.of(Map.of("skuId", 99001L, "quantity", 1))));
         String body = objectMapper.writeValueAsString(Map.of(
                 "reservationNo", "RES-INTERNAL",
                 "orderNo", "ORDER-INTERNAL",
                 "warehouseId", warehouse.id(),
+                "expiresAt", Instant.now().plusSeconds(1800),
                 "items", List.of(Map.of("skuId", 99001L, "quantity", 1))));
 
         mockMvc.perform(post("/api/v1/inventory/internal/reservations")
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                .content(body))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/api/v1/inventory/internal/reservations")
                         .header("X-Internal-Service", "trade-service")
-                        .header("X-Internal-Token", "test-internal-service-token-1234567890")
+                        .header("X-Internal-Token",
+                                "test-payment-internal-token-with-at-least-32-characters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
+                .andExpect(status().isUnauthorized());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM inventory_reservation WHERE reservation_no = ?",
+                Integer.class,
+                "RES-INTERNAL")).isZero();
+
+        mockMvc.perform(post("/api/v1/inventory/internal/reservations")
+                        .header("X-Internal-Service", "trade-service")
+                        .header("X-Internal-Token",
+                                "test-trade-internal-token-with-at-least-32-characters")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWithoutExpiry))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/v1/inventory/internal/reservations")
+                        .header("X-Internal-Service", "trade-service")
+                        .header("X-Internal-Token",
+                                "test-trade-internal-token-with-at-least-32-characters")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.warehouseId").isString())
+                .andExpect(jsonPath("$.data.items[0].skuId").isString())
                 .andExpect(jsonPath("$.data.status").value("REJECTED"));
     }
 
@@ -231,6 +276,34 @@ class InventoryFlowIntegrationTest {
     }
 
     @Test
+    void rejectsReusingAReservationNumberWithDifferentExpiry() {
+        WarehouseView warehouse = inventoryService.createWarehouse("HASH_EXPIRY", "Hash Expiry Warehouse");
+        long skuId = 90004L;
+        inventoryService.adjustStock("INIT-HASH-EXPIRY", warehouse.id(), skuId, 10, "Initial stock");
+        Instant originalExpiry = Instant.parse("2099-01-01T00:30:00Z");
+        inventoryService.reserve(new ReserveInventoryCommand(
+                "RES-HASH-EXPIRY",
+                "ORDER-HASH-EXPIRY",
+                warehouse.id(),
+                originalExpiry,
+                List.of(new ReservationLineCommand(skuId, 1))));
+
+        assertThatThrownBy(() -> inventoryService.reserve(new ReserveInventoryCommand(
+                "RES-HASH-EXPIRY",
+                "ORDER-HASH-EXPIRY",
+                warehouse.id(),
+                originalExpiry.plusSeconds(60),
+                List.of(new ReservationLineCommand(skuId, 1)))))
+                .isInstanceOf(InventoryException.class)
+                .satisfies(exception -> assertThat(((InventoryException) exception).error())
+                        .isEqualTo(InventoryError.IDEMPOTENCY_CONFLICT));
+
+        ReservationView stored = inventoryService.getReservation("RES-HASH-EXPIRY");
+        assertThat(stored.expiresAt()).isEqualTo(originalExpiry);
+        assertThat(inventoryService.getStockPosition(warehouse.id(), skuId).reserved()).isEqualTo(1);
+    }
+
+    @Test
     void rollsBackEarlierSkuReservationsWhenOneSkuIsUnavailable() {
         WarehouseView warehouse = inventoryService.createWarehouse("MULTI", "Multi SKU Warehouse");
         inventoryService.adjustStock("INIT-MULTI-1", warehouse.id(), 91001L, 5, "Initial stock");
@@ -285,6 +358,11 @@ class InventoryFlowIntegrationTest {
 
         orderPaidHandler.handle(event);
         orderPaidHandler.handle(event);
+        assertThatThrownBy(() -> orderPaidHandler.handle(new OrderPaidCommand(
+                event.eventId(), "ORDER-PAID-CONFLICT", event.reservationNo())))
+                .isInstanceOf(InventoryException.class)
+                .satisfies(exception -> assertThat(((InventoryException) exception).error())
+                        .isEqualTo(InventoryError.IDEMPOTENCY_CONFLICT));
 
         assertThat(inventoryService.getReservation("RES-ORDER-PAID").status()).isEqualTo("CONFIRMED");
         StockPosition position = inventoryService.getStockPosition(warehouse.id(), skuId);
@@ -296,6 +374,46 @@ class InventoryFlowIntegrationTest {
     }
 
     @Test
+    void rejectsAnImpossibleOrderPaidEventAfterInventoryAlreadyExpired() {
+        WarehouseView warehouse = inventoryService.createWarehouse(
+                "ORDERPAID_EXPIRED",
+                "Order Paid Expired Warehouse");
+        long skuId = 92006L;
+        inventoryService.adjustStock(
+                "INIT-ORDER-PAID-EXPIRED",
+                warehouse.id(),
+                skuId,
+                5,
+                "Initial stock");
+        inventoryService.reserve(new ReserveInventoryCommand(
+                "RES-ORDER-PAID-EXPIRED",
+                "ORDER-PAID-EXPIRED",
+                warehouse.id(),
+                Instant.now().plusSeconds(60),
+                List.of(new ReservationLineCommand(skuId, 2))));
+        expireInDatabase("RES-ORDER-PAID-EXPIRED");
+        inventoryService.expireReservation("RES-ORDER-PAID-EXPIRED");
+
+        assertThatThrownBy(() -> orderPaidHandler.handle(new OrderPaidCommand(
+                "00000000-0000-0000-0000-000000000202",
+                "ORDER-PAID-EXPIRED",
+                "RES-ORDER-PAID-EXPIRED")))
+                .isInstanceOf(InventoryException.class)
+                .satisfies(exception -> assertThat(
+                        ((InventoryException) exception).error())
+                        .isEqualTo(InventoryError.INVALID_STATE));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM consumed_event",
+                Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM stock_movement "
+                        + "WHERE reservation_no = 'RES-ORDER-PAID-EXPIRED' "
+                        + "AND movement_type = 'CONFIRM'",
+                Integer.class)).isZero();
+    }
+
+    @Test
     void expiresAReservationWithoutReducingOnHandStock() {
         WarehouseView warehouse = inventoryService.createWarehouse("EXPIRY", "Expiry Warehouse");
         long skuId = 92002L;
@@ -304,8 +422,9 @@ class InventoryFlowIntegrationTest {
                 "RES-EXPIRED",
                 "ORDER-EXPIRED",
                 warehouse.id(),
-                Instant.now().minusSeconds(1),
+                Instant.now().plusSeconds(60),
                 List.of(new ReservationLineCommand(skuId, 2))));
+        expireInDatabase("RES-EXPIRED");
 
         ReservationView expired = inventoryService.expireReservation("RES-EXPIRED");
 
@@ -314,6 +433,180 @@ class InventoryFlowIntegrationTest {
         assertThat(position.onHand()).isEqualTo(4);
         assertThat(position.reserved()).isZero();
         assertThat(position.available()).isEqualTo(4);
+    }
+
+    @Test
+    void rejectsAnAlreadyExpiredReservationWithoutHoldingStock() {
+        WarehouseView warehouse = inventoryService.createWarehouse(
+                "STALE_RESERVE",
+                "Stale Reserve Warehouse");
+        long skuId = 92007L;
+        inventoryService.adjustStock(
+                "INIT-STALE-RESERVE",
+                warehouse.id(),
+                skuId,
+                4,
+                "Initial stock");
+
+        ReservationView rejected = inventoryService.reserve(new ReserveInventoryCommand(
+                "RES-STALE-ON-ARRIVAL",
+                "ORDER-STALE-ON-ARRIVAL",
+                warehouse.id(),
+                Instant.now().minusSeconds(60),
+                List.of(new ReservationLineCommand(skuId, 2))));
+
+        assertThat(rejected.status()).isEqualTo("REJECTED");
+        StockPosition position = inventoryService.getStockPosition(warehouse.id(), skuId);
+        assertThat(position.onHand()).isEqualTo(4);
+        assertThat(position.reserved()).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM stock_movement "
+                        + "WHERE reservation_no = 'RES-STALE-ON-ARRIVAL'",
+                Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM outbox_event "
+                        + "WHERE aggregate_id = 'RES-STALE-ON-ARRIVAL' "
+                        + "AND event_type = 'InventoryReservationRejected'",
+                Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void confirmationAtomicallyAdjudicatesAnOverdueReservationAsExpired() {
+        WarehouseView warehouse = inventoryService.createWarehouse(
+                "CONFIRM_EXPIRED",
+                "Confirm Expired Warehouse");
+        long skuId = 92004L;
+        inventoryService.adjustStock(
+                "INIT-CONFIRM-EXPIRED",
+                warehouse.id(),
+                skuId,
+                4,
+                "Initial stock");
+        inventoryService.reserve(new ReserveInventoryCommand(
+                "RES-CONFIRM-EXPIRED",
+                "ORDER-CONFIRM-EXPIRED",
+                warehouse.id(),
+                Instant.now().plusSeconds(60),
+                List.of(new ReservationLineCommand(skuId, 2))));
+        expireInDatabase("RES-CONFIRM-EXPIRED");
+
+        ReservationView result =
+                inventoryService.confirmReservation("RES-CONFIRM-EXPIRED");
+
+        assertThat(result.status()).isEqualTo("EXPIRED");
+        StockPosition position =
+                inventoryService.getStockPosition(warehouse.id(), skuId);
+        assertThat(position.onHand()).isEqualTo(4);
+        assertThat(position.reserved()).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM stock_movement "
+                        + "WHERE reservation_no = 'RES-CONFIRM-EXPIRED' "
+                        + "AND movement_type = 'EXPIRE'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM stock_movement "
+                        + "WHERE reservation_no = 'RES-CONFIRM-EXPIRED' "
+                        + "AND movement_type = 'CONFIRM'",
+                Integer.class)).isZero();
+    }
+
+    @Test
+    void concurrentConfirmationAndExpiryHaveOneExpiredInventoryOutcome() throws Exception {
+        WarehouseView warehouse = inventoryService.createWarehouse(
+                "CONFIRM_EXPIRE_RACE",
+                "Confirm Expire Race Warehouse");
+        long skuId = 92005L;
+        inventoryService.adjustStock(
+                "INIT-CONFIRM-EXPIRE-RACE",
+                warehouse.id(),
+                skuId,
+                5,
+                "Initial stock");
+        inventoryService.reserve(new ReserveInventoryCommand(
+                "RES-CONFIRM-EXPIRE-RACE",
+                "ORDER-CONFIRM-EXPIRE-RACE",
+                warehouse.id(),
+                Instant.now().plusSeconds(60),
+                List.of(new ReservationLineCommand(skuId, 2))));
+        expireInDatabase("RES-CONFIRM-EXPIRE-RACE");
+
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<String> confirmation = executor.submit(() -> {
+                start.await();
+                return inventoryService
+                        .confirmReservation("RES-CONFIRM-EXPIRE-RACE")
+                        .status();
+            });
+            Future<String> expiry = executor.submit(() -> {
+                start.await();
+                return inventoryService
+                        .expireReservation("RES-CONFIRM-EXPIRE-RACE")
+                        .status();
+            });
+            start.countDown();
+
+            assertThat(confirmation.get(10, TimeUnit.SECONDS))
+                    .isEqualTo("EXPIRED");
+            assertThat(expiry.get(10, TimeUnit.SECONDS))
+                    .isEqualTo("EXPIRED");
+        } finally {
+            executor.shutdownNow();
+        }
+
+        StockPosition position =
+                inventoryService.getStockPosition(warehouse.id(), skuId);
+        assertThat(position.onHand()).isEqualTo(5);
+        assertThat(position.reserved()).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM stock_movement "
+                        + "WHERE reservation_no = 'RES-CONFIRM-EXPIRE-RACE' "
+                        + "AND movement_type = 'EXPIRE'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM stock_movement "
+                        + "WHERE reservation_no = 'RES-CONFIRM-EXPIRE-RACE' "
+                        + "AND movement_type = 'CONFIRM'",
+                Integer.class)).isZero();
+    }
+
+    @Test
+    void exposesOperationalDiagnosticsOnlyToAdministrators() throws Exception {
+        mockMvc.perform(get("/actuator/metrics"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/metrics")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/actuator/metrics")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/prometheus")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/actuator/prometheus")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/actuator/prometheus")
+                        .header("X-Metrics-Token", "wrong-metrics-token-with-at-least-32-characters"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/prometheus")
+                        .header("X-Metrics-Token",
+                                "test-only-metrics-scrape-token-with-at-least-32-characters"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(org.hamcrest.Matchers.containsString("ecommerce_consumer_failure_active_events")));
+        mockMvc.perform(get("/actuator/consumerfailures"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/consumerfailures")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/actuator/consumerfailures")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.service").value("inventory-service"));
     }
 
     @Test
@@ -330,19 +623,42 @@ class InventoryFlowIntegrationTest {
                 .when(publisher).publish(anyString(), anyString(), anyString());
         OutboxProperties properties = new OutboxProperties(
                 true, "127.0.0.1:18082", "ecommerce-inventory-events", 2000,
-                Duration.ZERO, 50);
+                Duration.ZERO, 50, 2, "inventory-test-job",
+                Duration.ofSeconds(30), Duration.ofSeconds(5));
         Clock futureClock = Clock.offset(Clock.systemUTC(), Duration.ofHours(1));
-        OutboxPublisherJob job = new OutboxPublisherJob(outboxMapper, publisher, properties, futureClock);
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        OutboxPublisherJob job = new OutboxPublisherJob(
+                outboxMapper, publisher, properties, futureClock, meterRegistry);
 
-        job.publishPendingEvents();
-        assertThat(jdbcTemplate.queryForObject("SELECT status FROM outbox_event", String.class))
-                .isEqualTo("PENDING");
-        assertThat(jdbcTemplate.queryForObject("SELECT attempts FROM outbox_event", Integer.class))
-                .isEqualTo(1);
+        try {
+            job.publishPendingEvents();
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM outbox_event", String.class))
+                    .isEqualTo("PENDING");
+            assertThat(jdbcTemplate.queryForObject("SELECT attempts FROM outbox_event", Integer.class))
+                    .isEqualTo(1);
+            assertThat(meterRegistry.get("ecommerce.outbox.publications")
+                    .tag("outcome", "failure").counter().count()).isEqualTo(1);
+            assertThat(meterRegistry.get("ecommerce.outbox.pending").gauge().value()).isEqualTo(1);
 
-        job.publishPendingEvents();
-        assertThat(jdbcTemplate.queryForObject("SELECT status FROM outbox_event", String.class))
-                .isEqualTo("PUBLISHED");
+            job.publishPendingEvents();
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM outbox_event", String.class))
+                    .isEqualTo("PUBLISHED");
+            assertThat(meterRegistry.get("ecommerce.outbox.publications")
+                    .tag("outcome", "success").counter().count()).isEqualTo(1);
+            assertThat(meterRegistry.get("ecommerce.outbox.pending").gauge().value()).isZero();
+        } finally {
+            job.close();
+        }
+    }
+
+    private void expireInDatabase(String reservationNo) {
+        Instant databaseNow = jdbcTemplate.queryForObject(
+                "SELECT CURRENT_TIMESTAMP(3)",
+                Instant.class);
+        assertThat(jdbcTemplate.update(
+                "UPDATE inventory_reservation SET expires_at = ? WHERE reservation_no = ?",
+                java.sql.Timestamp.from(databaseNow.minusSeconds(1)),
+                reservationNo)).isEqualTo(1);
     }
 
     private ReserveInventoryCommand reservation(

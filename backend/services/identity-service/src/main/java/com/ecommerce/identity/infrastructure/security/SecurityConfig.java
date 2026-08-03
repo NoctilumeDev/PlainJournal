@@ -96,6 +96,7 @@ public class SecurityConfig {
                                 "/api/v1/identity/auth/refresh",
                                 "/api/v1/identity/auth/logout",
                                 "/actuator/health",
+                                "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
                         .requestMatchers("/api/v1/identity/internal/**").hasRole("INTERNAL_SERVICE")

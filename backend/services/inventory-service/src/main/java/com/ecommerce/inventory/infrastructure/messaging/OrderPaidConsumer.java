@@ -2,6 +2,7 @@ package com.ecommerce.inventory.infrastructure.messaging;
 
 import com.ecommerce.inventory.application.service.OrderPaidHandler;
 import com.ecommerce.inventory.application.service.OrderPaidHandler.OrderPaidCommand;
+import com.ecommerce.platform.common.observability.ConsumerFailureRetryHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -23,13 +24,14 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @ConditionalOnProperty(prefix = "ecommerce.inventory.order-consumer", name = "enabled", havingValue = "true")
-public class OrderPaidConsumer {
+public class OrderPaidConsumer implements ConsumerFailureRetryHandler {
 
     private static final Logger log = LoggerFactory.getLogger(OrderPaidConsumer.class);
 
     private final OrderEventConsumerProperties properties;
     private final OrderPaidHandler handler;
     private final ObjectMapper objectMapper;
+    private final ConsumerFailureRecorder failureRecorder;
     private final ClientServiceProvider provider = ClientServiceProvider.loadService();
     private final AtomicLong nextWarningAt = new AtomicLong();
     private volatile SimpleConsumer consumer;
@@ -37,10 +39,12 @@ public class OrderPaidConsumer {
     public OrderPaidConsumer(
             OrderEventConsumerProperties properties,
             OrderPaidHandler handler,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ConsumerFailureRecorder failureRecorder) {
         this.properties = properties;
         this.handler = handler;
         this.objectMapper = objectMapper;
+        this.failureRecorder = failureRecorder;
     }
 
     @Scheduled(fixedDelayString = "${ecommerce.inventory.order-consumer.fixed-delay:1000}")
@@ -49,13 +53,7 @@ public class OrderPaidConsumer {
         try {
             active = consumer();
             for (MessageView message : active.receive(properties.batchSize(), properties.invisibleDuration())) {
-                try {
-                    handler.handle(parse(message));
-                    active.ack(message);
-                } catch (Exception exception) {
-                    log.warn("OrderPaid processing failed and will be retried: messageId={}",
-                            message.getMessageId(), exception);
-                }
+                processMessage(message, active);
             }
             nextWarningAt.set(0);
         } catch (Exception exception) {
@@ -64,8 +62,53 @@ public class OrderPaidConsumer {
         }
     }
 
+    void processMessage(MessageView message, SimpleConsumer active) throws Exception {
+        OrderPaidCommand command;
+        try {
+            command = parse(message);
+        } catch (Exception exception) {
+            failureRecorder.recordTerminal(message, properties.consumerGroup(), exception);
+            active.ack(message);
+            log.error("OrderPaid payload is not retryable and requires attention: messageId={}",
+                    message.getMessageId(), exception);
+            return;
+        }
+        try {
+            handler.handle(command);
+            failureRecorder.markRecovered(message, properties.consumerGroup());
+            active.ack(message);
+        } catch (Exception exception) {
+            boolean terminal = failureRecorder.record(message, properties.consumerGroup(), exception);
+            active.ack(message);
+            if (terminal) {
+                log.error("OrderPaid processing exhausted retries and requires attention: messageId={}",
+                        message.getMessageId(), exception);
+            } else {
+                log.warn("OrderPaid processing failed; durable MySQL retry now owns recovery: "
+                                + "messageId={}",
+                        message.getMessageId(), exception);
+            }
+        }
+    }
+
     private OrderPaidCommand parse(MessageView message) throws Exception {
-        JsonNode envelope = objectMapper.readTree(readBody(message.getBody()));
+        return parseEnvelope(objectMapper.readTree(readBody(message.getBody())));
+    }
+
+    @Override
+    public String consumerGroup() {
+        return properties.consumerGroup();
+    }
+
+    @Override
+    public void retry(String rawPayload) throws Exception {
+        handler.handle(parseEnvelope(objectMapper.readTree(rawPayload)));
+    }
+
+    private OrderPaidCommand parseEnvelope(JsonNode envelope) {
+        if (envelope.path("payloadVersion").asInt(-1) != 1) {
+            throw new IllegalArgumentException("Unsupported OrderPaid payload version");
+        }
         if (!"OrderPaid".equals(envelope.path("eventType").asText())) {
             throw new IllegalArgumentException("Unexpected order event type");
         }

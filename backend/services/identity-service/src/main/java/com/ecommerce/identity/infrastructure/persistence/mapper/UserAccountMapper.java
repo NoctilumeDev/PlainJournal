@@ -5,7 +5,12 @@ import com.ecommerce.identity.infrastructure.persistence.entity.UserAccountEntit
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.Instant;
+
 public interface UserAccountMapper extends BaseMapper<UserAccountEntity> {
+
+    @Select("SELECT CURRENT_TIMESTAMP(3)")
+    Instant currentTime();
 
     @Select("SELECT id FROM user_account WHERE id = #{userId} FOR UPDATE")
     Long lockUser(@Param("userId") Long userId);

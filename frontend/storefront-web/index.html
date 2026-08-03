@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN" data-pj-theme="qinghe">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="素简记精选自营商城，为日常留下真正值得使用的东西。"
+    />
+    <meta name="theme-color" content="#f2f7f6" />
+    <script>
+      try {
+        const storedTheme = localStorage.getItem("sujianji-theme");
+        if (storedTheme === "subai" || storedTheme === "qinghe") {
+          document.documentElement.dataset.pjTheme = storedTheme;
+          document
+            .querySelector('meta[name="theme-color"]')
+            ?.setAttribute(
+              "content",
+              storedTheme === "subai" ? "#f7f7f5" : "#f2f7f6",
+            );
+        }
+      } catch {
+        // The default Qinghe theme remains usable when storage is unavailable.
+      }
+    </script>
+    <link rel="icon" href="data:," />
+    <title>素简记｜精选日常用品</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

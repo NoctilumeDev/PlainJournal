@@ -1,6 +1,7 @@
 package com.ecommerce.payment.infrastructure.messaging;
 
 import com.ecommerce.payment.application.port.DomainEventPublisher;
+import com.ecommerce.platform.common.observability.MessagingTracing;
 import jakarta.annotation.PreDestroy;
 import org.apache.rocketmq.client.apis.ClientConfiguration;
 import org.apache.rocketmq.client.apis.ClientServiceProvider;
@@ -16,21 +17,24 @@ import java.nio.charset.StandardCharsets;
 public class RocketMqDomainEventPublisher implements DomainEventPublisher {
 
     private final OutboxProperties properties;
+    private final MessagingTracing messagingTracing;
     private final ClientServiceProvider provider = ClientServiceProvider.loadService();
     private volatile Producer producer;
 
-    public RocketMqDomainEventPublisher(OutboxProperties properties) {
+    public RocketMqDomainEventPublisher(OutboxProperties properties, MessagingTracing messagingTracing) {
         this.properties = properties;
+        this.messagingTracing = messagingTracing;
     }
 
     @Override
     public void publish(String eventId, String eventType, String payload) throws Exception {
-        Message message = provider.newMessageBuilder()
+        var builder = provider.newMessageBuilder()
                 .setTopic(properties.topic())
                 .setTag(eventType)
                 .setKeys(eventId)
-                .setBody(payload.getBytes(StandardCharsets.UTF_8))
-                .build();
+                .setBody(payload.getBytes(StandardCharsets.UTF_8));
+        messagingTracing.capture().forEach(builder::addProperty);
+        Message message = builder.build();
         producer().send(message);
     }
 

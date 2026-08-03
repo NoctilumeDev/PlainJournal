@@ -4,14 +4,21 @@ import com.ecommerce.platform.common.api.ApiResponse;
 import com.ecommerce.trade.application.exception.TradeError;
 import com.ecommerce.trade.application.exception.TradeException;
 import com.ecommerce.trade.application.port.CatalogPort;
+import com.ecommerce.trade.infrastructure.config.RemoteClientProperties;
+import com.ecommerce.trade.infrastructure.resilience.RemoteDependencyFailure;
+import com.ecommerce.trade.infrastructure.resilience.TradeSynchronousBoundaryResilience;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 
 @Component
 public class HttpCatalogClient implements CatalogPort {
@@ -21,22 +28,41 @@ public class HttpCatalogClient implements CatalogPort {
             };
 
     private final RestClient restClient;
+    private final TradeSynchronousBoundaryResilience resilience;
 
-    public HttpCatalogClient(RestClient.Builder tradeRestClientBuilder) {
-        this.restClient = tradeRestClientBuilder.baseUrl("http://catalog-service").build();
+    @Autowired
+    public HttpCatalogClient(
+            RestClient.Builder tradeRestClientBuilder,
+            RemoteClientProperties properties,
+            TradeSynchronousBoundaryResilience resilience) {
+        this(tradeRestClientBuilder.baseUrl(properties.catalogBaseUrl()).build(), resilience);
+    }
+
+    HttpCatalogClient(RestClient restClient, TradeSynchronousBoundaryResilience resilience) {
+        this.restClient = restClient;
+        this.resilience = resilience;
     }
 
     @Override
     public ProductSnapshot getProduct(Long productId) {
+        return resilience.execute(
+                TradeSynchronousBoundaryResilience.Boundary.CATALOG_QUERY,
+                () -> requestProduct(productId));
+    }
+
+    private ProductSnapshot requestProduct(Long productId) {
         try {
             ApiResponse<ProductResponse> response = restClient.get()
                     .uri("/api/v1/catalog/products/{productId}", productId)
                     .retrieve()
                     .body(RESPONSE_TYPE);
             if (response == null || response.data() == null) {
-                throw new TradeException(TradeError.REMOTE_DEPENDENCY_UNAVAILABLE);
+                throw RemoteDependencyFailure.invalidResponse();
             }
             ProductResponse product = response.data();
+            if (!Objects.equals(productId, product.id())) {
+                throw RemoteDependencyFailure.invalidResponse();
+            }
             return new ProductSnapshot(
                     product.id(),
                     product.title(),
@@ -49,11 +75,17 @@ public class HttpCatalogClient implements CatalogPort {
             if (exception.getStatusCode() == HttpStatus.NOT_FOUND) {
                 throw new TradeException(TradeError.PRODUCT_UNAVAILABLE, exception);
             }
-            throw new TradeException(TradeError.REMOTE_DEPENDENCY_UNAVAILABLE, exception);
+            throw RemoteDependencyFailure.forHttpStatus(exception.getStatusCode(), exception);
         } catch (TradeException exception) {
             throw exception;
+        } catch (RemoteDependencyFailure exception) {
+            throw exception;
+        } catch (ResourceAccessException exception) {
+            throw RemoteDependencyFailure.transientFailure(exception);
+        } catch (RestClientException exception) {
+            throw RemoteDependencyFailure.invalidResponse(exception);
         } catch (RuntimeException exception) {
-            throw new TradeException(TradeError.REMOTE_DEPENDENCY_UNAVAILABLE, exception);
+            throw RemoteDependencyFailure.invalidResponse(exception);
         }
     }
 

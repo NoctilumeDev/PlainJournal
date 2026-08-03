@@ -28,6 +28,14 @@ public class RefundOrderEntity {
     private String status;
     private BigDecimal amount;
     private String channelRefundNo;
+    private String requestStatus;
+    private Integer requestAttempts;
+    private Instant nextRequestAt;
+    private Instant requestClaimedAt;
+    private String requestClaimOwner;
+    private Instant requestClaimUntil;
+    private Instant requestSentAt;
+    private String lastRequestError;
     @Version
     private Integer version;
     private Instant createdAt;

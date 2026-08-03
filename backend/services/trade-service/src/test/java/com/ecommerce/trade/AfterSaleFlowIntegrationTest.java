@@ -46,6 +46,7 @@ class AfterSaleFlowIntegrationTest {
     private static final long USER_ID = 1001L;
     private static final long ORDER_ID = 9001L;
     private static final String ORDER_NO = "ORD-AFTER-SALE-001";
+    private static final String PAYMENT_NO = "PAY-AFTER-SALE-001";
 
     @MockitoBean
     private CatalogPort catalogPort;
@@ -82,13 +83,13 @@ class AfterSaleFlowIntegrationTest {
         jdbcTemplate.update("""
                 INSERT INTO trade_order
                     (id, order_no, user_id, idempotency_key, request_hash, reservation_no,
-                     warehouse_code, warehouse_id, status, original_amount, discount_amount,
+                     warehouse_code, warehouse_id, payment_no, status, original_amount, discount_amount,
                      total_amount, marketing_lock_no, payment_deadline, recovery_attempts,
                      version, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 ORDER_ID, ORDER_NO, USER_ID, "idem-seed-order", "0".repeat(64), "RES-AFTER-SALE-001",
-                "PRIMARY", 10L, "COMPLETED", new BigDecimal("40.00"), new BigDecimal("5.00"),
+                "PRIMARY", 10L, PAYMENT_NO, "COMPLETED", new BigDecimal("40.00"), new BigDecimal("5.00"),
                 new BigDecimal("35.00"), "MKT-AFTER-SALE-001", now.plusSeconds(900), 0,
                 0, now, now);
         insertOrderItem(9101L, 1, 101L, "Air Conditioner", "Standard", "20.00", "2.00", "18.00", now);
@@ -140,6 +141,20 @@ class AfterSaleFlowIntegrationTest {
     }
 
     @Test
+    void rejectsAnAfterSaleApplicationOutsideTheConfiguredWindow() {
+        jdbcTemplate.update("UPDATE trade_order SET updated_at = ? WHERE id = ?",
+                Instant.now().minusSeconds(31L * 24 * 60 * 60), ORDER_ID);
+
+        assertThatThrownBy(() -> afterSaleService.apply(new ApplyAfterSaleCommand(
+                USER_ID, "idem-after-sale-expired", ORDER_NO, "Too late")))
+                .isInstanceOf(TradeException.class)
+                .satisfies(exception -> assertThat(((TradeException) exception).error())
+                        .isEqualTo(TradeError.AFTER_SALE_WINDOW_EXPIRED));
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM after_sale_order", Integer.class))
+                .isZero();
+    }
+
+    @Test
     void completesTheTradeSideOfTheReturnRefundFlowExactlyOnce() {
         AfterSaleView applied = afterSaleService.apply(new ApplyAfterSaleCommand(
                 USER_ID, "idem-after-sale-flow", ORDER_NO, "Return everything"));
@@ -151,6 +166,17 @@ class AfterSaleFlowIntegrationTest {
                 afterSaleNo, "RET-001", ORDER_NO, USER_ID);
         afterSaleService.applyFulfillmentEvent(submitted);
         afterSaleService.applyFulfillmentEvent(submitted);
+        assertThatThrownBy(() -> afterSaleService.applyFulfillmentEvent(
+                new AfterSaleFulfillmentEventCommand(
+                        submitted.eventId(),
+                        submitted.eventType(),
+                        submitted.afterSaleNo(),
+                        "RET-CONFLICT",
+                        submitted.orderNo(),
+                        submitted.userId())))
+                .isInstanceOf(TradeException.class)
+                .satisfies(error -> assertThat(((TradeException) error).error())
+                        .isEqualTo(TradeError.IDEMPOTENCY_CONFLICT));
         afterSaleService.applyFulfillmentEvent(new AfterSaleFulfillmentEventCommand(
                 "00000000-0000-0000-0000-000000000202", "ReturnReceived",
                 afterSaleNo, "RET-001", ORDER_NO, USER_ID));
@@ -160,23 +186,54 @@ class AfterSaleFlowIntegrationTest {
                 ORDER_NO, USER_ID, 10L);
         afterSaleService.applyReturnStocked(stocked);
         afterSaleService.applyReturnStocked(stocked);
+        assertThatThrownBy(() -> afterSaleService.applyReturnStocked(new ReturnStockedCommand(
+                stocked.eventId(),
+                stocked.afterSaleNo(),
+                stocked.returnReceiptNo(),
+                stocked.orderNo(),
+                stocked.userId(),
+                11L)))
+                .isInstanceOf(TradeException.class)
+                .satisfies(error -> assertThat(((TradeException) error).error())
+                        .isEqualTo(TradeError.IDEMPOTENCY_CONFLICT));
         assertThat(afterSaleService.get(afterSaleNo).status()).isEqualTo("REFUNDING");
 
-        afterSaleService.applyRefundEvent(new RefundEventCommand(
+        RefundEventCommand failed = new RefundEventCommand(
                 "00000000-0000-0000-0000-000000000204", "RefundFailed", "RF-001",
-                afterSaleNo, ORDER_NO, USER_ID, new BigDecimal("35.00")));
+                afterSaleNo, ORDER_NO, PAYMENT_NO, USER_ID, new BigDecimal("35.00"));
+        afterSaleService.applyRefundEvent(failed);
+        assertThatThrownBy(() -> afterSaleService.applyRefundEvent(new RefundEventCommand(
+                failed.eventId(),
+                failed.eventType(),
+                failed.refundNo(),
+                failed.afterSaleNo(),
+                failed.orderNo(),
+                failed.paymentNo(),
+                failed.userId(),
+                new BigDecimal("34.00"))))
+                .isInstanceOf(TradeException.class)
+                .satisfies(error -> assertThat(((TradeException) error).error())
+                        .isEqualTo(TradeError.IDEMPOTENCY_CONFLICT));
         assertThat(afterSaleService.get(afterSaleNo).status()).isEqualTo("REFUND_FAILED");
 
         afterSaleService.applyRefundEvent(new RefundEventCommand(
                 "00000000-0000-0000-0000-000000000205", "RefundSucceeded", "RF-001",
-                afterSaleNo, ORDER_NO, USER_ID, new BigDecimal("35.00")));
+                afterSaleNo, ORDER_NO, PAYMENT_NO, USER_ID, new BigDecimal("35.00")));
         AfterSaleView completed = afterSaleService.get(afterSaleNo);
+
+        afterSaleService.applyRefundEvent(new RefundEventCommand(
+                "00000000-0000-0000-0000-000000000206", "RefundFailed", "RF-001",
+                afterSaleNo, ORDER_NO, PAYMENT_NO, USER_ID, new BigDecimal("35.00")));
 
         assertThat(completed.status()).isEqualTo("COMPLETED");
         assertThat(completed.refundNo()).isEqualTo("RF-001");
         assertThat(completed.completedAt()).isNotNull();
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM consumed_event", Integer.class))
-                .isEqualTo(5);
+                .isEqualTo(6);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM consumed_event WHERE owner_user_id = ?",
+                Integer.class,
+                USER_ID)).isEqualTo(6);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM after_sale_history", Integer.class))
                 .isEqualTo(7);
         assertThat(jdbcTemplate.queryForObject(
@@ -195,6 +252,8 @@ class AfterSaleFlowIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("APPLIED"))
                 .andExpect(jsonPath("$.data.refundAmount").value(35.00))
+                .andExpect(jsonPath("$.data.userId").isString())
+                .andExpect(jsonPath("$.data.items[0].skuId").isString())
                 .andReturn().getResponse().getContentAsString();
         String afterSaleNo = objectMapper.readTree(response).path("data").path("afterSaleNo").asText();
 

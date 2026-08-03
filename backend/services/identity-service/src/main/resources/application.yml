@@ -18,7 +18,7 @@ spring:
       config:
         group: ECOMMERCE
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${IDENTITY_DB_NAME:ecom_identity}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${IDENTITY_DB_NAME:ecom_identity}?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true
     username: ${IDENTITY_DB_USER:ecom_identity_app}
     password: ${IDENTITY_DB_PASSWORD:}
     hikari:
@@ -49,7 +49,7 @@ mybatis-plus:
 ecommerce:
   security:
     internal:
-      token: ${INTERNAL_SERVICE_TOKEN:}
+      token: ${TRADE_INTERNAL_SERVICE_TOKEN:}
       allowed-callers:
         - trade-service
     login-attempt:

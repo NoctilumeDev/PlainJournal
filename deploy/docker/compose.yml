@@ -4,7 +4,7 @@ services:
   mysql:
     profiles: ["core"]
     image: mysql:${MYSQL_IMAGE_TAG}
-    container_name: ecom-mysql
+    container_name: plainjournal-mysql
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
@@ -31,10 +31,70 @@ services:
     mem_limit: 768m
     networks: [ecommerce]
 
+  mysql-replica:
+    profiles: ["m7-catalog-replica"]
+    image: mysql:${MYSQL_IMAGE_TAG}
+    container_name: plainjournal-mysql-replica
+    restart: "no"
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+      - --server-id=102
+      - --relay-log=catalog-relay-bin
+      - --relay-log-recovery=ON
+      - --read-only=ON
+      - --skip-replica-start
+      - --replicate-do-db=${CATALOG_DB_NAME}
+      - --max-connections=100
+      - --innodb-buffer-pool-size=128M
+    ports:
+      - "127.0.0.1:${CATALOG_REPLICA_PORT:-13316}:3306"
+    volumes:
+      - "${MIDDLEWARE_DATA_ROOT}/mysql-replica/data:/var/lib/mysql"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+    mem_limit: 512m
+    networks: [ecommerce]
+
+  mysql-trade-shard-1:
+    profiles: ["m7-trade-sharding"]
+    image: mysql:${MYSQL_IMAGE_TAG}
+    container_name: plainjournal-mysql-trade-shard-1
+    restart: "no"
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+      - --max-connections=120
+      - --innodb-buffer-pool-size=128M
+    ports:
+      - "127.0.0.1:${TRADE_SHARD_1_PORT:-13326}:3306"
+    volumes:
+      - "${MIDDLEWARE_DATA_ROOT}/mysql-trade-shard-1/data:/var/lib/mysql"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+    mem_limit: 512m
+    networks: [ecommerce]
+
   redis:
     profiles: ["core"]
     image: redis:${REDIS_IMAGE_TAG}
-    container_name: ecom-redis
+    container_name: plainjournal-redis
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
@@ -56,7 +116,8 @@ services:
   nacos:
     profiles: ["core"]
     image: nacos/nacos-server:${NACOS_IMAGE_TAG}
-    container_name: ecom-nacos
+    container_name: plainjournal-nacos
+    hostname: plainjournal-nacos
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
@@ -82,7 +143,7 @@ services:
   rocketmq-namesrv:
     profiles: ["core"]
     image: apache/rocketmq:${ROCKETMQ_IMAGE_TAG}
-    container_name: ecom-rocketmq-namesrv
+    container_name: plainjournal-rocketmq-namesrv
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
@@ -95,23 +156,40 @@ services:
     mem_limit: 384m
     networks: [ecommerce]
 
+  rocketmq-store-init:
+    profiles: ["core"]
+    image: apache/rocketmq:${ROCKETMQ_IMAGE_TAG}
+    container_name: plainjournal-rocketmq-store-init
+    restart: "no"
+    user: "0:0"
+    command:
+      - sh
+      - -lc
+      - chown -R 3000:3000 /home/rocketmq/store
+    volumes:
+      - "rocketmq-broker-store:/home/rocketmq/store"
+    mem_limit: 64m
+    networks: [ecommerce]
+
   rocketmq-broker:
     profiles: ["core"]
     image: apache/rocketmq:${ROCKETMQ_IMAGE_TAG}
-    container_name: ecom-rocketmq-broker
+    container_name: plainjournal-rocketmq-broker
     restart: unless-stopped
     depends_on:
-      - rocketmq-namesrv
+      rocketmq-namesrv:
+        condition: service_started
+      rocketmq-store-init:
+        condition: service_completed_successfully
     environment:
       TZ: Asia/Shanghai
-      NAMESRV_ADDR: ecom-rocketmq-namesrv:9876
+      NAMESRV_ADDR: plainjournal-rocketmq-namesrv:9876
       JAVA_OPT_EXT: "-Xms512m -Xmx768m -Xmn256m"
     command:
       - sh
       - mqbroker
-      - --enable-proxy
       - -c
-      - /home/rocketmq/rocketmq-5.3.2/conf/broker.conf
+      - /home/rocketmq/rocketmq-${ROCKETMQ_IMAGE_TAG}/conf/broker.conf
     ports:
       - "127.0.0.1:10909:10909"
       - "127.0.0.1:${ROCKETMQ_BROKER_PORT}:10911"
@@ -119,17 +197,46 @@ services:
       - "127.0.0.1:${ROCKETMQ_PROXY_REMOTING_PORT}:8080"
       - "127.0.0.1:${ROCKETMQ_PROXY_GRPC_PORT}:18082"
     volumes:
-      - "./rocketmq/broker.conf:/home/rocketmq/rocketmq-5.3.2/conf/broker.conf:ro"
-      - "./rocketmq/rmq-proxy.json:/home/rocketmq/rocketmq-5.3.2/conf/rmq-proxy.json:ro"
+      - "./rocketmq/broker.conf:/home/rocketmq/rocketmq-${ROCKETMQ_IMAGE_TAG}/conf/broker.conf:ro"
+      - "./rocketmq/rmq-proxy.json:/home/rocketmq/rocketmq-${ROCKETMQ_IMAGE_TAG}/conf/rmq-proxy.json:ro"
       - "${MIDDLEWARE_DATA_ROOT}/rocketmq/broker-logs:/home/rocketmq/logs"
-      - "${MIDDLEWARE_DATA_ROOT}/rocketmq/broker-store:/home/rocketmq/store"
+      - "rocketmq-broker-store:/home/rocketmq/store"
     mem_limit: 1g
     networks: [ecommerce]
+
+  rocketmq-proxy:
+    profiles: ["core"]
+    image: apache/rocketmq:${ROCKETMQ_IMAGE_TAG}
+    container_name: plainjournal-rocketmq-proxy
+    restart: unless-stopped
+    depends_on:
+      rocketmq-broker:
+        condition: service_started
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPT_EXT: "-Xms128m -Xmx384m -Xmn128m"
+    command:
+      - sh
+      - -lc
+      - |
+        until sh mqadmin clusterList -n plainjournal-rocketmq-namesrv:9876 2>/dev/null |
+          grep -q EcommerceCluster; do
+          sleep 1
+        done
+        exec sh mqproxy \
+          -n plainjournal-rocketmq-namesrv:9876 \
+          -pc /home/rocketmq/rocketmq-${ROCKETMQ_IMAGE_TAG}/conf/rmq-proxy.json \
+          -pm cluster
+    network_mode: "service:rocketmq-broker"
+    volumes:
+      - "./rocketmq/rmq-proxy.json:/home/rocketmq/rocketmq-${ROCKETMQ_IMAGE_TAG}/conf/rmq-proxy.json:ro"
+      - "${MIDDLEWARE_DATA_ROOT}/rocketmq/broker-logs:/home/rocketmq/logs"
+    mem_limit: 512m
 
   minio:
     profiles: ["core"]
     image: quay.io/minio/minio:${MINIO_IMAGE_TAG}
-    container_name: ecom-minio
+    container_name: plainjournal-minio
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
@@ -144,7 +251,251 @@ services:
     mem_limit: 512m
     networks: [ecommerce]
 
+  clamav:
+    profiles: ["m8-malware-scan"]
+    image: clamav/clamav:${CLAMAV_IMAGE_TAG:-1.5.3-debian13-slim}
+    container_name: plainjournal-clamav
+    restart: "no"
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:${CLAMAV_PORT:-13310}:3310"
+    volumes:
+      - "${MIDDLEWARE_DATA_ROOT}/clamav/database:/var/lib/clamav"
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+    mem_limit: 3g
+    networks: [ecommerce]
+
+  opensearch:
+    profiles: ["m8-search"]
+    image: ${OPENSEARCH_IMAGE:-public.ecr.aws/opensearchproject/opensearch:3.7.0}
+    container_name: plainjournal-opensearch
+    restart: "no"
+    environment:
+      TZ: Asia/Shanghai
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      bootstrap.memory_lock: "false"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "127.0.0.1:${OPENSEARCH_PORT:-19200}:9200"
+    volumes:
+      - "${MIDDLEWARE_DATA_ROOT}/opensearch/data:/usr/share/opensearch/data"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200/_cluster/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    mem_limit: 1408m
+    networks: [ecommerce]
+
+  ecommerce-gateway:
+    profiles: ["m3-gateway"]
+    image: plainjournal/ecommerce-gateway:${GATEWAY_IMAGE_TAG:-local}
+    build:
+      context: ../../backend
+      dockerfile: ecommerce-gateway/Dockerfile
+    container_name: plainjournal-m3-gateway
+    restart: "no"
+    init: true
+    depends_on:
+      redis:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+    environment:
+      TZ: Asia/Shanghai
+      APP_ENV: ${APP_ENV:-local}
+      GATEWAY_PORT: 18000
+      NACOS_HOST: plainjournal-nacos
+      NACOS_CLIENT_PORT: 8848
+      NACOS_USERNAME: nacos
+      NACOS_ADMIN_PASSWORD: ${NACOS_ADMIN_PASSWORD}
+      REDIS_HOST: plainjournal-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      IDENTITY_JWT_SECRET: ${IDENTITY_JWT_SECRET}
+      GATEWAY_RATE_LIMIT_REDIS_ENABLED: "true"
+      SERVICE_INSTANCE_ID: m3-gateway
+    ports:
+      - "127.0.0.1:18000:18000"
+    stop_grace_period: 30s
+    mem_limit: 512m
+    networks: [ecommerce]
+
+  prometheus:
+    profiles: ["observability"]
+    image: quay.io/prometheus/prometheus:${PROMETHEUS_IMAGE_TAG:-v3.12.0}
+    container_name: plainjournal-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-19090}:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - "./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "./observability/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro"
+      - "${MIDDLEWARE_DATA_ROOT}/prometheus/data:/prometheus"
+    secrets:
+      - metrics_scrape_token
+    depends_on:
+      - alertmanager
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 512m
+    networks: [ecommerce]
+
+  alertmanager:
+    profiles: ["observability"]
+    image: quay.io/prometheus/alertmanager:${ALERTMANAGER_IMAGE_TAG:-v0.32.1}
+    container_name: plainjournal-alertmanager
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "127.0.0.1:${ALERTMANAGER_PORT:-19093}:9093"
+    volumes:
+      - "./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"
+      - "${MIDDLEWARE_DATA_ROOT}/alertmanager/data:/alertmanager"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9093/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 128m
+    networks: [ecommerce]
+
+  tempo:
+    profiles: ["observability"]
+    image: grafana/tempo:${TEMPO_IMAGE_TAG:-2.10.5}
+    container_name: plainjournal-tempo
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/tempo/tempo.yml
+    ports:
+      - "127.0.0.1:${TEMPO_HTTP_PORT:-13200}:3200"
+      - "127.0.0.1:${TEMPO_OTLP_HTTP_PORT:-14318}:4318"
+    volumes:
+      - "./observability/tempo/tempo.yml:/etc/tempo/tempo.yml:ro"
+      - "${MIDDLEWARE_DATA_ROOT}/tempo/data:/var/tempo"
+    mem_limit: 512m
+    networks: [ecommerce]
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:${GRAFANA_IMAGE_TAG:-13.1.0}
+    container_name: plainjournal-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: plainjournal-admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-13000}:3000"
+    volumes:
+      - "./observability/grafana/provisioning:/etc/grafana/provisioning:ro"
+      - "./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro"
+      - "${MIDDLEWARE_DATA_ROOT}/grafana/data:/var/lib/grafana"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 384m
+    networks: [ecommerce]
+
+  trade-service:
+    profiles: ["m3-trade"]
+    image: plainjournal/trade-service:${TRADE_IMAGE_TAG:-local}
+    build:
+      context: ../../backend
+      dockerfile: services/trade-service/Dockerfile
+    restart: "no"
+    init: true
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_started
+      rocketmq-broker:
+        condition: service_started
+      rocketmq-proxy:
+        condition: service_started
+    environment:
+      TZ: Asia/Shanghai
+      APP_ENV: ${APP_ENV:-local}
+      TRADE_SERVICE_PORT: 18104
+      SPRING_DATASOURCE_URL: jdbc:mysql://plainjournal-mysql:3306/${TRADE_DB_NAME}?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${TRADE_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${TRADE_DB_PASSWORD}
+      NACOS_HOST: plainjournal-nacos
+      NACOS_CLIENT_PORT: 8848
+      NACOS_USERNAME: nacos
+      NACOS_ADMIN_PASSWORD: ${NACOS_ADMIN_PASSWORD}
+      IDENTITY_JWT_SECRET: ${IDENTITY_JWT_SECRET}
+      TRADE_INTERNAL_SERVICE_TOKEN: ${TRADE_INTERNAL_SERVICE_TOKEN}
+      PAYMENT_INTERNAL_SERVICE_TOKEN: ${PAYMENT_INTERNAL_SERVICE_TOKEN}
+      METRICS_SCRAPE_TOKEN: ${METRICS_SCRAPE_TOKEN}
+      ECOMMERCE_TRADE_OUTBOX_ENDPOINTS: ${TRADE_CONTAINER_ROCKETMQ_ENDPOINTS:-plainjournal-rocketmq-broker:18082}
+      ECOMMERCE_TRADE_OUTBOX_TOPIC: ${TRADE_CONTAINER_OUTBOX_TOPIC:-ecommerce-order-events}
+      ECOMMERCE_TRADE_OUTBOX_FLASH_SALE_TOPIC: ${TRADE_CONTAINER_FLASH_SALE_OUTBOX_TOPIC:-ecommerce-flash-sale-events}
+      ECOMMERCE_TRADE_OUTBOX_ENABLED: ${TRADE_CONTAINER_OUTBOX_ENABLED:-true}
+      ECOMMERCE_TRADE_PAYMENT_CONSUMER_ENABLED: ${TRADE_CONTAINER_PAYMENT_CONSUMER_ENABLED:-false}
+      ECOMMERCE_TRADE_PAYMENT_CONSUMER_ENDPOINTS: ${TRADE_CONTAINER_ROCKETMQ_ENDPOINTS:-plainjournal-rocketmq-broker:18082}
+      ECOMMERCE_TRADE_PAYMENT_CONSUMER_TOPIC: ${TRADE_CONTAINER_PAYMENT_CONSUMER_TOPIC:-ecommerce-payment-events}
+      ECOMMERCE_TRADE_PAYMENT_CONSUMER_CONSUMER_GROUP: ${TRADE_CONTAINER_PAYMENT_CONSUMER_GROUP:-trade-payment-succeeded-v1}
+      ECOMMERCE_TRADE_PAYMENT_CONSUMER_FIXED_DELAY: ${TRADE_CONTAINER_PAYMENT_CONSUMER_FIXED_DELAY:-1000}
+      ECOMMERCE_TRADE_PAYMENT_CONSUMER_INVISIBLE_DURATION: ${TRADE_CONTAINER_PAYMENT_CONSUMER_INVISIBLE_DURATION:-30s}
+      ECOMMERCE_TRADE_FULFILLMENT_CONSUMER_ENABLED: "false"
+      ECOMMERCE_TRADE_AFTER_SALE_FULFILLMENT_CONSUMER_ENABLED: "false"
+      ECOMMERCE_TRADE_AFTER_SALE_INVENTORY_CONSUMER_ENABLED: "false"
+      ECOMMERCE_TRADE_REFUND_RESULT_CONSUMER_ENABLED: "false"
+      ECOMMERCE_TRADE_ORDER_RECOVERY_ENABLED: "false"
+      ECOMMERCE_TRADE_RECONCILIATION_ENABLED: "false"
+      MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED: "false"
+      ECOMMERCE_TRADE_FAULT_INJECTION_ENABLED: ${TRADE_CONTAINER_FAULT_INJECTION_ENABLED:-false}
+      ECOMMERCE_TRADE_FAULT_INJECTION_POINT: ${TRADE_CONTAINER_FAULT_INJECTION_POINT:-}
+      ECOMMERCE_TRADE_FAULT_INJECTION_TARGET_EVENT_ID: ${TRADE_CONTAINER_FAULT_INJECTION_TARGET_EVENT_ID:-}
+      ECOMMERCE_TRADE_FAULT_INJECTION_EXIT_CODE: ${TRADE_CONTAINER_FAULT_INJECTION_EXIT_CODE:-91}
+      SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 20s
+      TRADE_OUTBOX_LEASE_DURATION: ${TRADE_CONTAINER_OUTBOX_LEASE_DURATION:-60s}
+      TRADE_OUTBOX_SHUTDOWN_AWAIT: 10s
+    expose:
+      - "18104"
+    stop_grace_period: 30s
+    mem_limit: 768m
+    networks: [ecommerce]
+
+secrets:
+  metrics_scrape_token:
+    file: ./.runtime-secrets/metrics-scrape-token
+
+volumes:
+  rocketmq-broker-store:
+    name: plainjournal-rocketmq-broker-store
+
 networks:
   ecommerce:
-    name: ecommerce-platform-network
+    name: plainjournal-network
     driver: bridge

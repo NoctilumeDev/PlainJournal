@@ -9,7 +9,7 @@ import org.apache.ibatis.annotations.Select;
 public interface UserBenefitMapper extends BaseMapper<UserBenefitEntity> {
 
     @Insert("""
-            INSERT IGNORE INTO user_benefit
+            INSERT INTO user_benefit
                 (id, benefit_no, grant_key, rule_id, user_id, status, locked_order_no,
                  locked_at, redeemed_order_no, redeemed_at, version, created_at, updated_at)
             VALUES
@@ -17,8 +17,9 @@ public interface UserBenefitMapper extends BaseMapper<UserBenefitEntity> {
                  #{entity.userId}, #{entity.status}, #{entity.lockedOrderNo}, #{entity.lockedAt},
                  #{entity.redeemedOrderNo}, #{entity.redeemedAt}, #{entity.version},
                  #{entity.createdAt}, #{entity.updatedAt})
+            ON DUPLICATE KEY UPDATE id = id
             """)
-    int insertIfAbsent(@Param("entity") UserBenefitEntity entity);
+    int insertOrLockExisting(@Param("entity") UserBenefitEntity entity);
 
     @Select("SELECT * FROM user_benefit WHERE benefit_no = #{benefitNo} FOR UPDATE")
     UserBenefitEntity selectByBenefitNoForUpdate(@Param("benefitNo") String benefitNo);

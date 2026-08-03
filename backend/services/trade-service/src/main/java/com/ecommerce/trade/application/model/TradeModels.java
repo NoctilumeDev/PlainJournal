@@ -1,5 +1,8 @@
 package com.ecommerce.trade.application.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -10,8 +13,11 @@ public final class TradeModels {
     }
 
     public record CartItemView(
+            @JsonSerialize(using = ToStringSerializer.class)
             Long id,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long productId,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long skuId,
             String productTitle,
             String skuName,
@@ -20,6 +26,9 @@ public final class TradeModels {
             long quantity,
             boolean selected
     ) {
+    }
+
+    public record GuestBagItemCommand(Long productId, Long skuId, long quantity) {
     }
 
     public record OrderLineCommand(Long productId, Long skuId, long quantity) {
@@ -39,6 +48,7 @@ public final class TradeModels {
     }
 
     public record AddressSnapshotView(
+            @JsonSerialize(using = ToStringSerializer.class)
             Long sourceAddressId,
             String recipientName,
             String phone,
@@ -55,7 +65,9 @@ public final class TradeModels {
 
     public record OrderItemView(
             int lineNo,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long productId,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long skuId,
             String productTitle,
             String skuCode,
@@ -72,6 +84,7 @@ public final class TradeModels {
 
     public record DiscountAllocationView(
             int lineNo,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long skuId,
             String benefitNo,
             String ruleCode,
@@ -118,6 +131,7 @@ public final class TradeModels {
             String orderNo,
             Long userId,
             String reservationNo,
+            String paymentNo,
             String status,
             BigDecimal totalAmount,
             Instant paymentDeadline
@@ -131,6 +145,20 @@ public final class TradeModels {
             Long userId,
             String reservationNo,
             BigDecimal amount
+    ) {
+    }
+
+    public record FlashSaleAdmissionAcceptedCommand(
+            String eventId,
+            String requestToken,
+            String activityNo,
+            Long userId,
+            Long addressId,
+            Long productId,
+            Long skuId,
+            BigDecimal salePrice,
+            Instant acceptedAt,
+            Instant activityEndsAt
     ) {
     }
 
@@ -161,6 +189,7 @@ public final class TradeModels {
 
     public record AfterSaleItemView(
             int lineNo,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long skuId,
             String productTitle,
             String skuName,
@@ -174,6 +203,7 @@ public final class TradeModels {
     public record AfterSaleView(
             String afterSaleNo,
             String orderNo,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long userId,
             String afterSaleType,
             String status,
@@ -220,6 +250,7 @@ public final class TradeModels {
             String refundNo,
             String afterSaleNo,
             String orderNo,
+            String paymentNo,
             Long userId,
             BigDecimal amount
     ) {

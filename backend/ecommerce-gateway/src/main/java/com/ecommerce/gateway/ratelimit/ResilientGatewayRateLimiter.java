@@ -58,9 +58,8 @@ public class ResilientGatewayRateLimiter implements GatewayRateLimiter {
         String subjectHash = hash(clientIdentifier);
         String key = "ecommerce:" + properties.namespace() + ":gateway:rate:"
                 + policyName + ":" + subjectHash;
-        boolean locallyAllowed = recordLocalRequest(key, policy, now);
         if (!properties.redisEnabled()) {
-            return Mono.just(locallyAllowed);
+            return Mono.just(recordLocalRequest(key, policy, now));
         }
 
         return redisTemplate.execute(
@@ -69,17 +68,31 @@ public class ResilientGatewayRateLimiter implements GatewayRateLimiter {
                         List.of(Long.toString(policy.window().toMillis()), Integer.toString(policy.limit()))
                 )
                 .next()
-                .map(result -> locallyAllowed && result != null && result == 1L)
-                .doOnNext(ignored -> markRedisHealthy())
-                .switchIfEmpty(Mono.fromSupplier(() -> {
-                    markRedisDegraded(new IllegalStateException("Redis rate-limit script returned no result"));
-                    return locallyAllowed;
-                }))
+                .map(result -> result != null && result == 1L)
+                .doOnNext(ignored -> {
+                    localWindows.invalidate(key);
+                    markRedisHealthy();
+                })
+                .switchIfEmpty(localFallback(
+                        key,
+                        policy,
+                        now,
+                        new IllegalStateException("Redis rate-limit script returned no result")))
                 .timeout(properties.redisTimeout())
                 .onErrorResume(exception -> {
-                    markRedisDegraded(exception);
-                    return Mono.just(locallyAllowed);
+                    return localFallback(key, policy, now, exception);
                 });
+    }
+
+    private Mono<Boolean> localFallback(
+            String key,
+            GatewayRateLimitProperties.Policy policy,
+            Instant now,
+            Throwable exception) {
+        return Mono.fromSupplier(() -> {
+            markRedisDegraded(exception);
+            return recordLocalRequest(key, policy, now);
+        });
     }
 
     private boolean recordLocalRequest(

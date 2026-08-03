@@ -1,0 +1,14 @@
+* text=auto eol=lf
+
+*.md whitespace=-blank-at-eol,-blank-at-eof
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.avif binary
+*.gif binary
+*.ico binary
+*.jpeg binary
+*.jpg binary
+*.png binary
+*.webp binary

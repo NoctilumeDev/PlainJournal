@@ -32,6 +32,8 @@ public class FulfillmentOrderEntity {
     private String status;
     private String carrier;
     private String trackingNo;
+    private Long latestPositionTraceId;
+    private Instant latestPositionAt;
     private Integer version;
     private Instant createdAt;
     private Instant updatedAt;

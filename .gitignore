@@ -5,9 +5,14 @@
 # Local middleware credentials and generated runtime files
 deploy/docker/.env
 deploy/docker/*.log
+deploy/docker/.runtime-secrets/
 
 # Application build outputs (reserved for later development)
 **/target/
 **/node_modules/
 **/dist/
 **/.run/
+**/.vite/
+**/coverage/
+**/test-results/
+**/playwright-report/

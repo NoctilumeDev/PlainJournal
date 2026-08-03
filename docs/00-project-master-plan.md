@@ -1,14 +1,14 @@
 # 素简记分布式电商平台项目计划书
 
 > 项目英文标识：Plain Journal  
-> 项目类型：自营 B2C 起步、面向分布式与高并发能力成长、可演进至多商户的平台型电商  
+> 项目类型：边界完整的自营 B2C 分布式电商；多商户平台化转入未来独立的“素简记 Pro”
 > 当前版本：V1.0  
-> 基线日期：2026-07-16  
-> 当前坐标：营销价格基础已完成，下一阶段为整单退货退款
+> 基线日期：2026-08-03
+> 当前坐标：M1–M8 与前端视觉重构 V1–V7.4 已关闭；当前仓库以 Apache-2.0 发布 `v1.0.0`，不实施原 M9
 
 ## 1. 执行摘要
 
-素简记不是对既有商城的界面复刻，也不是为了展示中间件数量而搭建的微服务样板。它以一条真实、完整、可核对的自营 B2C 交易链为业务载体，在个人单机环境能够承受的范围内，系统性实践从增强型单体走向分布式业务系统、多实例集群、高并发系统、数据规模化和多商户平台的关键机制。
+素简记不是对既有商城的界面复刻，也不是为了展示中间件数量而搭建的微服务样板。它以一条真实、完整、可核对的自营 B2C 交易链为业务载体，在个人单机环境能够承受的范围内，系统性实践从增强型单体走向分布式业务系统、多实例集群、高并发系统和数据规模化的关键机制。多商户平台涉及经营主体、订单、履约、售后与资金所有权的系统性重构，转入未来独立仓库“素简记 Pro”，不再扩大当前 v1.0 的施工面积。
 
 项目首先保证交易事实正确：订单、库存、支付、履约、营销和退款均以 MySQL 为最终事实；跨服务不依赖分布式大事务，而使用本地事务、Outbox、RocketMQ、幂等消费、状态机、补偿和对账实现最终一致性。随后通过多实例部署、故障注入、链路观测和量化压测，证明系统在重复消息、乱序、超时、进程退出、中间件故障和热点并发下仍然可解释、可恢复、不超卖、不重复扣款或退款。
 
@@ -32,7 +32,7 @@
 - 多实例可能同时处理同一业务命令、消息和定时任务。
 - 中间件故障不能伪造业务成功，也不能永久卡死。
 - 缓存、队列和分片只能提高容量，不能改变最终事实归属。
-- 平台扩展到多商户后，订单、优惠、履约、售后和资金都需要重新明确经营主体。
+- 若未来派生“素简记 Pro”，订单、优惠、履约、售后和资金必须重新明确经营主体，不能在本仓库局部加字段。
 
 ### 2.2 能力阶梯
 
@@ -43,19 +43,22 @@
   -> 生产型服务治理
   -> 高并发交易系统
   -> 数据规模化
-  -> 多商户平台
   -> 实时与智能化系统
+
+未来独立演进：素简记 Pro -> 多商户平台
 ```
 
 个人电脑无法复刻大型互联网平台的节点数量和流量规模，但可以缩小规模、保持问题类型不变：启动多个实例、制造延迟和断连、重复和打乱消息、制造 MQ 积压、生成百万到千万级数据、验证缓存击穿和热点库存竞争，并记录可重复的吞吐、延迟与恢复结果。
 
 因此，本项目追求的是“机制真实、证据真实、规模缩比”，不宣称复刻任何大型平台。
 
+多实例实验以三个同服务实例为上限和默认代表规模。常规开发按需运行当前十一个单实例；交易、消息或发布实验只扩容当次需要验证的代表服务，不把全部应用同时扩为三实例。中间件集群、读副本和分片环境也使用互斥实验配置按需启动。
+
 ## 3. 北极星目标
 
 ### 3.1 总目标
 
-> 以自营 B2C 电商为第一阶段业务模型，在个人开发环境内系统性实现并验证分布式一致性、服务治理、多实例集群、高并发、数据扩展和多商户演进能力，最终形成业务完整、机制可信、可观测、可恢复、可压测、可部署的现代电商平台。
+> 以自营 B2C 电商为完整业务模型，在个人开发环境内系统性实现并验证分布式一致性、服务治理、多实例集群、高并发和数据扩展能力，最终形成业务闭合、机制可信、可观测、可恢复、可压测、可部署的现代电商产品。
 
 ### 3.2 技术目标
 
@@ -69,7 +72,7 @@
 - 在真实中间件、多实例和故障条件下验证关键闭环。
 - 建立标准化压测、容量基线、热点治理和秒杀削峰能力。
 - 选择有限领域实践分布式 ID、读写分离、分片、归档和扩容迁移。
-- 在自营模式稳定后演进商户、店铺、子订单、分账、结算和租户级权限。
+- 为未来“素简记 Pro”保留演化文档，但不在当前仓库引入商户、店铺、子订单、分账、结算或租户级权限。
 
 ### 3.3 产品目标
 
@@ -77,8 +80,8 @@
 - 用户能够清楚理解商品、优惠、实付、履约、售后和退款状态。
 - 管理端支持运营、仓库、客服、财务和系统治理，不通过通用改表接口绕过状态机。
 - 顾客端和管理端共享设计令牌，但根据任务密度采用不同布局。
-- 后续扩展聊天、物流定位、搜索、评价、通知和运营统计。
-- 最终根据平台成熟度演进多商户，而不是在首期提前引入店铺结算复杂度。
+- M8 已扩展聊天、通知、物流 GEO、商品评价、商品搜索和运营统计；十二个机制切片及 2026-07-25 整体审查、代表闭环真实回归和阶段关闭门禁均已完成。
+- 以自营边界完成前端产品化、演示、部署和 GitHub v1.0 交付；平台化演进转入独立作品。
 
 ## 4. 核心架构原则
 
@@ -97,12 +100,13 @@
 - Gateway 负责入口治理，不承载业务规则或访问业务数据库。
 - Identity 负责用户、地址、令牌和权限。
 - Catalog 负责商品定义与媒体，不负责库存数量和历史订单价格。
-- Inventory 负责仓库、现货、预占、释放、确认与回补流水。
+- Inventory 负责仓库、现货、预占、释放、确认、回补流水与库存所有者域对账。
 - Trade 负责购物车、订单、价格快照、订单状态和售后聚合。
 - Payment 负责支付单、回调、退款单、渠道流水和对账。
 - Fulfillment 负责正向履约、物流轨迹、退货收货和仓库验收。
 - Marketing 负责规则、权益、定价锁和权益生命周期。
-- Chat 与 Notification 在后续阶段分别负责实时会话和通知投递。
+- Chat 负责实时会话和附件安全；Notification 负责站内信、邮件偏好、可靠投递和审计恢复。
+- Analytics 负责版本化事件来源日志、日/商品汇总、有界对账和审计重建，不跨服务查询生产表。
 
 服务之间只能通过 DTO、内部 API 和版本化事件协作，禁止共享数据库 Entity、跨 schema 外键和跨服务 Mapper。
 
@@ -118,13 +122,30 @@
 
 不以接入某个框架或中间件作为完成标准，以正确性、恢复性、可观测性和量化结果作为完成标准。
 
+### 4.4 技术采纳与单机边界
+
+项目遵循：
+
+> 能力一个不少，组件绝不凑数；主线只保留一种代表实现，替代方案通过独立 POC 验证。
+
+- 服务发现、配置、网关、最终一致性、链路观测、故障治理、缓存治理、容量验证和数据扩展属于当前仓库必须掌握的能力；多商户演进属于未来 Pro 的独立课题。
+- 同一能力不并行堆叠多个框架。同步客户端以 Spring HTTP 客户端抽象为主，不为清单引入 OpenFeign；熔断和舱壁以 Resilience4j 为主，Sentinel 仅在热点动态规则实验确有收益时做 POC。
+- 追踪使用 Micrometer Tracing、单一 OpenTelemetry bridge 和 W3C 传播标准，主后端固定为按需启动的 Tempo；只有现有拓扑不能满足明确需求时才独立评估替换，不在主线绑定两套观测 SDK。
+- 库存、支付和退款正确性依赖数据库条件更新、唯一约束、状态机和幂等，不使用 Redis 锁代替最终裁决。Redisson 只允许承担缓存重建和非最终事实协调，不建设五节点 Redlock 集群。
+- 全局 ID 只保留一种经过时钟回拨、节点号冲突和并发唯一性验证的实现；不重复引入多个 ID 框架。
+- 读写分离和分片只在代表领域建立可关闭的实验环境，不把全项目改造成无法在个人机器回归的常驻拓扑。
+- 跨服务即时查询和需要立即结果的命令允许同步调用；已经发生的业务事实和最终一致性推进使用版本化事件，不执行“所有跨服务调用一律消息化”。
+- 单元测试允许 Mock；关键闭环必须补充真实中间件、多实例和故障验证，禁止用 Mock 结果代替分布式证据。
+
+完整决策、替代项和实验拓扑见[技术采纳矩阵与单机实验边界](17-technology-adoption-matrix.md)。
+
 ## 5. 品牌与前端设计原则
 
 ### 5.1 品牌定位
 
 - 中文名称：素简记。
 - 项目英文标识：Plain Journal。
-- 技术副标题：从自营 B2C 演进至多商户的分布式电商平台。
+- 技术副标题：面向一致性、高并发与数据扩展的自营 B2C 分布式电商。
 - 品牌主张：把复杂留给系统，把简单交给用户。
 
 ### 5.2 视觉边界
@@ -166,12 +187,15 @@ frontend/
 | --- | ---: | --- | --- |
 | Gateway | 18000 | 路由、限流、统一入口 | 已完成 |
 | Identity | 18101 | 用户、地址、JWT、RBAC | 已完成 |
-| Catalog | 18102 | 分类、品牌、SPU、SKU、图片 | 已完成 |
+| Catalog | 18102 | 分类、品牌、SPU、SKU、图片、评价治理与可重建搜索投影 | 当前切片及 M8.10–M8.11 已完成 |
 | Inventory | 18103 | 仓库、库存、预占、流水 | 已完成 |
-| Trade | 18104 | 购物车、订单、价格快照 | 已完成 |
-| Payment | 18105 | 支付单、验签、支付流水 | 已完成 |
-| Fulfillment | 18106 | 拣货、发货、物流、签收 | 已完成 |
+| Trade | 18104 | 购物车、订单、价格快照、整单售后 | 当前切片已完成 |
+| Payment | 18105 | 支付、退款、验签、渠道请求恢复 | 当前切片已完成 |
+| Fulfillment | 18106 | 正向履约、物流、MySQL 空间位置、退货收货与验收 | 当前切片及 M8.9 GEO 已完成 |
 | Marketing | 18107 | 优惠、地区资格、权益生命周期 | 已完成 |
+| Chat | 18108 | 会话、消息、实时路由、附件与扫描治理 | M8.1–M8.7 已完成 |
+| Notification | 18109 | 站内信、邮件偏好、可靠邮件投递与恢复审计 | M8.8 已完成 |
+| Analytics | 18110 | Trade/Payment 事件日志、日/商品汇总、对账与审计重建 | M8.12 已完成 |
 
 ### 6.2 已贯通主链路
 
@@ -193,13 +217,87 @@ frontend/
 
 未支付取消能够释放库存和营销权益；商品、地址、价格、优惠规则和商品行分摊均保存不可变历史快照。
 
+逆向链路已经实现：`申请售后 -> 审核 -> 寄回 -> 收货验收 -> 库存幂等回补 -> 快照退款 -> 渠道回调 -> 售后完成`。退款渠道不可用时保持处理中并有限重试，持续失败进入人工补偿记录，不伪造成功。
+
 ### 6.3 已验证证据
 
-- Maven 全量验证共有 67 个测试，0 失败、0 错误、0 跳过。
-- MySQL、Redis、Nacos、RocketMQ、MinIO 真实环境冒烟通过。
+- 2026-08-03 正式发布前全量 `mvn clean verify` 共 100 份 Surefire 报告、436 个测试，
+  0 失败、0 错误、0 跳过。独立 PMD 3.28.0 / PMD 7.17.0 产生 12 份报告、0 违规；
+  安装当前 Reactor 产物后重跑的 SpotBugs 低阈值扫描产生 12 份报告、313 条分类诊断，
+  其中 Priority 1 为 0、Priority 2 为 247、Priority 3 为 66、缺失分析类为 0。
+  2026-08-02 前端在 Node.js 24.14.0 / pnpm 11.9.0 下串行通过 196 个单元/契约测试
+  （design-system 5、Foundation 42、UI primitives 4、Storefront 133、Admin 12）、
+  23 个 Playwright Mock E2E、16 条分层规则、全部类型检查、两端生产构建和 axe
+  可访问性检查；V4 三个专项用例覆盖 URL 分页、搜索 `MYSQL_FALLBACK`、真实索引、
+  图片状态和公开评价，内置浏览器另关闭传统滚动条下 320px 全站横向溢出，证据见
+  [前端视觉 V4 收口](86-frontend-visual-v4-product-discovery-20260802.md)。Checkout
+  真实链验证价格/库存/权益、幂等恢复、取消释放和 6 次管理边界 403；订单/Payment
+  真实链验证支付创建上游 200 后响应丢失、原键恢复、取消/支付互斥、跨账户 404，
+  以及 Payment、Trade、Inventory、Fulfillment 四域数据库收敛；Fulfillment 前端
+  真实链又验证确认收货上游 200 后响应丢失、查询恢复 `SIGNED`、Trade 收敛
+  `COMPLETED`、中文快照、响应式布局和零残留。售后前端当前内置浏览器验收验证寄回
+  前后 `WAIT_RETURN / WAIT_SHIPMENT / PROCESSING -> RETURNING / RETURNING /
+  PROCESSING`、响应式无溢出和零控制台错误；它使用受控 HTTP 夹具，资金、库存和
+  逆向链仍以既有真实全栈证据为准。评价分层自动化又让上游完成 POST 后丢弃响应，
+  页面只按 Catalog 资格恢复且没有第二次 POST；人工浏览器完成提交、商品页回显、
+  点赞和举报。真实 Chat 浏览器/F12 复验继续通过认领前正文隔离、认领后读取与回复、
+  无需刷新同步会话归属、响应丢失恢复、23 个授权请求、7 个 WebSocket 101 和零
+  页面/网络错误。Maven 服务测试使用 H2 MySQL compatibility mode，浏览器 Mock E2E
+  使用受控夹具，均不能替代真实 MySQL、Redis、Nacos、RocketMQ、MinIO、ClamAV、
+  SMTP、MySQL Spatial、OpenSearch、多实例、故障和容量证据；三层矩阵见
+  [M0–M8 三层证据审查](69-m0-m8-pre-m9-three-layer-audit-20260728.md)。
+- MySQL、Redis、Nacos、RocketMQ、MinIO 真实环境冒烟通过；Payment→Trade 真实停服、熔断、零脏写与半开恢复通过；Trade→Marketing 停服突发、熔断拒绝、零提前预占、五订单/五唯一锁恢复与库存释放通过；Redis 停服本地降级通过；按需 Prometheus、Alertmanager、Grafana、Tempo 真实栈、五个实时采集目标及 16 条规则通过；Tempo 已查询到支付成功和退款成功两条同时包含 `payment-service`、`trade-service` 与 RocketMQ PRODUCER/CONSUMER span 的代表 trace。
 - 已验证网关发现路由、请求 ID、Flyway、JWT/RBAC、MinIO 签名媒体、库存竞争、Outbox、支付回调、履约事件和 Redis 故障降级。
 - 已验证优惠券、红包、补贴叠加与分摊，取消释放和支付核销。
-- 当前主要是单机缩比部署；分布式语义已经存在，多实例、治理和容量验证尚未系统完成。
+- M4 第四批已通过真实 MySQL、Redis、Nacos、RocketMQ、Gateway、Identity、Catalog、Inventory、Trade 与 Marketing 链路，验证购物车 ¥189.00 展示快照与 Catalog ¥199.00 当前价差异、Inventory 可用 5 件、Marketing ¥398.00 - ¥20.00 = ¥378.00 无副作用试算、稳定订单键、响应未知恢复、三域唯一事实、超大 ID 字符串契约，以及取消后的库存与权益释放。真实浏览器直接连接该链路验收权威复核和 `PENDING_PAYMENT` 订单结果，没有把订单成功解释为支付成功。
+- M4 第五批已验证当前账户订单列表、跨账户列表为空、跨账户读取/取消 404，以及真实取消响应丢失恢复：故障代理记录 Trade 上游 HTTP 200 后主动断开响应，前端立即查询恢复为 `CANCELING`；Inventory 恢复后 Trade 调度收敛为 `CANCELED`，库存恢复为 available 5 / reserved 0，Marketing 权益恢复为 `AVAILABLE`，浏览器没有提前显示取消成功。
+- M4 后续批次已验证支付创建 HTTP 200 响应丢失后按原 `payment:{uuid}` 查询恢复、单一支付事实、跨账户 404、签名回调和 Trade `PAID`；确认收货 HTTP 200 响应丢失后按 Fulfillment 权威事实恢复 `SIGNED`，并由消息收敛到 Trade `COMPLETED`。
+- M4 最终批次已完成优惠权益、整单售后申请、退货寄回、退款进度，以及履约/退货、售后审核、库存、营销、Payment 补偿和四域对账管理工作区；两套主题“青荷/素白”按完整设计令牌切换并持久化，2026-07-28 起青荷为顾客商城默认主题。
+- 最终五中间件冒烟再次通过正向、逆向、补偿和对账闭环。审查发现浏览器 `AddressSnapshotView` 的 `ToStringSerializer` 污染 `OrderPaid` Outbox；现已改为独立事件 Map，Fulfillment 兼容已发布字符串 ID，坏载荷有限失败后进入 `NEEDS_ATTENTION`。
+- 2026-07-21 的 M0 至 M4 最终复验再次开启观测、追踪、同步韧性、Redis 故障注入和 1000 请求/100 并发容量场景：Inventory 100 成功/900 拒绝，P95 1233.78 ms；Trade 100 初始可支付/900 缺货关闭，P95 581.73 ms；支付链 29.067 秒收敛，Trade Outbox 排空，未付款预占在收敛期间过期数为 0。另以真实代理验证 Inventory 已提交预占但响应丢失后的权威查询恢复。
+- 最终审查修复了 Inventory 请求哈希遗漏 `expiresAt` 和 M4 Payment/Fulfillment 专项脚本依赖外部代理的问题；两个 M4 脚本现在默认自行启动、停止一次性本地代理，文档中的最简命令可在应用健康后直接复现。
+- 当前仍是单机缩比部署。M3 已完成 Trade Outbox 多实例抢占与租约、Trade 容器 1/2/3 实例、消费者竞争与三个进程终止点、Gateway/Nacos 发布治理、库存预占结果未知恢复，以及 stable/candidate 真实双版本兼容。最终候选版本完成 1000 请求、100 并发完整业务复测：支付链从 1018.326 秒收敛到 71.887 秒，Trade 收敛时未发布 Outbox 从 106 降到 0，未付款预占在收敛期间过期数从 99 降到 0；Trade P95 从 2492.45 ms 降到 1290.69 ms。Inventory P95 从 1341.90 ms 上升到 1689.67 ms，作为 M5 容量优化的历史基线保留。M0–M5 最终回归、静态门禁和基线清理见 [M0–M5 全量回归与毕业收口](44-m0-m5-full-regression-20260721.md)。
+- M6 已完成独立秒杀链：1000 请求/100 并发严格 100 准入、900 售罄；同一用户 100 并发只占一个名额；Redis 故障时 7 ms 失败关闭且普通查询保持可用。排队实验中 MQ 停机期间新增接受事实保留在 Marketing Outbox，恢复后 101 条准入全部在 Trade 建单并由 Inventory MySQL 裁决，最终 `on_hand=101,reserved=101`，全部处理中、未发布、失败和人工处理计数为 0。普通下单、支付创建、退款查询混合 300 请求/30 并发全部成功，详见 [M6 秒杀排队、最终裁决与毕业报告](47-m6-flash-sale-queue-and-graduation.md)。
+- M7 第六批已在两个真实 MySQL、四个目标 schema 和真实 Trade JVM 上完成主动 `user_id % 2 -> user_id % 4` 重分片：旧消费事实缺少所有者时失败关闭，批提交后中断可续跑，在线新增/更新/删除可在最终写栅栏后追平，69 组全列指纹一致，篡改阻止 Promote，四片读取与跨所有者 404、受限回滚和回滚后重放均通过。源事实删除数、临时 schema、Java、端口和清理错误均为 0。该机制需要短维护写栅栏且没有反向复制，不冒充生产无停机 CDC。详见 [M7 第六批：Trade 主动 2→4 重分片](54-m7-trade-active-resharding.md)。
+- M8.2 已在真实 MySQL、Redis、Nacos、RocketMQ、Gateway 和两个 Chat 实例上验证 Outbox 多实例租约、Broker 故障保持 `STORED/PENDING`、恢复后跨节点投递、节点退出路由 TTL、`OFFLINE` 回执与重连回放。私聊正文没有进入 Outbox，最终 Chat 业务行、Redis Key、端口和 JVM 残留均为 0。详见 [M8 第二批：聊天实时路由、跨节点投递与离线回放](57-m8-chat-realtime-routing.md)。
+- M8.3 已在真实 MySQL、私有 MinIO、Nacos 和 Gateway 上验证幂等上传意图、签名 PUT、大小/MIME/文件头/完整 SHA-256 确认、消息事务原子绑定、非成员下载拒绝、同尺寸对象篡改拦截和多实例安全的过期孤儿清理。对象键没有进入 Outbox，最终 Chat 七表、运行前缀对象、端口和 JVM 残留均为 0。详见 [M8 第三批：聊天附件存储、完整性与授权下载](58-m8-chat-attachment-storage-and-authorization.md)。
+- M8.4 已在真实 Gateway、Redis、Nacos、两个健康 Chat 实例和一个 Redis 故障实例上验证短期不透明票据、摘要键、Lua 单次消费、跨实例签发/消费、重放与过期拒绝、Header JWT 兼容，以及 Redis 故障时签发/握手失败关闭。原票据在应用日志中命中为 0，最终 Chat 七表、运行前缀 Redis Key、端口和 JVM 残留均为 0。详见 [M8 第四批：浏览器 WebSocket 短期握手票据](59-m8-chat-browser-websocket-ticket.md)。
+- M8.5 已在真实 MySQL、Redis 和 RocketMQ 上验证毒消息先持久化 `NEEDS_ATTENTION` 再 ACK、Redis 停机时有效消息建立 `RETRYING + next_attempt_at` 后 ACK 原消息、Redis 恢复后由 MySQL 租约作业转为 `RECOVERED`，以及 Actuator/Prometheus、原始载荷隐藏和最终 MySQL/消费组/端口/JVM 零残留。两次 360 秒失败基线已经证明不能把 RocketMQ POP revive 当作唯一恢复保障。详见 [M8 第五批：Chat 持久化消费失败治理](60-m8-chat-consumer-failure-governance.md)。
+- M8.6 已在真实 Identity、Chat、Gateway、MySQL、Redis、Nacos、RocketMQ 和两个浏览器工作区上验证创建/发送响应丢失恢复、认领前正文隔离、短期单次票据、无需刷新实时回复、刷新历史恢复、固定验证 consumer group 和最终零残留。详见 [M8 第六批：顾客端与客服端 Chat 会话工作区](61-m8-chat-frontend-workspace.md)。
+- M8.7 已在真实 Gateway、MySQL、MinIO 和按需 ClamAV 上验证隔离前缀、`SCAN_PENDING -> READY`、真实 EICAR 命中、感染附件禁止绑定、ClamAV 停机后两次有限重试进入 `SCAN_NEEDS_ATTENTION`、客户越权拒绝，以及管理员幂等审计重扫后重新进入 `READY`。最终业务行、审计、运行前缀对象、ClamAV 容器、端口和 JVM 残留均为 0。详见 [M8 第七批：聊天附件隔离、恶意文件扫描与审计恢复](62-m8-chat-malware-scan-and-quarantine.md)。
+- M8.8 已在真实 Gateway、MySQL、Nacos、RocketMQ 和本地 SMTP 捕获器上验证
+  `PaymentSucceeded` 事件消费、重复来源事件收敛为一个通知事实、SMTP 不可用时
+  站内信继续可读、邮件两次失败进入 `NEEDS_ATTENTION`、顾客恢复 403、管理员相同
+  命令两次只写一条审计、恢复后真实 SMTP 发送 `SENT`、稳定 `Message-ID`、毒消息
+  持久化及 Actuator 原始载荷隐藏。最终运行数据、隔离 Topic、端口和 JVM 残留均为
+  0。详见 [M8 第八批：可靠通知投递与审计恢复](63-m8-notification-reliable-delivery.md)。
+- M8.9 已在真实 MySQL 8.4、Redis 和独立 Fulfillment JVM 上验证 V8/V9 Flyway、
+  `POINT SRID 4326`、空间索引、`ST_Distance_Sphere` 附近查询、南京/上海/乱序苏州
+  轨迹、顾客所有权隔离、Redis Key 删除与 `CLIENT PAUSE` 回退、读修复和管理员重建。
+  最终数据库夹具、Redis Key、18106 监听和 JVM 残留均为 0。详见
+  [M8 第九批：Fulfillment 物流 GEO 与可重建 Redis 投影](64-m8-fulfillment-geo.md)。
+- M8.10 已在真实 MySQL 8.4、Nacos、RocketMQ、Gateway、Trade 和 Catalog 上验证
+  `ShipmentSigned -> COMPLETED -> OrderCompleted -> review_eligibility`、跨账户 404、
+  8 路相同评价命令收敛为同一评价 ID、点赞重放、平台回复、举报和审核隐藏。
+  RocketMQ Proxy 停机时 Trade Outbox 保持 `PENDING`，恢复后发布与资格消费收敛。
+  首轮真实并发暴露的 MySQL `REPEATABLE READ` 旧快照误报 409 已通过
+  `READ_COMMITTED` 和锁后幂等复查修复；最终临时 schema、Topic、消费组、端口和
+  JVM 均无残留。详见
+  [M8 第十批：商品评价、并发幂等与审核治理](65-m8-product-reviews.md)。
+- M8.11 已在真实 MySQL 8.4、按需 OpenSearch 3.7.0 和独立 Catalog JVM 上验证
+  两商品增量投影、OpenSearch 停机时 MySQL 写入继续提交、公开搜索明确
+  `MYSQL_FALLBACK/degraded=true`、三次有限重试后进入 `NEEDS_ATTENTION`、幂等审计
+  恢复、蓝绿重建、missing/stale/orphan 注入与修复、下架隔离及专用 metrics 身份。
+  最终未发布和人工关注 Outbox 均为 0；临时 schema、授权、索引、OpenSearch 容器、
+  18102/19200 端口和 JVM 残留均为 0，七个核心容器保持运行。详见
+  [M8 第十一批：商品搜索、可重建索引与事实对账](66-m8-catalog-search.md)。
+- M8.12 已在真实 MySQL 8.4、Nacos、RocketMQ、Gateway 和独立 Analytics JVM 上验证
+  六类版本化事件、重复投递收敛、旧 `OrderCompleted` 商品收入不估算、RocketMQ
+  Proxy 停机保留与恢复、`DAILY:STALE` / `PRODUCT:MISSING` / `PRODUCT:ORPHAN`
+  三类偏差，以及幂等、授权和追加审计的投影重建。8 次发送最终形成 7 条来源事件，
+  三类偏差从 3 收敛为 0；临时 schema、用户、Topic、端口和 JVM 均无残留，七个核心
+  容器保持运行。详见
+  [M8 第十二批：运营统计事件读模型、对账与审计重建](67-m8-operational-analytics.md)。
 
 ### 6.4 当前坐标
 
@@ -211,13 +309,19 @@ frontend/
 支付与履约                  已完成
 地址不可变快照              已完成
 营销价格基础                已完成
-整单退货退款                下一阶段
-生产型治理与多实例          尚未开始
-聊天与实时通信              尚未开始
-物流实时定位                尚未开始
-秒杀与容量工程              尚未开始
-Vue 3 顾客端和管理端        尚未开始
-多商户平台                  尚未开始
+整单退货退款                已完成
+生产型治理与多实例          M3 已完成
+聊天与实时通信              M8.1–M8.7 已完成
+可靠通知投递                M8.8 已完成；前端通知中心尚未实施
+物流位置与附近查询          M8.9 已完成；实时 GPS 与外部地图不在当前范围
+商品评价                    M8.10 核心闭环已完成；评价媒体尚未实施
+商品搜索                    M8.11 已完成；OpenSearch 为可重建投影
+运营统计                    M8.12 与 M8 整体审查、代表闭环回归均已完成
+秒杀与容量工程              M6 已完成
+Vue 3 顾客端和管理端        M4 已完成
+数据规模化专项              M7 六批机制和 M0–M7 全面回归门禁已完成
+前端视觉重构                V1–V7.4 已完成；v1.0.0 开源发布基线已验证
+多商户平台                  当前仓库不实施；转入未来独立“素简记 Pro”
 ```
 
 ## 7. 成熟度模型与毕业条件
@@ -227,12 +331,12 @@ Vue 3 顾客端和管理端        尚未开始
 | L0 | 增强型单体 | 完整业务、本地事务、缓存、MQ、前端与 E2E | 由既有项目完成 |
 | L1 | 分布式基础 | 服务边界、独立 schema、Gateway、Nacos、真实中间件 | 已完成 |
 | L2 | 分布式交易 | Outbox、幂等、最终一致性、正向交易快照 | 已完成 |
-| L3 | 分布式逆向交易 | 退货、回补、退款、失败恢复和对账 | 下一阶段 |
-| L4 | 多实例与生产治理 | 熔断、舱壁、追踪、监控、补偿工作台、滚动升级 | 未开始 |
-| L5 | 高并发系统 | 缓存治理、削峰、背压、资源隔离、量化压测 | 未开始 |
-| L6 | 数据规模化 | 分布式 ID、读写分离、分片、归档与迁移 | 未开始 |
-| L7 | 多商户平台 | 商户、店铺、子订单、分账、结算、租户权限 | 未开始 |
-| L8 | 实时与智能化 | 聊天、GEO、实时事件、搜索、推荐演进 | 未开始 |
+| L3 | 分布式逆向交易 | 退货、回补、退款、失败恢复和对账 | 已完成，四个所有者域均有只读对账证据 |
+| L4 | 多实例与生产治理 | 熔断、舱壁、追踪、监控、补偿工作台、滚动升级 | 已完成，包含真实双版本兼容、滚动回滚与最终容量复测 |
+| L5 | 高并发系统 | 缓存治理、削峰、背压、资源隔离、量化压测 | 已完成：M5 普通容量与 M6 秒杀排队/故障/混合峰值均有真实证据 |
+| L6 | 数据规模化 | 分布式 ID、读写分离、分片、归档与迁移 | 已完成：六批机制、专项真实验证和 M0–M7 全面回归门禁均通过 |
+| L7 | 多商户平台 | 商户、店铺、子订单、分账、结算、租户权限 | 当前仓库不实施；转入未来“素简记 Pro” |
+| L8 | 实时与智能化 | 聊天、通知、GEO、评价、实时事件、搜索、统计与推荐演进 | 已完成：M8.1–M8.12 的机制切片、整体审查、代表闭环回归和仓库门禁均已通过 |
 
 达到某一级不以代码目录或依赖存在为准，必须完成对应业务闭环、自动测试、真实中间件测试、故障测试和文档交付。
 
@@ -245,10 +349,10 @@ Vue 3 顾客端和管理端        尚未开始
 | 业务闭环 | 售后、退款、聊天、物流、评价、通知 | 先完成交易事实闭环 |
 | 分布式工程 | 治理、追踪、补偿、多实例、发布 | 依附真实业务链路验证 |
 | 高并发工程 | 缓存、压测、秒杀、资源隔离 | 先基线再优化 |
-| 数据与平台化 | ID、读写分离、分片、多商户、结算 | 选择有限领域深入实践 |
+| 数据扩展 | ID、读写分离、分片、归档、迁移 | 选择有限领域深入实践 |
 | 产品交付 | 设计系统、顾客端、管理端、E2E、部署 | API 稳定后逐步并行 |
 
-每个里程碑必须有一个主工作流，其他工作流只承担必要配套，避免同时启动售后、秒杀、聊天和多商户。
+每个里程碑必须有一个主工作流，其他工作流只承担必要配套，避免同时启动售后、秒杀、聊天和平台化改造。
 
 ## 9. 里程碑路线
 
@@ -261,6 +365,8 @@ Vue 3 顾客端和管理端        尚未开始
 该基线后续不得被专项实验破坏。每个阶段结束都必须回归正向交易和未支付取消链路。
 
 ### M1：整单退货退款闭环
+
+状态：已关闭。代码、自动验证以及真实 MySQL、RocketMQ、MinIO、Redis、Nacos 和模拟退款渠道端到端复验全部通过。
 
 目标：完成第一条完整逆向交易链，并验证跨 Trade、Fulfillment、Inventory、Payment 的最终一致性。
 
@@ -315,6 +421,8 @@ AfterSaleApproved
 
 ### M2：可观测性、韧性与补偿治理
 
+状态：已完成。第一至第八批完成统一运维指标、消费失败治理、业务处理中诊断、安全观测栈、Payment 授权补偿、Payment/Inventory 对账、两个同步韧性代表边界、Trade 调度隔离和 PaymentSucceeded 代表 trace。第九批补齐 Trade 订单/售后与 Fulfillment 履约/退货所有者域只读对账；第十批把 RefundSucceeded 的 W3C 上下文持久化、RocketMQ 发布和 Trade 消费纳入真实 Tempo 验证。最终通过 1000 请求容量准入、三组真实停服故障矩阵、四域 `OPEN -> RESOLVED` 对账、两条端到端 trace、130 个自动化测试及完整观测栈复验。该结论不外推为八服务所有 HTTP 与消息路径都已手工埋点；后续新增高风险链路仍按同一准入规则补证据。所有入口均不跨库写数据；对账不自动修业务事实，任意消息重放和直接修改成功状态仍被禁止。
+
 目标：把分散在日志和定时任务中的恢复能力提升为可观测、可告警、可操作的系统能力。
 
 实施范围：
@@ -347,7 +455,11 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 - 超过阈值的处理中业务可以告警并在工作台定位。
 - 人工重试拥有权限校验、幂等保护和审计记录。
 
+完成证据见 [Trade 与 Fulfillment 所有者域对账](25-trade-fulfillment-reconciliation.md)及 [M2 毕业与容量准入报告](26-m2-graduation-and-capacity-admission.md)。
+
 ### M3：应用容器化、多实例与发布治理
+
+状态：已关闭。五批依次完成 Trade Outbox 多实例抢占与租约、Trade 容器 1/2/3 实例、消费者竞争与三个进程终止点、Gateway/Nacos 发布治理、Inventory 预占结果未知恢复，以及 stable/candidate 双版本数据库/HTTP/事件兼容和最终 1000 请求、100 并发容量复测。完成证据见 [M3 双版本兼容、滚动发布与容量复测](31-m3-dual-version-and-capacity.md)。
 
 目标：从“单机运行多个独立服务”升级为“可重复部署和验证的多实例集群”。
 
@@ -355,7 +467,7 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 
 - 为 Gateway 和业务服务提供统一、最小化、非 root 的容器镜像。
 - Compose 支持按 foundation、transaction、collaboration、campaign 配置组启动。
-- 至少对 Gateway、Trade、Inventory、Payment 启动两个实例验证。
+- M3 验证时保持当时八个单实例；按场景将 Gateway、Trade、Inventory 或 Payment 中的代表服务扩为三个实例验证，不要求全部服务同时三开。M8 新增 Chat、Notification 与 Analytics 后，常规拓扑按需运行十一个单实例，三实例上限与互斥实验原则不变。
 - 验证服务发现、负载均衡、无状态认证和消费者组竞争。
 - 定时任务使用数据库抢占、租约或等价机制，避免多实例重复处理。
 - 支持优雅停机、消费者停止拉取、在途请求完成和健康探针。
@@ -378,6 +490,8 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 - 发布过程中健康实例持续提供服务，失败版本可回滚。
 
 ### M4：素简记顾客端与管理端 V1
+
+状态：已完成。顾客端已覆盖 Catalog、身份会话、账户与地址、购物袋、权威结算、幂等下单、订单与取消、Payment、履约/物流、确认收货、优惠权益、整单售后、退货寄回和退款进度；管理端已覆盖员工角色门禁、Fulfillment 状态机、售后审核、Inventory 仓库与库存调整、Marketing 创建/发放、Payment 授权补偿和四域只读对账。青荷/素白主题使用同一套设计语言和完整令牌切换；M4 首次交付时素白为默认，2026-07-28 的独立视觉优化将青荷设为默认并完成 106 个 Vitest、7 个 E2E 与真实浏览器验收。M4 历史门禁为 70 个 Vitest、2 个 Playwright E2E、两端类型检查/构建、后端 179 个测试、独立 PMD、SpotBugs 分类审查、真实支付/确认收货响应丢失故障和完整五中间件冒烟。通用管理订单/退款列表、Catalog 草稿列表和 Marketing 列表因后端没有对应契约而明确保留为后续 API 演进，不属于伪造的 M4 能力。详见 [M4 前端就绪与架构基线](32-m4-frontend-readiness-and-architecture.md)、[全项目审查与质量门禁](33-project-wide-audit-and-quality-gate.md)、[M4 Payment 与结果未知恢复](38-m4-payment-and-unknown-result-recovery.md)、[M4 履约与物流时间线](39-m4-fulfillment-and-logistics-timeline.md)、[M4 顾客售后、管理端与毕业报告](40-m4-customer-after-sale-admin-and-graduation.md)、[青荷默认主题优化](70-qinghe-default-theme-20260728.md)和 [M0–M5 全量回归与毕业收口](44-m0-m5-full-regression-20260721.md)。
 
 目标：把已经完成的后端能力交付为现代、完整、可理解的产品体验。
 
@@ -410,7 +524,13 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 
 ### M5：容量基线与普通业务高并发优化
 
+状态：已完成。第一批完成无第三方依赖的 Node.js HTTP 负载执行器、PowerShell 环境快照和真实 Gateway→Nacos→Catalog 工具烟测；第二批完成确定性数据、固定资源、Catalog/Trade 39 组正式查询曲线，并修复 Trade 订单列表无分页与 N+1；第三批完成 1/5/10/20/50/100 并发写链矩阵、同键/同回调/库存竞争 correctness gates，以及 Catalog Caffeine + Redis 多级缓存、Pub/Sub 失效、Redis 运行时降级和背压。写链 113 份结果与缓存正式门禁均为通过、错误为 0；随后完成基线移除与 M0–M5 全量回归。方法与边界见 [M5 容量方法与第一批基线](41-m5-capacity-methodology-and-first-baseline.md)、[M5 查询容量、订单分页与 N+1 收敛](42-m5-query-capacity-and-order-pagination.md)、[M5 写链容量与 Catalog 多级缓存](43-m5-write-capacity-and-catalog-cache.md)及 [M0–M5 全量回归与毕业收口](44-m0-m5-full-regression-20260721.md)。
+
 目标：先量化单机容量和瓶颈，再实施缓存与资源治理，避免凭感觉宣称高并发。
+
+### M5.5：仓库治理与进入下一阶段门禁
+
+状态：已完成。对目录结构、未提交工作树、死代码、依赖分析、脚本重复、Node 运行时、生成产物和文档链接进行了独立复核；前端启用未使用符号门禁，M5 查询/缓存工具统一 Node 解析规则。修改后再次通过后端 179 个测试、PMD 0 违规、SpotBugs 0 条 Priority 1、前端 70 个 Vitest、2 个 Playwright E2E、生产构建和依赖审计。真实中间件、故障、多实例和 1000/100 并发证据继续以 M0–M5 全量回归为准，不用本轮自动化测试重复冒充真实验证。详见 [M5.5 仓库治理与进入下一阶段门禁](45-m5-5-repository-governance.md)。
 
 实施步骤：
 
@@ -438,6 +558,8 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 - 明确记录个人机器的稳定容量、拐点、瓶颈和扩容建议。
 
 ### M6：秒杀与峰值流量体系
+
+状态：已完成。Marketing 持有活动和准入 MySQL 事实，Gateway 与 Redis Lua 完成入口限流、一人一次和稳定令牌；Marketing 本地事务写准入与 Outbox，独立 RocketMQ Topic 排队；Trade 幂等消费、独立调度恢复并创建 `FLASH_SALE` 订单；Inventory 继续使用 MySQL 条件更新、唯一约束和流水做最终裁决；Trade 结果 Outbox 回写 Marketing。真实 1000/100、MQ 停机恢复、101 条最终收敛和普通交易混合峰值均通过，详见 [M6 第一批：秒杀活动准入基线](46-m6-flash-sale-admission-baseline.md)和 [M6 秒杀排队、最终裁决与毕业报告](47-m6-flash-sale-queue-and-graduation.md)。
 
 目标：建立独立于普通下单入口的高并发活动链路，并证明峰值不会拖垮普通交易和退款。
 
@@ -476,12 +598,17 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 
 实施范围：
 
-- 建立全局业务 ID 方案，验证多实例唯一性和时钟/号段异常。
-- 为 Catalog 查询搭建真实 MySQL 读副本，验证复制延迟和读己之写策略。
+- 已完成代表实现：建立全局业务 ID 方案，验证多实例唯一性、时钟回拨和 worker 冲突。
+- 已完成代表实现：为 Catalog 公开查询搭建真实 MySQL 读副本，验证复制暂停、读己之写、故障回退和恢复追平。
 - 生成百万级并逐步推进至个人机器极限的数据集，记录存储与索引成本。
-- 对 Trade 的订单、订单项、快照和分摊表设计一致的分片键与路由。
-- 解决跨表同路由、按用户分页、按订单号定位和后台跨分片查询。
-- 实践历史订单归档、在线迁移、扩容和回滚。
+- 已完成代表实现：Trade 使用 ShardingSphere-JDBC 5.5.3，按 `user_id % 2`
+  将订单、订单项、快照、分摊、售后、Outbox 和幂等事实路由到两个真实 MySQL
+  schema；业务写单片，后台无分片键只允许受控只读广播。
+- 已解决代表边界：按用户分页直接单片；按订单号/售后号先只读定位用户，再进入
+  单片命令；Outbox 逐片领取并轮转首片，对账逐片本地事务执行。
+- 已完成历史订单归档代表闭环：固定截止点、逐片批事务、checkpoint、显式水位刷新、11 表指纹、切读门禁、回滚和回滚后重放；源事实不删除。
+- 已完成主动 2→4 重分片代表闭环：消费幂等所有者路由、断点批复制、在线变化追平、最终写栅栏、69 组全列指纹、切换、四片读取、受限回滚和回滚后重放。
+- 该单机方案复用两个真实 MySQL、四个目标 schema；最终阶段需要短维护写栅栏，没有反向复制，不将其描述为生产无停机 CDC。
 - 保留分片前后的相同业务契约和回归测试。
 
 退出条件：
@@ -499,7 +626,7 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 
 - `chat-service`：顾客与平台客服会话、客户端消息幂等、已读未读、离线消息和附件。
 - `notification-service`：站内信、邮件、模板、重试和发送记录。
-- 物流定位：MySQL 保存关键轨迹，Redis GEO 保存最新位置，前端地图展示。
+- 物流定位：MySQL 保存全部追加轨迹和最新位置空间事实，Redis GEO 保存可重建加速，前端展示坐标事实但不冒充外部地图。
 - 商品评价：订单完成资格、评价、回复、点赞、举报和媒体。
 - 搜索：商品索引、增量更新、重建与数据库事实核对。
 - 运营统计：从事件或只读模型生成，不跨服务直接 JOIN 生产表。
@@ -508,12 +635,124 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 
 - 消息持久化后才向发送方确认成功，断线重发不重复。
 - 多个 WebSocket 节点可以路由在线用户，节点退出后能够转离线。
-- Redis GEO 丢失不影响关键物流事实。
+- 通知来源事件重复投递不重复生成站内信；邮件依赖失败不回滚站内信，超限后可经
+  领域授权、幂等和审计命令恢复。
+- Redis GEO 丢失或异常不影响物流事实和附近查询；MySQL 可独立裁决并重建缓存。
+- 评价资格只由订单完成事件投影生成；重复事件和相同提交不制造重复评价，审核隐藏后
+  公开汇总与公开列表保持一致。
 - 搜索索引可以重建，错误索引不会改变商品真实状态。
+- 运营统计只消费版本化事件并拥有自己的来源日志；重复投递不重复累计，旧事件缺失的
+  商品收入不估算，汇总可在有界对账后通过幂等审计命令重建。
 
-### M9：多商户平台演进
+2026-07-23 第一批已经完成 `chat-service` 的可靠事实底座：会话幂等创建、
+平台客服认领、消息按会话序号串行写入、`chat_message + outbox_event` 同一本地
+事务、`conversation_id + sender_id + client_message_id` 唯一、历史 keyset
+分页、已读位置和消息回执。8 路并发会话重试与 16 路并发消息重试均收敛为一个
+MySQL 事实；真实 Gateway/Nacos/MySQL 验证通过。该批只确认 `STORED`，Outbox
+在 M8.1 证据中保持 `PENDING`，不提前解释成实时成功。详见
+[M8 第一批：可靠聊天持久化与客户端幂等](56-m8-chat-reliable-persistence.md)。
 
-进入条件：
+第二批已经完成 Outbox 多实例租约、RocketMQ 发布与共享 Dispatcher、Redis
+presence 和节点 TTL、节点 Tag 定向事件、JWT WebSocket、跨节点投递、节点退出
+转离线与 MySQL 回放。Broker 不可用时消息保持 `STORED`、Outbox 保持 `PENDING`；
+恢复后才推进 `DISPATCHED/DELIVERED`。该批历史边界仍不包含附件、Chat 持久化
+消费失败台账、浏览器短期握手票据、Notification、GEO、评价、搜索和统计。详见
+[M8 第二批：聊天实时路由、跨节点投递与离线回放](57-m8-chat-realtime-routing.md)。
+
+第三批已经完成幂等上传意图、私有 MinIO 签名 PUT、大小/MIME/文件头与完整
+SHA-256 确认、消息事务原子绑定、REST/WebSocket 附件元数据、会话成员授权下载、
+下载前完整性复核，以及基于 MySQL 抢占状态机的过期孤儿对象清理。该批不冒充独立
+恶意文件扫描，也不包含浏览器短期握手票据、Chat 持久化消费失败台账或其他 M8
+领域。详见
+[M8 第三批：聊天附件存储、完整性与授权下载](58-m8-chat-attachment-storage-and-authorization.md)。
+
+第四批已经完成浏览器短期、单次 WebSocket 握手票据：长期 JWT 只用于受保护 REST
+换票，Redis 以票据 SHA-256 摘要建键，Lua 原子 `GET + DEL` 保证多个 Chat 实例
+最多一个消费成功；票据绑定环境、用户、角色、路径和过期时间。Redis 不可用时签发
+和握手均失败关闭，原有 Authorization Header 客户端保持兼容。该批不包含前端客服
+工作台、Chat 持久化消费失败台账或其他 M8 领域。详见
+[M8 第四批：浏览器 WebSocket 短期握手票据](59-m8-chat-browser-websocket-ticket.md)。
+
+第五批已经完成 Chat 持久化消费失败治理：`ChatMessageStored` 与
+`ChatDeliveryRequested` 统一写入本服务 `consumer_failure` 台账；临时依赖失败进入
+`RETRYING` 并保存 `next_attempt_at`，台账提交成功后 ACK 原消息；MySQL 租约作业
+负责有限重试，多实例以 owner 和租约围栏竞争，无效契约或预算耗尽进入
+`NEEDS_ATTENTION`，后续成功转为 `RECOVERED`。Actuator 只向 `ADMIN` 返回不含原始
+私聊载荷的只读摘要，Prometheus 暴露活动数、最老失败年龄和状态转换指标。真实
+MySQL、Redis 与 RocketMQ 验证覆盖毒消息、Redis 停机、MySQL 租约恢复和最终零
+残留。详见
+[M8 第五批：Chat 持久化消费失败治理](60-m8-chat-consumer-failure-governance.md)。
+
+第六批已经完成顾客端与客服端文本会话工作区。创建响应丢失后复用原
+`clientConversationId`，发送响应丢失后查询 MySQL 权威历史；客服认领前不能读取
+私聊正文，两端通过短期单次票据连接真实 WebSocket。真实 Identity、Chat、Gateway、
+MySQL、Redis、Nacos、RocketMQ 和 headless Chrome 连续两次验证通过，固定专用
+Dispatcher consumer group 未重复回放历史毒消息，当前会话失败台账与最终业务数据、
+Redis Key、端口和进程残留均为 0。界面仍不开放附件控件。
+详见 [M8 第六批：顾客端与客服端 Chat 会话工作区](61-m8-chat-frontend-workspace.md)。
+
+第七批已经完成附件隔离、真实 ClamAV 扫描、有限重试和管理员审计重扫。上传确认
+只进入 `SCAN_PENDING`，扫描通过后才进入 `READY`；EICAR 命中进入 `INFECTED` 并
+禁止绑定。扫描器停机达到上限后进入 `SCAN_NEEDS_ATTENTION`，只有 `ADMIN/OPERATOR`
+可以用稳定命令 ID 和原因重新进入扫描，命令不能直接制造成功。真实 MySQL、MinIO、
+ClamAV 停机/恢复和 Gateway 验证通过，最终业务行、审计、对象、按需容器、端口和
+进程残留均为 0。前端附件控件仍不开放，开放动作需要独立补充上传/扫描状态交互和
+真实浏览器门禁。详见
+[M8 第七批：聊天附件隔离、恶意文件扫描与审计恢复](62-m8-chat-malware-scan-and-quarantine.md)。
+
+第八批已经完成 Notification 可靠投递闭环。`PaymentSucceeded`、
+`RefundSucceeded`、`ShipmentDispatched` 和 `ShipmentSigned` 通过版本化事件进入
+Notification；消费幂等、通知任务、站内信和可选邮件任务在同一 MySQL 本地事务提交。
+邮件由 MySQL 租约抢占，在事务外调用 SMTP；失败有限重试，达到上限进入
+`NEEDS_ATTENTION`。顾客不能恢复，`ADMIN/OPERATOR` 只能使用稳定命令 ID、原因和
+追加式审计把任务重置为 `RETRY`，不能直接制造 `SENT`。真实 Gateway、MySQL、
+Nacos、RocketMQ 和本地 SMTP 故障/恢复验证覆盖重复消息、稳定 `Message-ID`、毒消息
+治理、原始载荷隐藏和最终零残留。前端通知中心不在本批范围。
+详见 [M8 第八批：可靠通知投递与审计恢复](63-m8-notification-reliable-delivery.md)。
+
+第九批已经完成 Fulfillment 物流 GEO 闭环。带坐标的追加轨迹与
+`shipment_latest_position` 在同一 MySQL 事务提交，乱序旧事件按
+`occurred_at + trace_id` 规则不能覆盖新位置；MySQL 8.4 使用
+`POINT SRID 4326`、空间索引和 `ST_Distance_Sphere` 裁决附近查询。Redis GEO
+仅在提交后最佳努力更新，缺失或异常时顾客读取回退 MySQL 并尝试读修复，管理员可
+从 MySQL 有界重建。真实脚本验证了缓存删除、`CLIENT PAUSE`、所有权隔离、重建和
+最终零残留；顾客端与管理端只展示真实坐标事实，不引入外部地图或实时 GPS。
+详见 [M8 第九批：Fulfillment 物流 GEO 与可重建 Redis 投影](64-m8-fulfillment-geo.md)。
+
+第十批已经完成商品评价核心闭环。Trade 在签收完成事务中写入带不可变订单行快照的
+`OrderCompleted` Outbox，Catalog 幂等消费后生成所有者隔离的评价资格；提交评价不
+同步回查 Trade。顾客评价、点赞和举报，平台回复、举报审核和公开评分汇总均由
+Catalog MySQL 裁决。真实 MySQL 并发验证发现并修复默认 `REPEATABLE READ` 下锁后
+一致性读仍看到旧快照、导致相同请求误报 409 的问题；改为 `READ_COMMITTED` 后 8 路
+请求全部返回同一评价 ID。RocketMQ Proxy 停机/恢复、毒消息治理、前端工作区和最终
+零残留均已验证。评价媒体不在本批范围。
+详见 [M8 第十批：商品评价、并发幂等与审核治理](65-m8-product-reviews.md)。
+
+第十一批已经完成商品搜索闭环。Catalog 商品事务只写 MySQL 最终事实、
+`search_revision` 和同库搜索 Outbox；OpenSearch 使用 `external_gte` 维护可重建
+投影。索引不可用时公开接口明确返回 `MYSQL_FALLBACK/degraded=true`，持续失败进入
+`NEEDS_ATTENTION`，管理员只能通过幂等、带原因和追加审计的命令恢复。全量重建写入
+新物理索引并原子切换别名；对账识别并修复 `MISSING/STALE/ORPHAN`，饱和扫描只处理
+公共完整区间。真实停机/恢复、蓝绿重建、偏差注入、下架隔离、前端降级提示和最终
+零残留均已验证。中文分词插件、同义词、个性化排序和集群高可用不在本批范围。
+详见 [M8 第十一批：商品搜索、可重建索引与事实对账](66-m8-catalog-search.md)。
+
+第十二批已经完成运营统计独立闭环。`analytics-service` 只消费 Trade/Payment
+六类版本化事件，在自有 MySQL 保存来源事件、商品行、日汇总、商品汇总、消费失败
+和重建审计；重复来源事件不重复累计，逻辑身份冲突进入治理。旧
+`OrderCompleted` 缺少商品实付字段时不估算收入。真实 RocketMQ Proxy 停机/恢复、
+三类投影偏差注入、幂等审计重建、角色授权、专用 Prometheus 身份和最终零残留均已
+验证。全量冷构建同时发现并修复 Chat Outbox 纳秒时间写入 `TIMESTAMP(3)` 后立即发布
+的精度竞态。M8 的十二个机制切片至此完成；2026-07-25 又完成全目录、依赖、死代码、
+事件契约、脚本、文档、前端和代表闭环整体审查，M8 现已关闭。详见
+[M8 第十二批：运营统计事件读模型、对账与审计重建](67-m8-operational-analytics.md)。
+
+### 后续独立演进：素简记 Pro（原 M9，不在当前仓库实施）
+
+该部分保留为未来新仓库的架构输入，不是当前 v1.0 的待办。启动时应从素简记稳定
+Release 派生并保留演化关系，不能在当前工作树直接追加 `tenant_id` 或零散商户判断。
+
+未来启动条件：
 
 - 自营正向、逆向交易稳定。
 - 支付退款与库存能够对账。
@@ -522,6 +761,7 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 
 第一阶段范围：
 
+- 本地验收固定三个商户，目标是练透隔离、拆单、分账和结算机制，不以堆租户数量作为完成标准。
 - Merchant、Shop、商户状态和平台审核。
 - 商户子账号及店长、客服、仓库角色。
 - 商品、SKU、仓库和库存的经营主体归属。
@@ -530,6 +770,7 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 - 支付成功后的平台账本、商户应结算金额、手续费和佣金。
 - 店铺级发货、售后审核、退货仓和逆向结算。
 - 平台跨商户监管与商户数据权限测试。
+- 在 Java 交易事实稳定后增加一个 Go 异构统计服务：只消费版本化事件并拥有自己的只读模型，不跨 schema 查询，不参与订单、库存、支付或结算最终裁决。
 
 关键原则：
 
@@ -541,13 +782,14 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 
 退出条件：
 
-- 两个商户的商品可在同一购物车结算并正确拆单。
+- 三个商户的商品可在同一购物车结算并正确拆单。
 - 平台券、店铺券、补贴和实付按商品行及资金承担方精确核对。
 - 商户无法查询或操作其他商户的商品、订单、售后和结算。
 - 部分店铺发货、退款或异常不会错误推进其他子订单。
 - 平台账本、商户结算和逆向退款保持借贷/收支守恒。
+- Go 统计读模型可从事件全量重建、重复消费不重复累计，停机恢复不影响 Java 主交易链。
 
-### M10：最终交付与毕业验收
+### 当前仓库最终交付与 v1.0 验收
 
 交付物：
 
@@ -561,7 +803,7 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 
 毕业标准：
 
-1. 正向交易、逆向退款和多商户最小链路均可演示和自动验证。
+1. 自营正向交易、逆向退款和关键顾客/管理旅程均可演示和自动验证。
 2. 重复、乱序、延迟消息及服务退出不会制造重复资金或库存副作用。
 3. 任一处理中状态都能解释其原因、恢复路径和人工介入方式。
 4. HTTP 与 MQ 链路可追踪，关键积压和异常可告警。
@@ -608,6 +850,7 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 - 数据所有权：`04-data-ownership.md`
 - 一致性策略：`05-consistency-strategy.md`
 - 各服务细节：`08` 至后续编号文档
+- 最新全项目门禁与跨域风险：`33-project-wide-audit-and-quality-gate.md`
 
 涉及以下变化时必须更新计划书或新增架构决策记录：
 
@@ -637,20 +880,109 @@ PENDING_STOCK、CANCELING、REFUND_PROCESSING 等中间态数量与年龄
 
 ## 13. 当前行动项
 
-当前只启动 M1“整单退货退款闭环”，暂缓部分退款、换货、仅退款、多次售后、聊天、秒杀和多商户。
+M1–M8 已关闭。M7 六批机制与专项真实验证均已完成：规模数据/游标分页、分布式 ID/节点租约、Catalog 真实读副本、Trade 两分片、历史归档迁移，以及主动 2→4 重分片。第六批最终证据为 `backend/.run/m7-trade-resharding-20260723-210422/verification.json`：旧 NULL 所有者门禁、提交后中断、在线变化、最终写栅栏、69 组全列指纹、篡改拦截、四片读取、受限回滚和回滚后重放全部通过；最终全量门禁中的 Trade 模块为 104 tests、PMD 0、SpotBugs Priority 1 为 0。详见 [M7 第一批](49-m7-scale-data-and-cursor-pagination.md)、[M7 第二批](50-m7-distributed-id.md)、[M7 第三批](51-m7-catalog-read-replica.md)、[M7 第四批](52-m7-trade-sharding.md)、[M7 第五批](53-m7-trade-history-archive-migration.md)和 [M7 第六批](54-m7-trade-active-resharding.md)。
 
-实施顺序：
+M0–M8 的业务、源码、权限、事务、时序、多实例、高并发、发布、脚本、前端和文档已按
+三层证据标准复审。后端当前基线为 100 份 Surefire 报告、436 tests 的全量
+`mvn clean verify`、12 份 PMD 报告 0 违规和 12 份 SpotBugs 低阈值报告 P1=0；
+2026-08-02 前端最新基线为 196 个单元/契约测试、23 个 Playwright E2E 和 16 条
+分层规则，类型检查与两端生产构建通过。
 
-1. 固化售后业务规则、状态机、事件和幂等键。
-2. Trade 建立整单售后聚合与订单价格分摊读取能力。
-3. Fulfillment 建立退货寄回、收货与验收事实。
-4. Inventory 建立以售后单号为业务键的幂等回补流水。
-5. Payment 建立退款单、模拟渠道退款和回调状态机。
-6. 通过 Outbox 与 RocketMQ 串联事件，并加入失败恢复。
-7. 完成模块测试、全量验证和真实中间件端到端冒烟。
-8. 更新状态机、数据所有权、一致性、服务文档和本计划书进度。
+真实链路覆盖所有者数据库与关系凭据隔离、同步边界、支付/库存因果、结果未知、
+1000/100 容量、三实例抢占、滚动发布、M6 秒杀、M7 分片/副本/重分片及 M8 全域
+能力；订单/Payment 与 Fulfillment 浏览器闭环还验证响应丢失、原键查询恢复、动作
+互斥、四域收敛、中文快照和响应式布局。售后第九批把 Trade、Fulfillment、Payment
+三份事实拆为独立 entity 并由 workflow 组合，当前浏览器寄回后仍保持 Payment
+`PROCESSING`，没有把履约推进冒充资金成功。评价第十批把 Catalog 评价事实、订单
+评价意图和商品参与动作分层；提交响应丢失只按资格恢复且不产生第二次 POST，人工
+浏览器完成提交、回显、点赞和举报。
 
-完成 M1 后，进入 M2 可观测性、韧性与补偿治理，不直接跳到秒杀或多商户。
+前端视觉重构 V1 已冻结问题与三个真实原型，V2 已完成两层令牌、共享 primitives、
+两端壳层、320px 溢出治理、对比度修复和商品展示资产补全；V3 已完成首页、商品详情
+与订单详情真实原型，并用三层证据修复 `PAYMENT_EXCEPTION` 错误暗示履约建立的问题；
+V4 已完成商品发现链；V5 已完成购物袋、结算、订单、Payment、Fulfillment 与售后；
+V6 已完成账户、通知、Chat 和管理端九个权限工作区；V7.1 已关闭全站交付审计与
+明确零消费者残留，V7.2 已关闭响应式图片交付，V7.3 已关闭演示夹具和生产静态交付
+代码，V7.4 已完成最终截图、GitHub 元数据和真实 Nginx 发布候选互斥验证。当前只剩
+仓库所有者控制的 LICENSE、GitHub origin、正式标签与 Release，不再扩大功能范围。
+
+复审同时确认：旧 stable 与当前 Trade 候选的 HTTP/API 和加法数据库迁移可按已验证
+顺序滚动，但 `PaymentSucceeded` 只有线级信封兼容，消费者工作流语义不等价，禁止
+新旧消费者并行竞争；必须先停旧、让 RocketMQ 缓冲、再只启候选，启用后回滚需要
+显式恢复。当前仓库不再进入原 M9，后续行动是统一视觉重构、演示数据、部署文档和
+GitHub v1.0 发布；三个商户与 Go 异构统计服务转入未来独立“素简记 Pro”。
+
+历史报告见 [M0–M7 全面审查](55-m0-m7-full-audit-and-regression-20260723.md)与
+[M8 全面审查](68-m8-full-audit-and-graduation-20260725.md)，当前权威结论见
+[M0–M8 三层证据审查](69-m0-m8-pre-m9-three-layer-audit-20260728.md)、
+[前端 Fulfillment 第八批](78-frontend-fulfillment-layering-eighth-slice-20260730.md)、
+[前端售后三域第九批](79-frontend-after-sale-layering-ninth-slice-20260801.md)、
+[前端评价第十批](80-frontend-review-layering-tenth-slice-20260801.md)、
+[前端视觉重构总计划](81-frontend-visual-reconstruction-master-plan-20260801.md)、
+[V1 支付恢复 P0 修复与三层验收](83-frontend-visual-v1-payment-recovery-20260802.md)、
+[V2 设计系统与全局壳层收口](84-frontend-visual-v2-design-system-and-shell-20260802.md)、
+[V3 三个真实原型收口](85-frontend-visual-v3-three-prototypes-20260802.md)和
+[V4 商品发现链收口](86-frontend-visual-v4-product-discovery-20260802.md)。
+
+2026-08-02 V1 补充：V1 已完成 52 张真实浏览器截图、全部顾客路由、代表管理路由、样式资产和三原型冻结。审计发现的支付结果未知后忙碌状态不归零，以及读取同订单 `PROCESSING` 权威事实后设备 pending 未收敛两项 P0，已完成代码、自动化测试和真实浏览器/真实服务链三层修复验收。当时门禁为 175 个 Vitest、15 个 Playwright、15 条分层规则、类型检查与两端生产构建全部通过；真实故障链验证上游创建 HTTP 200 后浏览器响应丢失、唯一 Payment 按原键恢复、四域最终收敛、跨账户 404 和最终零残留。V1 正式完成；其后 V2 也已完成。详见 [V1 审计与冻结报告](82-frontend-visual-v1-audit-20260801.md)和[V1 支付恢复 P0 修复与三层验收](83-frontend-visual-v1-payment-recovery-20260802.md)。
+
+2026-08-02 V2 补充：两层令牌、`@plain-journal/ui`、顾客端/管理端全局壳层和登录入口已落地。审查关闭按钮特异性导致的对比度错误、状态颜色插值的瞬时低对比、素白选中说明对比度不足、管理端 320px grid 隐式轨道溢出，以及首页商品图路径存在但资产缺失五类问题。最终门禁为 182 个单元/契约测试、17 个 Playwright E2E、16 条分层规则、全部类型检查和两端生产构建通过；内置浏览器确认两主题风险语义稳定、两张 1122×1402 商品图真实解码、管理端根页面 320px 无溢出且两端 Console warning/error 为 0。V2 正式完成，下一坐标为 V3；详见 [V2 设计系统与全局壳层收口](84-frontend-visual-v2-design-system-and-shell-20260802.md)。
+
+2026-08-02 V3 补充：首页、商品详情和订单详情三个现有真实路由已完成统一视觉迁移。最终门禁为 183 个单元/契约测试、20 个 Playwright E2E、3 个 V3 专项用例、16 条分层规则、全部类型检查和两端生产构建通过；内置浏览器完成商品加购、青荷/素白持久化、待支付、已完成和 `PAYMENT_EXCEPTION` 三种订单状态验收，页面无横向溢出、图片真实解码且 Console warning/error 为 0。审查发现并修复支付异常订单错误显示“配送信息正在建立”的事实问题；代码条件、单元请求断言、Playwright 请求取证和真实浏览器均证明该状态不请求或展示 Fulfillment。V3 正式完成，下一坐标为 V4 商品发现链；详见 [V3 三个真实原型收口](85-frontend-visual-v3-three-prototypes-20260802.md)。
+
+2026-08-02 V4 补充：商品目录、搜索、全局索引、商品卡/网格、分页、图片 URL 状态和
+公开评价已完成统一迁移。最终门禁为 196 个单元/契约测试、23 个 Playwright E2E、
+3 个 V4 专项用例、16 条分层规则、全部类型检查和两端生产构建通过。Playwright
+请求取证证明分类与页码、新关键词回到第一页，以及 `MYSQL_FALLBACK` 降级来源没有
+被隐藏；内置浏览器在 320px 传统滚动条环境发现并关闭 `body min-width:20rem`
+导致的全站横向溢出，目录、搜索、索引和 390px 商品详情复验均无溢出且 Console
+warning/error 为 0。V4 正式完成，下一坐标为 V5 交易与售后链；详见
+[V4 商品发现链收口](86-frontend-visual-v4-product-discovery-20260802.md)。
+
+2026-08-03 当前补充：V5 已完成交易与售后链，V6 已完成账户、通知、Chat 和管理端
+九个权限工作区。V7.1 随后完成全站交付审计，新增可重复的交付静态门禁并清理六个
+明确零消费者选择器；V7.2 保留三张 PNG 作为源与 fallback，生成 18 个 AVIF/WebP
+响应式变体，总计 860.6 KiB，相对 5.59 MiB 原图集合下降 85.0%。首页、商品卡、
+详情、购物袋、管理 Catalog 和履约插图均接入共享 `picture/srcset/sizes`，真实
+Chromium 证明实际响应为 `image/avif` 且没有下载 PNG fallback。V7.3 又关闭夹具
+演示账号和生产静态交付：错误密码返回 401，生产 `dist` 验证两端深层刷新和同源
+API；Nginx/Compose 固化 History fallback、缓存、API/WS、双镜像、版本标签和回退
+边界。V7.4 进一步完成双镜像真实构建、OCI 元数据、HEALTHCHECK、分级缓存、缺失
+资源 404、同源 API、`rc.1 → rc.0 → rc.1` 无构建回退、三张最终截图和 GitHub
+发布材料。当前最终门禁为 303 个前端单元/契约测试、60 个开发态 Playwright E2E、
+3 个生产构建 E2E、28 条分层规则，以及交付、生产部署、发布材料各 3 条；类型检查
+与两端生产构建全部通过。详见
+[V5.3 售后与退款收口](89-frontend-visual-v5-3-after-sale-refund-20260802.md)、
+[V6.3 通知与 Chat 收口](92-frontend-visual-v6-3-notification-chat-20260803.md)、
+[V6.4.4 管理首页与 V6 收口](101-frontend-visual-v6-4-4-operations-home-20260803.md)
+、[V7.1 全站交付审计与冻结](102-frontend-visual-v7-1-delivery-audit-20260803.md)
+、[V7.2 响应式图片交付](103-frontend-visual-v7-2-image-delivery-20260803.md)
+、[V7.3 演示夹具与生产静态交付](104-frontend-visual-v7-3-demo-static-deployment-20260803.md)
+和 [V7.4 GitHub 展示与发布候选](105-frontend-visual-v7-4-release-candidate-20260803.md)。
+
+M3 完整证据见 [Trade Outbox 多实例抢占与租约](27-m3-trade-outbox-multi-instance.md)、[Trade 容器多实例与优雅停机](28-m3-trade-container-multi-instance.md)、[消费者竞争、进程终止与发布治理](29-m3-consumer-fault-and-release-governance.md)、[Inventory 预占结果未知恢复](30-m3-inventory-unknown-result-recovery.md)及 [双版本兼容、滚动发布与容量复测](31-m3-dual-version-and-capacity.md)。
+
+M4 完整证据见 [M4 前端就绪与架构基线](32-m4-frontend-readiness-and-architecture.md)、[全项目审查与质量门禁](33-project-wide-audit-and-quality-gate.md)、[M4 身份会话与游客购物袋合并](34-m4-identity-session-and-cart-merge.md)、[M4 地址管理与只读结算试算](35-m4-address-and-checkout-preview.md)、[M4 权威结算、幂等下单与订单恢复](36-m4-authoritative-checkout-and-order-recovery.md)、[M4 订单中心与取消结果未知恢复](37-m4-order-center-and-cancellation-recovery.md)、[M4 Payment 与结果未知恢复](38-m4-payment-and-unknown-result-recovery.md)、[M4 履约与物流时间线](39-m4-fulfillment-and-logistics-timeline.md)及 [M4 顾客售后、管理端与毕业报告](40-m4-customer-after-sale-admin-and-graduation.md)。
+
+M5 第一批证据见 [M5 容量方法与第一批基线](41-m5-capacity-methodology-and-first-baseline.md)。
+
+M5 第二批证据见 [M5 查询容量、订单分页与 N+1 收敛](42-m5-query-capacity-and-order-pagination.md)。
+
+M5 第三批证据见 [M5 写链容量与 Catalog 多级缓存](43-m5-write-capacity-and-catalog-cache.md)。
+
+M0–M5 全量回归证据见 [M0–M5 全量回归与毕业收口](44-m0-m5-full-regression-20260721.md)。
+
+M5.5 仓库治理证据见 [M5.5 仓库治理与进入下一阶段门禁](45-m5-5-repository-governance.md)。
+
+M6 第一批证据见 [M6 第一批：秒杀活动准入基线](46-m6-flash-sale-admission-baseline.md)。
+
+M6 排队与毕业证据见 [M6 秒杀排队、最终裁决与毕业报告](47-m6-flash-sale-queue-and-graduation.md)。
+
+M0–M6 当前代码、真实中间件、故障、多实例和质量门禁总证据见 [M0–M6 全量回归与毕业收口](48-m0-m6-full-regression-20260722.md)。
+
+M0–M7 当前代码审查、质量门禁与分批真实回归总证据见 [M0–M7 全面审查与回归门禁](55-m0-m7-full-audit-and-regression-20260723.md)。
+
+M8.1–M8.12 当前聊天可靠持久化、实时路由、附件闭环、浏览器短期握手票据、持久化消费失败治理、顾客/客服会话工作区、附件恶意文件扫描治理、可靠通知投递、物流 GEO、商品评价、商品搜索和运营统计证据分别见 [M8 第一批](56-m8-chat-reliable-persistence.md)、[M8 第二批](57-m8-chat-realtime-routing.md)、[M8 第三批](58-m8-chat-attachment-storage-and-authorization.md)、[M8 第四批](59-m8-chat-browser-websocket-ticket.md)、[M8 第五批](60-m8-chat-consumer-failure-governance.md)、[M8 第六批](61-m8-chat-frontend-workspace.md)、[M8 第七批](62-m8-chat-malware-scan-and-quarantine.md)、[M8 第八批](63-m8-notification-reliable-delivery.md)、[M8 第九批](64-m8-fulfillment-geo.md)、[M8 第十批](65-m8-product-reviews.md)、[M8 第十一批](66-m8-catalog-search.md)和 [M8 第十二批](67-m8-operational-analytics.md)。阶段整体毕业证据见 [M8 全面审查、回归与毕业收口](68-m8-full-audit-and-graduation-20260725.md)。
 
 ---
 

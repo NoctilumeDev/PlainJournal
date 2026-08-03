@@ -9,15 +9,16 @@ import org.apache.ibatis.annotations.Select;
 public interface RefundCallbackLogMapper extends BaseMapper<RefundCallbackLogEntity> {
 
     @Insert("""
-            INSERT IGNORE INTO refund_callback_log
+            INSERT INTO refund_callback_log
                 (id, channel, external_event_id, refund_no, request_hash, signature_valid,
                  processing_status, raw_payload, error_message, received_at)
             VALUES
                 (#{entity.id}, #{entity.channel}, #{entity.externalEventId}, #{entity.refundNo},
                  #{entity.requestHash}, #{entity.signatureValid}, #{entity.processingStatus},
                  #{entity.rawPayload}, #{entity.errorMessage}, #{entity.receivedAt})
+            ON DUPLICATE KEY UPDATE id = id
             """)
-    int insertIfAbsent(@Param("entity") RefundCallbackLogEntity entity);
+    int insertOrLockExisting(@Param("entity") RefundCallbackLogEntity entity);
 
     @Select("""
             SELECT * FROM refund_callback_log

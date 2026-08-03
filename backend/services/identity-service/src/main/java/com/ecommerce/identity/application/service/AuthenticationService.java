@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -31,7 +30,6 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final LoginAuditService loginAuditService;
     private final LoginAttemptStore loginAttemptStore;
-    private final Clock clock;
     private final String dummyPasswordHash;
 
     public AuthenticationService(
@@ -39,14 +37,12 @@ public class AuthenticationService {
             TokenManager tokenManager,
             PasswordEncoder passwordEncoder,
             LoginAuditService loginAuditService,
-            LoginAttemptStore loginAttemptStore,
-            Clock clock) {
+            LoginAttemptStore loginAttemptStore) {
         this.identityStore = identityStore;
         this.tokenManager = tokenManager;
         this.passwordEncoder = passwordEncoder;
         this.loginAuditService = loginAuditService;
         this.loginAttemptStore = loginAttemptStore;
-        this.clock = clock;
         this.dummyPasswordHash = passwordEncoder.encode("identity-timing-protection");
     }
 
@@ -58,7 +54,7 @@ public class AuthenticationService {
             throw new IdentityException(IdentityError.EMAIL_ALREADY_REGISTERED);
         }
 
-        Instant now = clock.instant();
+        Instant now = identityStore.currentTime();
         try {
             UserAccount account = identityStore.createAccount(
                     normalizedEmail,
@@ -73,10 +69,9 @@ public class AuthenticationService {
         }
     }
 
-    @Transactional
     public AuthTokens login(String email, String password, LoginContext context) {
         String normalizedEmail = normalizeEmail(email);
-        Instant now = clock.instant();
+        Instant now = identityStore.currentTime();
         if (loginAttemptStore.isBlocked(normalizedEmail, now)) {
             loginAuditService.record(
                     null,
@@ -127,7 +122,7 @@ public class AuthenticationService {
 
     @Transactional
     public AuthTokens refresh(String rawRefreshToken) {
-        Instant now = clock.instant();
+        Instant now = identityStore.currentTime();
         String tokenHash = tokenManager.hashRefreshToken(rawRefreshToken);
         StoredRefreshToken storedToken = identityStore.findRefreshTokenByHash(tokenHash)
                 .filter(token -> token.isUsableAt(now))
@@ -148,7 +143,8 @@ public class AuthenticationService {
     public void logout(String rawRefreshToken) {
         String tokenHash = tokenManager.hashRefreshToken(rawRefreshToken);
         identityStore.findRefreshTokenByHash(tokenHash)
-                .ifPresent(token -> identityStore.revokeRefreshToken(token.id(), clock.instant()));
+                .ifPresent(token -> identityStore.revokeRefreshToken(
+                        token.id(), identityStore.currentTime()));
     }
 
     @Transactional(readOnly = true)

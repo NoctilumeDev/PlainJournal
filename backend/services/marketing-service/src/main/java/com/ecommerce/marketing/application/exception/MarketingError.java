@@ -6,6 +6,15 @@ public enum MarketingError {
     BENEFIT_NOT_ELIGIBLE("BENEFIT_NOT_ELIGIBLE", "A selected benefit is not eligible for this order"),
     DUPLICATE_BENEFIT_TYPE("DUPLICATE_BENEFIT_TYPE", "Only one benefit of each type can be used per order"),
     INVALID_PRICING_REQUEST("INVALID_PRICING_REQUEST", "The pricing request is inconsistent"),
+    INVALID_FLASH_SALE("INVALID_FLASH_SALE", "The flash-sale activity is invalid"),
+    FLASH_SALE_INVALID_STATE("FLASH_SALE_INVALID_STATE", "The flash-sale activity cannot perform this operation"),
+    FLASH_SALE_NOT_READY("FLASH_SALE_NOT_READY", "The flash-sale admission gate is not ready"),
+    FLASH_SALE_NOT_STARTED("FLASH_SALE_NOT_STARTED", "The flash-sale activity has not started"),
+    FLASH_SALE_ENDED("FLASH_SALE_ENDED", "The flash-sale activity has ended"),
+    FLASH_SALE_SOLD_OUT("FLASH_SALE_SOLD_OUT", "The flash-sale admission quota is exhausted"),
+    FLASH_SALE_ADMISSION_UNAVAILABLE(
+            "FLASH_SALE_ADMISSION_UNAVAILABLE",
+            "The flash-sale admission gate is temporarily unavailable"),
     IDEMPOTENCY_CONFLICT("IDEMPOTENCY_CONFLICT", "The idempotency key was already used for different data"),
     INVALID_STATE("INVALID_STATE", "The pricing lock is not in a valid state for this operation"),
     CONCURRENT_MODIFICATION("CONCURRENT_MODIFICATION", "The marketing resource was modified concurrently");

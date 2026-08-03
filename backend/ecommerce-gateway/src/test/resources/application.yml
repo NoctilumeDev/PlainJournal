@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: ecommerce-gateway
+  config:
+    import: []
+
+ecommerce:
+  security:
+    token:
+      secret: test-only-gateway-jwt-secret-with-at-least-32-characters
+      issuer: ecommerce-identity-test
+  gateway:
+    rate-limit:
+      namespace: test
+      enabled: true
+      redis-enabled: false
+      redis-timeout: 100ms
+      local-maximum-size: 1000
+      login:
+        limit: 10
+        window: 1m
+      registration:
+        limit: 5
+        window: 1m
+      refresh:
+        limit: 30
+        window: 1m
+      flash-sale:
+        limit: 60
+        window: 1s

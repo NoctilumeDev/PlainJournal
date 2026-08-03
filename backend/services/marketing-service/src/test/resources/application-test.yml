@@ -3,7 +3,7 @@ server:
 
 spring:
   config:
-    import: "optional:nacos:"
+    import: []
   cloud:
     nacos:
       discovery:
@@ -22,17 +22,48 @@ spring:
     locations: classpath:db/migration
 
 ecommerce:
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: 3
   foundation:
     configuration-source: local-default
   security:
     token:
       secret: test-only-marketing-jwt-secret-with-at-least-32-characters
       issuer: ecommerce-identity-test
+    metrics:
+      token: test-only-metrics-scrape-token-with-at-least-32-characters
     internal:
-      token: test-internal-service-token-with-at-least-32-characters
+      token: test-trade-internal-token-with-at-least-32-characters
       allowed-callers:
         - trade-service
   marketing:
+    flash-sale:
+      namespace: test
+      redis-enabled: false
+      result-retention: 24h
+      processing-timeout: 2m
+      timeout-scan-delay: 5000
+      timeout-scan-batch-size: 100
+      pending-recovery-delay: 60000
+      pending-recovery-batch-size: 100
+    flash-sale-outbox:
+      enabled: false
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-flash-sale-events
+      fixed-delay: 500
+      retry-delay: 0s
+      batch-size: 100
+      publisher-id: marketing-test
+      lease-duration: 30s
+    flash-sale-result-consumer:
+      enabled: false
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-flash-sale-events
+      consumer-group: marketing-flash-sale-result-v1
+      batch-size: 32
+      invisible-duration: 30s
+      await-duration: 5s
     order-consumer:
       enabled: false
       endpoints: 127.0.0.1:18082
@@ -44,3 +75,25 @@ logging:
   level:
     root: warn
     com.alibaba.nacos: error
+
+management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+          - consumerfailures
+  endpoint:
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only

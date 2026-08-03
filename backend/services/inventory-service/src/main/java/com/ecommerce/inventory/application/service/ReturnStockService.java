@@ -23,6 +23,7 @@ import com.ecommerce.inventory.infrastructure.persistence.mapper.InventoryReserv
 import com.ecommerce.inventory.infrastructure.persistence.mapper.InventoryReturnMapper;
 import com.ecommerce.inventory.infrastructure.persistence.mapper.OutboxEventMapper;
 import com.ecommerce.inventory.infrastructure.persistence.mapper.StockMovementMapper;
+import com.ecommerce.platform.common.idempotency.PayloadFingerprint;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -31,7 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -55,7 +55,6 @@ public class ReturnStockService {
     private final ConsumedEventMapper consumedEventMapper;
     private final OutboxEventMapper outboxMapper;
     private final ObjectMapper objectMapper;
-    private final Clock clock;
 
     public ReturnStockService(
             InventoryReturnMapper returnMapper,
@@ -65,8 +64,7 @@ public class ReturnStockService {
             StockMovementMapper movementMapper,
             ConsumedEventMapper consumedEventMapper,
             OutboxEventMapper outboxMapper,
-            ObjectMapper objectMapper,
-            Clock clock) {
+            ObjectMapper objectMapper) {
         this.returnMapper = returnMapper;
         this.reservationMapper = reservationMapper;
         this.reservationItemMapper = reservationItemMapper;
@@ -75,18 +73,29 @@ public class ReturnStockService {
         this.consumedEventMapper = consumedEventMapper;
         this.outboxMapper = outboxMapper;
         this.objectMapper = objectMapper;
-        this.clock = clock;
     }
 
     @Transactional
     public ReturnStockView stock(ReturnInspectedCommand command) {
-        if (consumedEventMapper.insertIfAbsent(
-                command.eventId(), RETURN_INSPECTED_CONSUMER_GROUP, clock.instant()) != 1) {
-            return view(requireReturn(command.afterSaleNo()));
-        }
         List<ReturnInspectedItem> items = normalize(command.items());
         String requestHash = requestHash(command, items);
-        Instant now = clock.instant();
+        if (consumedEventMapper.insertIfAbsent(
+                command.eventId(),
+                RETURN_INSPECTED_CONSUMER_GROUP,
+                requestHash,
+                reservationMapper.currentTime()) != 1) {
+            String storedFingerprint = consumedEventMapper.selectPayloadFingerprint(
+                    command.eventId(), RETURN_INSPECTED_CONSUMER_GROUP);
+            if (!PayloadFingerprint.matches(storedFingerprint, requestHash)) {
+                throw new InventoryException(InventoryError.IDEMPOTENCY_CONFLICT);
+            }
+            InventoryReturnEntity repeated = requireReturn(command.afterSaleNo());
+            if (!PayloadFingerprint.matches(repeated.getRequestHash(), requestHash)) {
+                throw new InventoryException(InventoryError.IDEMPOTENCY_CONFLICT);
+            }
+            return view(repeated);
+        }
+        Instant now = reservationMapper.currentTime();
 
         InventoryReturnEntity candidate = new InventoryReturnEntity();
         candidate.setId(IdWorker.getId());
@@ -99,7 +108,7 @@ public class ReturnStockService {
         candidate.setRequestHash(requestHash);
         candidate.setStatus("PENDING");
         candidate.setCreatedAt(now);
-        int inserted = returnMapper.insertIfAbsent(candidate);
+        returnMapper.insertOrLockExisting(candidate);
 
         InventoryReturnEntity inventoryReturn = returnMapper.selectByAfterSaleNoForUpdate(command.afterSaleNo());
         if (inventoryReturn == null) {
@@ -108,7 +117,7 @@ public class ReturnStockService {
         if (!inventoryReturn.getRequestHash().equals(requestHash)) {
             throw new InventoryException(InventoryError.IDEMPOTENCY_CONFLICT);
         }
-        if (inserted == 0) {
+        if (!candidate.getId().equals(inventoryReturn.getId())) {
             if (!"STOCKED".equals(inventoryReturn.getStatus())) {
                 throw new InventoryException(InventoryError.CONCURRENT_MODIFICATION);
             }

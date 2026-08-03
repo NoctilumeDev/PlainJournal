@@ -3,7 +3,7 @@ server:
 
 spring:
   config:
-    import: "optional:nacos:"
+    import: []
   cloud:
     nacos:
       discovery:
@@ -28,13 +28,29 @@ ecommerce:
     token:
       secret: test-only-payment-jwt-secret-with-at-least-32-characters
       issuer: ecommerce-identity-test
+    metrics:
+      token: test-only-metrics-scrape-token-with-at-least-32-characters
+  clients:
     internal:
-      token: test-internal-service-token-1234567890
+      token: test-payment-internal-token-with-at-least-32-characters
       caller: payment-service
   payment:
     client:
-      connect-timeout: 1s
-      read-timeout: 2s
+      service-discovery-enabled: true
+      trade-base-url: http://trade-service
+      connect-timeout: 100ms
+      read-timeout: 250ms
+      trade-payment-context:
+        total-budget: 1s
+        max-attempts: 2
+        retry-wait: 25ms
+        max-concurrent-calls: 4
+        bulkhead-max-wait: 100ms
+        sliding-window-size: 4
+        minimum-number-of-calls: 2
+        failure-rate-threshold: 50
+        open-state-wait: 100ms
+        half-open-calls: 1
     mock-channel:
       callback-secret: test-mock-callback-secret-with-at-least-32-characters
       callback-max-skew: 5m
@@ -45,10 +61,57 @@ ecommerce:
       fixed-delay: 2000
       retry-delay: 0s
       batch-size: 100
+      publisher-id: payment-test
+      lease-duration: 30s
     refund-consumer:
       enabled: false
+    refund-dispatch:
+      enabled: false
+      dispatcher-id: payment-refund-test
+    reconciliation:
+      enabled: false
+      fixed-delay: 10000
+      initial-delay: 10000
+      scan-limit: 100
 
 logging:
   level:
     root: warn
     com.alibaba.nacos: error
+
+management:
+  tracing:
+    enabled: true
+    baggage:
+      enabled: false
+    sampling:
+      probability: 1.0
+    propagation:
+      type: W3C
+  otlp:
+    tracing:
+      export:
+        enabled: false
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+          - consumerfailures
+          - businessprocesses
+  endpoint:
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only
+    businessprocesses:
+      access: read-only

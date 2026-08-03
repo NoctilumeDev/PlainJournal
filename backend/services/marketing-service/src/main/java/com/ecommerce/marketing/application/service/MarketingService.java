@@ -13,6 +13,8 @@ import com.ecommerce.marketing.application.model.MarketingModels.GrantBenefitCom
 import com.ecommerce.marketing.application.model.MarketingModels.LockPricingCommand;
 import com.ecommerce.marketing.application.model.MarketingModels.PricingLine;
 import com.ecommerce.marketing.application.model.MarketingModels.PricingLockView;
+import com.ecommerce.marketing.application.model.MarketingModels.PricingPreviewView;
+import com.ecommerce.marketing.application.model.MarketingModels.PreviewPricingCommand;
 import com.ecommerce.marketing.application.model.MarketingModels.RegionRestriction;
 import com.ecommerce.marketing.application.model.MarketingModels.RuleView;
 import com.ecommerce.marketing.domain.BenefitStatus;
@@ -43,7 +45,6 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -54,6 +55,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -68,7 +70,6 @@ public class MarketingService {
     private final PricingLockBenefitMapper lockBenefitMapper;
     private final PricingLockAllocationMapper allocationMapper;
     private final ObjectMapper objectMapper;
-    private final Clock clock;
 
     public MarketingService(
             MarketingRuleMapper ruleMapper,
@@ -77,8 +78,7 @@ public class MarketingService {
             PricingLockMapper lockMapper,
             PricingLockBenefitMapper lockBenefitMapper,
             PricingLockAllocationMapper allocationMapper,
-            ObjectMapper objectMapper,
-            Clock clock) {
+            ObjectMapper objectMapper) {
         this.ruleMapper = ruleMapper;
         this.regionMapper = regionMapper;
         this.benefitMapper = benefitMapper;
@@ -86,7 +86,6 @@ public class MarketingService {
         this.lockBenefitMapper = lockBenefitMapper;
         this.allocationMapper = allocationMapper;
         this.objectMapper = objectMapper;
-        this.clock = clock;
     }
 
     @Transactional
@@ -105,7 +104,7 @@ public class MarketingService {
                 throw new MarketingException(MarketingError.INVALID_RULE);
             }
         });
-        Instant now = clock.instant();
+        Instant now = lockMapper.currentTime();
         MarketingRuleEntity rule = new MarketingRuleEntity();
         rule.setId(IdWorker.getId());
         rule.setRuleCode(command.ruleCode().trim());
@@ -139,7 +138,7 @@ public class MarketingService {
         if (rule == null) {
             throw new MarketingException(MarketingError.RESOURCE_NOT_FOUND);
         }
-        Instant now = clock.instant();
+        Instant now = lockMapper.currentTime();
         long id = IdWorker.getId();
         UserBenefitEntity candidate = new UserBenefitEntity();
         candidate.setId(id);
@@ -151,7 +150,7 @@ public class MarketingService {
         candidate.setVersion(0);
         candidate.setCreatedAt(now);
         candidate.setUpdatedAt(now);
-        benefitMapper.insertIfAbsent(candidate);
+        benefitMapper.insertOrLockExisting(candidate);
         UserBenefitEntity benefit = benefitMapper.selectByGrantKeyForUpdate(command.userId(), command.grantKey().trim());
         if (benefit == null) {
             throw new MarketingException(MarketingError.CONCURRENT_MODIFICATION);
@@ -169,11 +168,28 @@ public class MarketingService {
                 .stream().map(benefit -> benefitView(benefit, requireRule(benefit.getRuleId()))).toList();
     }
 
+    @Transactional(readOnly = true)
+    public PricingPreviewView previewPricing(PreviewPricingCommand command) {
+        ValidatedPricing request = validatePricing(command);
+        Instant now = lockMapper.currentTime();
+        PricingCalculation calculation = calculatePricing(
+                request, loadEligibleBenefits(request, now, false));
+        return new PricingPreviewView(
+                request.originalAmount(),
+                calculation.total(BenefitType.COUPON),
+                calculation.total(BenefitType.RED_PACKET),
+                calculation.total(BenefitType.SUBSIDY),
+                calculation.discountAmount(),
+                calculation.payableAmount(),
+                calculation.appliedBenefits(),
+                now);
+    }
+
     @Transactional
     public PricingLockView lockPricing(LockPricingCommand command) {
         ValidatedPricing request = validatePricing(command);
         String requestHash = requestHash(request);
-        Instant now = clock.instant();
+        Instant now = lockMapper.currentTime();
         long id = IdWorker.getId();
         PricingLockEntity candidate = new PricingLockEntity();
         candidate.setId(id);
@@ -188,7 +204,7 @@ public class MarketingService {
         candidate.setVersion(0);
         candidate.setCreatedAt(now);
         candidate.setUpdatedAt(now);
-        lockMapper.insertIfAbsent(candidate);
+        lockMapper.insertOrLockExisting(candidate);
 
         PricingLockEntity lock = lockMapper.selectByOrderNoForUpdate(request.orderNo());
         if (lock == null) {
@@ -202,27 +218,15 @@ public class MarketingService {
             return lockView(lock);
         }
 
-        List<EligibleBenefit> eligible = loadEligibleBenefits(request, now);
-        Map<Integer, Long> remainingCents = new LinkedHashMap<>();
-        request.lines().stream().sorted(Comparator.comparingInt(PricingLine::lineNo))
-                .forEach(line -> remainingCents.put(line.lineNo(), cents(line.lineAmount())));
-        BigDecimal totalDiscount = ZERO;
-        for (EligibleBenefit selected : eligible) {
-            long remaining = remainingCents.values().stream().mapToLong(Long::longValue).sum();
-            if (remaining <= 0) {
-                throw new MarketingException(MarketingError.BENEFIT_NOT_ELIGIBLE);
-            }
-            long appliedCents = Math.min(cents(selected.rule().getDiscountAmount()), remaining);
-            Map<Integer, Long> shares = allocate(appliedCents, remainingCents);
-            BigDecimal applied = amount(appliedCents);
-            insertAppliedBenefit(lock, selected, applied, shares, request.lines(), now);
-            shares.forEach((lineNo, share) -> remainingCents.compute(lineNo, (ignored, value) -> value - share));
-            lockUserBenefit(selected.benefit(), request.orderNo(), now);
-            totalDiscount = totalDiscount.add(applied);
+        PricingCalculation calculation = calculatePricing(
+                request, loadEligibleBenefits(request, now, true));
+        for (CalculatedBenefit applied : calculation.benefits()) {
+            insertAppliedBenefit(lock, applied, now);
+            lockUserBenefit(applied.eligible().benefit(), request.orderNo(), now);
         }
 
-        lock.setDiscountAmount(totalDiscount);
-        lock.setPayableAmount(request.originalAmount().subtract(totalDiscount));
+        lock.setDiscountAmount(calculation.discountAmount());
+        lock.setPayableAmount(calculation.payableAmount());
         lock.setStatus(PricingLockStatus.LOCKED.name());
         lock.setLockedAt(now);
         lock.setUpdatedAt(now);
@@ -232,7 +236,18 @@ public class MarketingService {
 
     @Transactional
     public PricingLockView release(String orderNo) {
-        PricingLockEntity lock = requireLock(orderNo);
+        return release(requireLock(orderNo), orderNo);
+    }
+
+    @Transactional
+    public void releaseIfPresent(String orderNo) {
+        PricingLockEntity lock = lockMapper.selectByOrderNoForUpdate(orderNo);
+        if (lock != null) {
+            release(lock, orderNo);
+        }
+    }
+
+    private PricingLockView release(PricingLockEntity lock, String orderNo) {
         if (PricingLockStatus.RELEASED.name().equals(lock.getStatus())) {
             return lockView(lock);
         }
@@ -240,7 +255,7 @@ public class MarketingService {
                 || PricingLockStatus.LOCKING.name().equals(lock.getStatus())) {
             throw new MarketingException(MarketingError.INVALID_STATE);
         }
-        Instant now = clock.instant();
+        Instant now = lockMapper.currentTime();
         for (PricingLockBenefitEntity applied : lockBenefits(lock.getId())) {
             UserBenefitEntity benefit = benefitMapper.selectByBenefitNoForUpdate(applied.getBenefitNo());
             if (benefit == null || !BenefitStatus.LOCKED.name().equals(benefit.getStatus())
@@ -262,14 +277,25 @@ public class MarketingService {
 
     @Transactional
     public PricingLockView redeem(String orderNo) {
-        PricingLockEntity lock = requireLock(orderNo);
+        return redeem(requireLock(orderNo), orderNo);
+    }
+
+    @Transactional
+    public void redeemIfPresent(String orderNo) {
+        PricingLockEntity lock = lockMapper.selectByOrderNoForUpdate(orderNo);
+        if (lock != null) {
+            redeem(lock, orderNo);
+        }
+    }
+
+    private PricingLockView redeem(PricingLockEntity lock, String orderNo) {
         if (PricingLockStatus.REDEEMED.name().equals(lock.getStatus())) {
             return lockView(lock);
         }
         if (!PricingLockStatus.LOCKED.name().equals(lock.getStatus())) {
             throw new MarketingException(MarketingError.INVALID_STATE);
         }
-        Instant now = clock.instant();
+        Instant now = lockMapper.currentTime();
         for (PricingLockBenefitEntity applied : lockBenefits(lock.getId())) {
             UserBenefitEntity benefit = benefitMapper.selectByBenefitNoForUpdate(applied.getBenefitNo());
             if (benefit == null || !BenefitStatus.LOCKED.name().equals(benefit.getStatus())
@@ -301,13 +327,39 @@ public class MarketingService {
     }
 
     private ValidatedPricing validatePricing(LockPricingCommand command) {
-        BigDecimal original = money(command.originalAmount(), false);
-        if (command.lines() == null || command.lines().isEmpty() || command.lines().size() > 100
-                || command.benefitNos().size() > BenefitType.values().length
-                || new HashSet<>(command.benefitNos()).size() != command.benefitNos().size()) {
+        if (command == null || command.orderNo() == null || command.orderNo().isBlank()) {
             throw new MarketingException(MarketingError.INVALID_PRICING_REQUEST);
         }
-        List<PricingLine> lines = command.lines().stream().map(line ->
+        return validatePricing(command.orderNo().trim(), command.userId(), command.originalAmount(),
+                command.deliveryRegion(), command.lines(), command.benefitNos());
+    }
+
+    private ValidatedPricing validatePricing(PreviewPricingCommand command) {
+        if (command == null) {
+            throw new MarketingException(MarketingError.INVALID_PRICING_REQUEST);
+        }
+        return validatePricing(null, command.userId(), command.originalAmount(),
+                command.deliveryRegion(), command.lines(), command.benefitNos());
+    }
+
+    private ValidatedPricing validatePricing(
+            String orderNo,
+            Long userId,
+            BigDecimal originalAmount,
+            DeliveryRegion deliveryRegion,
+            List<PricingLine> requestedLines,
+            List<String> requestedBenefitNos) {
+        BigDecimal original = money(originalAmount, false);
+        List<String> benefitNos = requestedBenefitNos == null ? List.of() : requestedBenefitNos;
+        if (userId == null || userId <= 0 || requestedLines == null || requestedLines.isEmpty()
+                || requestedLines.stream().anyMatch(Objects::isNull)
+                || requestedLines.size() > 100 || benefitNos.size() > BenefitType.values().length
+                || benefitNos.stream().anyMatch(benefitNo ->
+                benefitNo == null || benefitNo.isBlank() || benefitNo.length() > 64)
+                || new HashSet<>(benefitNos).size() != benefitNos.size()) {
+            throw new MarketingException(MarketingError.INVALID_PRICING_REQUEST);
+        }
+        List<PricingLine> lines = requestedLines.stream().map(line ->
                 new PricingLine(line.lineNo(), line.skuId(), money(line.lineAmount(), false))).toList();
         if (lines.stream().anyMatch(line -> line.lineNo() <= 0 || line.skuId() == null || line.skuId() <= 0)
                 || lines.stream().map(PricingLine::lineNo).distinct().count() != lines.size()
@@ -315,23 +367,29 @@ public class MarketingService {
                 .compareTo(original) != 0) {
             throw new MarketingException(MarketingError.INVALID_PRICING_REQUEST);
         }
-        DeliveryRegion region = command.deliveryRegion();
+        DeliveryRegion region = deliveryRegion;
         if (region == null || !optionalRegionCode(region.provinceCode())
                 || !optionalRegionCode(region.cityCode()) || !optionalRegionCode(region.districtCode())) {
             throw new MarketingException(MarketingError.INVALID_PRICING_REQUEST);
         }
-        return new ValidatedPricing(command.orderNo().trim(), command.userId(), original, region,
-                lines, command.benefitNos().stream().map(String::trim).sorted().toList());
+        return new ValidatedPricing(orderNo, userId, original, region,
+                lines, benefitNos.stream().map(String::trim).sorted().toList());
     }
 
-    private List<EligibleBenefit> loadEligibleBenefits(ValidatedPricing request, Instant now) {
+    private List<EligibleBenefit> loadEligibleBenefits(
+            ValidatedPricing request,
+            Instant now,
+            boolean lockRows) {
         List<EligibleBenefit> result = new ArrayList<>();
         Set<BenefitType> usedTypes = new HashSet<>();
         for (String benefitNo : request.benefitNos()) {
-            UserBenefitEntity benefit = benefitMapper.selectByBenefitNoForUpdate(benefitNo);
+            UserBenefitEntity benefit = lockRows
+                    ? benefitMapper.selectByBenefitNoForUpdate(benefitNo)
+                    : benefitMapper.selectOne(new LambdaQueryWrapper<UserBenefitEntity>()
+                    .eq(UserBenefitEntity::getBenefitNo, benefitNo));
             if (benefit == null || !benefit.getUserId().equals(request.userId())
                     || !(BenefitStatus.AVAILABLE.name().equals(benefit.getStatus())
-                    || (BenefitStatus.LOCKED.name().equals(benefit.getStatus())
+                    || (lockRows && BenefitStatus.LOCKED.name().equals(benefit.getStatus())
                     && request.orderNo().equals(benefit.getLockedOrderNo())))) {
                 throw new MarketingException(MarketingError.BENEFIT_NOT_ELIGIBLE);
             }
@@ -351,6 +409,60 @@ public class MarketingService {
         return result.stream().sorted(Comparator
                 .comparingInt((EligibleBenefit item) -> item.rule().getStackOrder())
                 .thenComparing(item -> item.benefit().getBenefitNo())).toList();
+    }
+
+    private PricingCalculation calculatePricing(
+            ValidatedPricing request,
+            List<EligibleBenefit> eligible) {
+        Map<Integer, Long> remainingCents = new LinkedHashMap<>();
+        Map<Integer, PricingLine> linesByNumber = new HashMap<>();
+        request.lines().stream().sorted(Comparator.comparingInt(PricingLine::lineNo))
+                .forEach(line -> {
+                    remainingCents.put(line.lineNo(), cents(line.lineAmount()));
+                    linesByNumber.put(line.lineNo(), line);
+                });
+
+        EnumMap<BenefitType, BigDecimal> totals = new EnumMap<>(BenefitType.class);
+        List<CalculatedBenefit> applied = new ArrayList<>();
+        BigDecimal totalDiscount = ZERO;
+        for (EligibleBenefit selected : eligible) {
+            long remaining = remainingCents.values().stream().mapToLong(Long::longValue).sum();
+            if (remaining <= 0) {
+                throw new MarketingException(MarketingError.BENEFIT_NOT_ELIGIBLE);
+            }
+            long appliedCents = Math.min(cents(selected.rule().getDiscountAmount()), remaining);
+            Map<Integer, Long> shares = allocate(appliedCents, remainingCents);
+            BigDecimal appliedAmount = amount(appliedCents);
+            List<DiscountAllocation> allocations = shares.entrySet().stream()
+                    .filter(entry -> entry.getValue() > 0)
+                    .map(entry -> {
+                        PricingLine line = linesByNumber.get(entry.getKey());
+                        return new DiscountAllocation(
+                                entry.getKey(),
+                                line.skuId(),
+                                selected.benefit().getBenefitNo(),
+                                selected.rule().getRuleCode(),
+                                BenefitType.valueOf(selected.rule().getBenefitType()),
+                                amount(entry.getValue()));
+                    })
+                    .toList();
+            AppliedBenefit view = new AppliedBenefit(
+                    selected.benefit().getBenefitNo(),
+                    selected.rule().getRuleCode(),
+                    BenefitType.valueOf(selected.rule().getBenefitType()),
+                    appliedAmount,
+                    allocations);
+            applied.add(new CalculatedBenefit(selected, view));
+            totals.merge(view.benefitType(), appliedAmount, BigDecimal::add);
+            totalDiscount = totalDiscount.add(appliedAmount);
+            shares.forEach((lineNo, share) ->
+                    remainingCents.compute(lineNo, (ignored, value) -> value - share));
+        }
+        return new PricingCalculation(
+                totalDiscount,
+                request.originalAmount().subtract(totalDiscount),
+                totals,
+                applied);
     }
 
     private boolean regionMatches(Long ruleId, DeliveryRegion deliveryRegion) {
@@ -402,39 +514,33 @@ public class MarketingService {
 
     private void insertAppliedBenefit(
             PricingLockEntity lock,
-            EligibleBenefit selected,
-            BigDecimal applied,
-            Map<Integer, Long> shares,
-            List<PricingLine> lines,
+            CalculatedBenefit applied,
             Instant now) {
+        EligibleBenefit selected = applied.eligible();
+        AppliedBenefit view = applied.view();
         PricingLockBenefitEntity snapshot = new PricingLockBenefitEntity();
         snapshot.setId(IdWorker.getId());
         snapshot.setLockId(lock.getId());
         snapshot.setUserBenefitId(selected.benefit().getId());
-        snapshot.setBenefitNo(selected.benefit().getBenefitNo());
-        snapshot.setRuleCode(selected.rule().getRuleCode());
-        snapshot.setBenefitType(selected.rule().getBenefitType());
-        snapshot.setDiscountAmount(applied);
+        snapshot.setBenefitNo(view.benefitNo());
+        snapshot.setRuleCode(view.ruleCode());
+        snapshot.setBenefitType(view.benefitType().name());
+        snapshot.setDiscountAmount(view.discountAmount());
         snapshot.setCreatedAt(now);
         lockBenefitMapper.insert(snapshot);
-        Map<Integer, PricingLine> byLine = new HashMap<>();
-        lines.forEach(line -> byLine.put(line.lineNo(), line));
-        shares.forEach((lineNo, share) -> {
-            if (share == 0) {
-                return;
-            }
+        for (DiscountAllocation source : view.allocations()) {
             PricingLockAllocationEntity allocation = new PricingLockAllocationEntity();
             allocation.setId(IdWorker.getId());
             allocation.setLockId(lock.getId());
-            allocation.setBenefitNo(selected.benefit().getBenefitNo());
-            allocation.setRuleCode(selected.rule().getRuleCode());
-            allocation.setBenefitType(selected.rule().getBenefitType());
-            allocation.setLineNo(lineNo);
-            allocation.setSkuId(byLine.get(lineNo).skuId());
-            allocation.setDiscountAmount(amount(share));
+            allocation.setBenefitNo(source.benefitNo());
+            allocation.setRuleCode(source.ruleCode());
+            allocation.setBenefitType(source.benefitType().name());
+            allocation.setLineNo(source.lineNo());
+            allocation.setSkuId(source.skuId());
+            allocation.setDiscountAmount(source.discountAmount());
             allocation.setCreatedAt(now);
             allocationMapper.insert(allocation);
-        });
+        }
     }
 
     private void lockUserBenefit(UserBenefitEntity benefit, String orderNo, Instant now) {
@@ -529,13 +635,16 @@ public class MarketingService {
     }
 
     private BigDecimal money(BigDecimal value, boolean allowZero) {
+        if (value == null) {
+            throw new MarketingException(MarketingError.INVALID_PRICING_REQUEST);
+        }
         try {
             BigDecimal normalized = value.setScale(2, RoundingMode.UNNECESSARY);
             if (allowZero ? normalized.signum() < 0 : normalized.signum() <= 0) {
                 throw new MarketingException(MarketingError.INVALID_PRICING_REQUEST);
             }
             return normalized;
-        } catch (NullPointerException | ArithmeticException exception) {
+        } catch (ArithmeticException exception) {
             throw new MarketingException(MarketingError.INVALID_PRICING_REQUEST, exception);
         }
     }
@@ -567,6 +676,24 @@ public class MarketingService {
     }
 
     private record EligibleBenefit(UserBenefitEntity benefit, MarketingRuleEntity rule) {
+    }
+
+    private record CalculatedBenefit(EligibleBenefit eligible, AppliedBenefit view) {
+    }
+
+    private record PricingCalculation(
+            BigDecimal discountAmount,
+            BigDecimal payableAmount,
+            EnumMap<BenefitType, BigDecimal> totals,
+            List<CalculatedBenefit> benefits
+    ) {
+        private BigDecimal total(BenefitType type) {
+            return totals.getOrDefault(type, ZERO);
+        }
+
+        private List<AppliedBenefit> appliedBenefits() {
+            return benefits.stream().map(CalculatedBenefit::view).toList();
+        }
     }
 
     private record ValidatedPricing(

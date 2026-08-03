@@ -1,10 +1,25 @@
 ecommerce:
   foundation:
     configuration-source: nacos
+  messaging:
+    consumer-failure-retry:
+      scheduler: fulfillmentControlScheduler
   security:
     token:
       issuer: ecommerce-identity
   fulfillment:
+    scheduling:
+      default-pool-size: 2
+      outbox-pool-size: 1
+      control-pool-size: 1
+      shutdown-await: 10s
+    geo:
+      cache-enabled: ${FULFILLMENT_GEO_CACHE_ENABLED:true}
+      mysql-spatial-enabled: ${FULFILLMENT_GEO_MYSQL_SPATIAL_ENABLED:true}
+      namespace: ${FULFILLMENT_GEO_NAMESPACE:local}
+      max-radius-meters: 2000000
+      max-results: 200
+      rebuild-limit: 5000
     outbox:
       enabled: true
       endpoints: 127.0.0.1:18082
@@ -12,6 +27,8 @@ ecommerce:
       fixed-delay: 2000
       retry-delay: 5s
       batch-size: 50
+      publisher-id: ${FULFILLMENT_OUTBOX_PUBLISHER_ID:${random.uuid}}
+      lease-duration: ${FULFILLMENT_OUTBOX_LEASE_DURATION:60s}
     order-consumer:
       enabled: true
       endpoints: 127.0.0.1:18082

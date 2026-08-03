@@ -52,12 +52,22 @@ public class CatalogExceptionHandler {
                 .body(ApiResponse.failure("INVALID_REQUEST_BODY", "Request body is invalid"));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure("VALIDATION_ERROR", exception.getMessage()));
+    }
+
     private HttpStatus statusFor(CatalogError error) {
         return switch (error) {
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case DUPLICATE_RESOURCE, INVALID_STATE, CONCURRENT_MODIFICATION -> HttpStatus.CONFLICT;
-            case INVALID_MEDIA -> HttpStatus.BAD_REQUEST;
-            case MEDIA_STORAGE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+            case DUPLICATE_RESOURCE, INVALID_STATE, CONCURRENT_MODIFICATION,
+                    IDEMPOTENCY_CONFLICT, REVIEW_ALREADY_SUBMITTED,
+                    REVIEW_NOT_PUBLISHED, REVIEW_ACTION_NOT_ALLOWED,
+                    REPORT_ALREADY_RESOLVED -> HttpStatus.CONFLICT;
+            case INVALID_CURSOR, INVALID_MEDIA -> HttpStatus.BAD_REQUEST;
+            case MEDIA_STORAGE_UNAVAILABLE, CAPACITY_PROTECTION,
+                    SEARCH_INDEX_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
         };
     }
 }

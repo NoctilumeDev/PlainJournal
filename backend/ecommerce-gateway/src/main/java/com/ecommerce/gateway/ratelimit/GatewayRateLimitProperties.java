@@ -20,7 +20,8 @@ public record GatewayRateLimitProperties(
         @Min(100) long localMaximumSize,
         @Valid @NotNull Policy login,
         @Valid @NotNull Policy registration,
-        @Valid @NotNull Policy refresh
+        @Valid @NotNull Policy refresh,
+        @Valid @NotNull Policy flashSale
 ) {
 
     public record Policy(@Min(1) int limit, @NotNull Duration window) {

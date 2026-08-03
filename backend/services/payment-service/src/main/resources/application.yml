@@ -18,7 +18,7 @@ spring:
       config:
         group: ECOMMERCE
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${PAYMENT_DB_NAME:ecom_payment}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${PAYMENT_DB_NAME:ecom_payment}?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true
     username: ${PAYMENT_DB_USER:ecom_payment_app}
     password: ${PAYMENT_DB_PASSWORD:}
     hikari:
@@ -38,17 +38,43 @@ mybatis-plus:
       id-type: assign_id
 
 ecommerce:
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: 16
+    consumer-failure-retry:
+      scheduler: paymentControlScheduler
   security:
     token:
       secret: ${IDENTITY_JWT_SECRET:}
       issuer: ecommerce-identity
+    metrics:
+      token: ${METRICS_SCRAPE_TOKEN:}
+  clients:
     internal:
-      token: ${INTERNAL_SERVICE_TOKEN:}
+      token: ${PAYMENT_INTERNAL_SERVICE_TOKEN:}
       caller: payment-service
   payment:
+    scheduling:
+      default-pool-size: 1
+      outbox-pool-size: 1
+      control-pool-size: 2
+      shutdown-await: 10s
     client:
-      connect-timeout: 2s
-      read-timeout: 4s
+      service-discovery-enabled: true
+      trade-base-url: http://trade-service
+      connect-timeout: 500ms
+      read-timeout: 1500ms
+      trade-payment-context:
+        total-budget: 5s
+        max-attempts: 2
+        retry-wait: 100ms
+        max-concurrent-calls: 8
+        bulkhead-max-wait: 250ms
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        open-state-wait: 10s
+        half-open-calls: 2
     mock-channel:
       callback-secret: ${MOCK_PAYMENT_CALLBACK_SECRET:}
       callback-max-skew: 5m
@@ -59,6 +85,8 @@ ecommerce:
       fixed-delay: 2000
       retry-delay: 5s
       batch-size: 50
+      publisher-id: ${PAYMENT_OUTBOX_PUBLISHER_ID:${random.uuid}}
+      lease-duration: ${PAYMENT_OUTBOX_LEASE_DURATION:60s}
     refund-consumer:
       enabled: ${PAYMENT_REFUND_CONSUMER_ENABLED:true}
       endpoints: ${ROCKETMQ_PROXY_ENDPOINT:127.0.0.1:18082}
@@ -68,17 +96,65 @@ ecommerce:
       batch-size: 16
       invisible-duration: 30s
       await-duration: 5s
+    refund-dispatch:
+      enabled: ${PAYMENT_REFUND_DISPATCH_ENABLED:true}
+      fixed-delay: 2000
+      initial-delay: 2000
+      retry-delay: 5s
+      dispatcher-id: ${PAYMENT_REFUND_DISPATCHER_ID:${random.uuid}}
+      claim-timeout: 5m
+      batch-size: 50
+      max-attempts: 10
+    reconciliation:
+      enabled: ${PAYMENT_RECONCILIATION_ENABLED:true}
+      fixed-delay: 10000
+      initial-delay: 10000
+      scan-limit: 500
 
 management:
+  tracing:
+    enabled: true
+    baggage:
+      enabled: false
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+    propagation:
+      type: W3C
+  otlp:
+    tracing:
+      export:
+        enabled: ${OTLP_TRACING_EXPORT_ENABLED:false}
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://127.0.0.1:14318/v1/traces}
+      transport: http
+      connect-timeout: 1s
+      timeout: 3s
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   endpoints:
     web:
       exposure:
-        include: health,info
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+          - consumerfailures
+          - businessprocesses
   endpoint:
     health:
       probes:
         enabled: true
       show-details: never
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only
+    businessprocesses:
+      access: read-only
 
 logging:
   pattern:

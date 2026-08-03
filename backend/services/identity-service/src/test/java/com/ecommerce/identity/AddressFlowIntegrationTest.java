@@ -29,7 +29,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AddressFlowIntegrationTest {
 
     private static final String PASSWORD = "ReaderPass123";
-    private static final String INTERNAL_TOKEN = "test-internal-service-token-with-at-least-32-characters";
+    private static final String TRADE_INTERNAL_TOKEN =
+            "test-trade-internal-token-with-at-least-32-characters";
+    private static final String PAYMENT_INTERNAL_TOKEN =
+            "test-payment-internal-token-with-at-least-32-characters";
 
     private final MockMvc mockMvc;
     private final ObjectMapper objectMapper;
@@ -56,14 +59,19 @@ class AddressFlowIntegrationTest {
         UserSession owner = registerAndLogin("address-owner@example.com");
         UserSession other = registerAndLogin("address-other@example.com");
 
-        Long firstId = createAddress(owner.token(), "Old Street 1", false).at("/data/id").longValue();
-        Long secondId = createAddress(owner.token(), "Lake Road 2", false).at("/data/id").longValue();
+        JsonNode firstAddress = createAddress(owner.token(), "Old Street 1", false);
+        JsonNode secondAddress = createAddress(owner.token(), "Lake Road 2", false);
+        assertThat(firstAddress.at("/data/id").isTextual()).isTrue();
+        assertThat(secondAddress.at("/data/id").isTextual()).isTrue();
+        Long firstId = Long.parseLong(firstAddress.at("/data/id").asText());
+        Long secondId = Long.parseLong(secondAddress.at("/data/id").asText());
 
         mockMvc.perform(get("/api/v1/identity/addresses")
                         .header("Authorization", bearer(owner.token())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[0].id").value(firstId))
+                .andExpect(jsonPath("$.data[0].id").isString())
+                .andExpect(jsonPath("$.data[0].id").value(firstId.toString()))
                 .andExpect(jsonPath("$.data[0].defaultAddress").value(true));
 
         mockMvc.perform(post("/api/v1/identity/addresses/{addressId}/default", secondId)
@@ -78,11 +86,15 @@ class AddressFlowIntegrationTest {
         mockMvc.perform(get(internalPath)).andExpect(status().isUnauthorized());
         mockMvc.perform(get(internalPath)
                         .header("X-Internal-Service", "payment-service")
-                        .header("X-Internal-Token", INTERNAL_TOKEN))
+                        .header("X-Internal-Token", TRADE_INTERNAL_TOKEN))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get(internalPath)
                         .header("X-Internal-Service", "trade-service")
-                        .header("X-Internal-Token", INTERNAL_TOKEN))
+                        .header("X-Internal-Token", PAYMENT_INTERNAL_TOKEN))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get(internalPath)
+                        .header("X-Internal-Service", "trade-service")
+                        .header("X-Internal-Token", TRADE_INTERNAL_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.detailAddress").value("Lake Road 2"))
                 .andExpect(jsonPath("$.data.provinceCode").value("330000"))
@@ -90,9 +102,9 @@ class AddressFlowIntegrationTest {
                 .andExpect(jsonPath("$.data.districtCode").value("330106"));
 
         mockMvc.perform(get("/api/v1/identity/internal/users/{userId}/addresses/{addressId}",
-                                other.id(), secondId)
+                        other.id(), secondId)
                         .header("X-Internal-Service", "trade-service")
-                        .header("X-Internal-Token", INTERNAL_TOKEN))
+                        .header("X-Internal-Token", TRADE_INTERNAL_TOKEN))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ADDRESS_NOT_FOUND"));
 
@@ -107,7 +119,8 @@ class AddressFlowIntegrationTest {
     void rejectsInvalidAddressInputAndCrossUserMutation() throws Exception {
         UserSession owner = registerAndLogin("address-owner@example.com");
         UserSession other = registerAndLogin("address-other@example.com");
-        Long addressId = createAddress(owner.token(), "Old Street 1", false).at("/data/id").longValue();
+        Long addressId = Long.parseLong(
+                createAddress(owner.token(), "Old Street 1", false).at("/data/id").asText());
 
         Map<String, Object> invalid = address("Old Street 1", false);
         invalid.put("phone", "javascript:alert(1)");

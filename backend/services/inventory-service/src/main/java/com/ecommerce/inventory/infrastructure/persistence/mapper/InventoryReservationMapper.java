@@ -11,16 +11,20 @@ import java.util.List;
 
 public interface InventoryReservationMapper extends BaseMapper<InventoryReservationEntity> {
 
+    @Select("SELECT CURRENT_TIMESTAMP(3)")
+    Instant currentTime();
+
     @Insert("""
-            INSERT IGNORE INTO inventory_reservation
+            INSERT INTO inventory_reservation
                 (id, reservation_no, order_no, request_hash, warehouse_id, status,
                  expires_at, version, created_at, updated_at)
             VALUES
                 (#{entity.id}, #{entity.reservationNo}, #{entity.orderNo}, #{entity.requestHash},
                  #{entity.warehouseId}, #{entity.status}, #{entity.expiresAt}, #{entity.version},
                  #{entity.createdAt}, #{entity.updatedAt})
+            ON DUPLICATE KEY UPDATE id = id
             """)
-    int insertIfAbsent(@Param("entity") InventoryReservationEntity entity);
+    int insertOrLockExisting(@Param("entity") InventoryReservationEntity entity);
 
     @Select("SELECT * FROM inventory_reservation WHERE reservation_no = #{reservationNo} FOR UPDATE")
     InventoryReservationEntity selectForUpdate(@Param("reservationNo") String reservationNo);

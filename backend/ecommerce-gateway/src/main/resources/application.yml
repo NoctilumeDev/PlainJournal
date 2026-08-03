@@ -52,6 +52,22 @@ spring:
               uri: lb://marketing-service
               predicates:
                 - Path=/api/v1/marketing/**
+            - id: chat-service
+              uri: lb://chat-service
+              predicates:
+                - Path=/api/v1/chat/**
+            - id: chat-websocket
+              uri: lb:ws://chat-service
+              predicates:
+                - Path=/ws/chat
+            - id: notification-service
+              uri: lb://notification-service
+              predicates:
+                - Path=/api/v1/notifications/**
+            - id: analytics-service
+              uri: lb://analytics-service
+              predicates:
+                - Path=/api/v1/analytics/**
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
@@ -63,6 +79,10 @@ spring:
         shutdown-timeout: 100ms
 
 ecommerce:
+  security:
+    token:
+      secret: ${IDENTITY_JWT_SECRET:}
+      issuer: ecommerce-identity
   gateway:
     rate-limit:
       namespace: ${APP_ENV:local}
@@ -79,6 +99,9 @@ ecommerce:
       refresh:
         limit: 30
         window: 1m
+      flash-sale:
+        limit: 60
+        window: 1s
 
 management:
   endpoints:

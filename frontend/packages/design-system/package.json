@@ -1,0 +1,16 @@
+{
+  "name": "@plain-journal/design-system",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "sideEffects": [
+    "./src/*.css"
+  ],
+  "exports": {
+    "./tokens.css": "./src/tokens.css",
+    "./base.css": "./src/base.css"
+  },
+  "scripts": {
+    "test": "node --test src/tokens.test.mjs"
+  }
+}

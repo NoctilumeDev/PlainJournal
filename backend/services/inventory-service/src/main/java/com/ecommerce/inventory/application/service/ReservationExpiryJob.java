@@ -1,5 +1,6 @@
 package com.ecommerce.inventory.application.service;
 
+import com.ecommerce.inventory.infrastructure.config.InventorySchedulingConfig;
 import com.ecommerce.inventory.application.exception.InventoryException;
 import com.ecommerce.inventory.infrastructure.config.ReservationProperties;
 import org.slf4j.Logger;
@@ -26,7 +27,9 @@ public class ReservationExpiryJob {
         this.properties = properties;
     }
 
-    @Scheduled(fixedDelayString = "${ecommerce.inventory.reservation.expiry-scan-delay:5000}")
+    @Scheduled(
+            fixedDelayString = "${ecommerce.inventory.reservation.expiry-scan-delay:5000}",
+            scheduler = InventorySchedulingConfig.CONTROL_SCHEDULER)
     public void expireReservations() {
         for (String reservationNo : inventoryService.findExpiredReservationNumbers(properties.expiryBatchSize())) {
             try {

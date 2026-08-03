@@ -1,0 +1,78 @@
+server:
+  port: 0
+
+spring:
+  config:
+    import: []
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+  datasource:
+    url: jdbc:h2:mem:notification;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  mail:
+    host: 127.0.0.1
+    port: 12525
+
+ecommerce:
+  foundation:
+    configuration-source: local-default
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: 2
+  security:
+    token:
+      secret: test-only-notification-jwt-secret-32-characters
+      issuer: ecommerce-identity-test
+    metrics:
+      token: test-only-metrics-token-with-at-least-32-characters
+  notification:
+    events:
+      enabled: false
+    email:
+      enabled: true
+      worker-enabled: false
+      from: no-reply@plainjournal.local
+      worker-id: notification-test
+      maximum-attempts: 2
+      retry-delay: 100ms
+      lease-duration: 10s
+      batch-size: 10
+      initial-delay: 0
+      fixed-delay: 250
+
+management:
+  tracing:
+    enabled: false
+  otlp:
+    tracing:
+      export:
+        enabled: false
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,consumerfailures
+  endpoint:
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only
+
+logging:
+  level:
+    root: warn
+    com.alibaba.nacos: error

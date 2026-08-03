@@ -1,5 +1,8 @@
 package com.ecommerce.catalog.application.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -8,14 +11,24 @@ public final class CatalogModels {
     private CatalogModels() {
     }
 
-    public record CategoryView(Long id, Long parentId, String name, String slug, int sortOrder) {
+    public record CategoryView(
+            @JsonSerialize(using = ToStringSerializer.class) Long id,
+            @JsonSerialize(using = ToStringSerializer.class) Long parentId,
+            String name,
+            String slug,
+            int sortOrder
+    ) {
     }
 
-    public record BrandView(Long id, String name, String slug) {
+    public record BrandView(
+            @JsonSerialize(using = ToStringSerializer.class) Long id,
+            String name,
+            String slug
+    ) {
     }
 
     public record SkuView(
-            Long id,
+            @JsonSerialize(using = ToStringSerializer.class) Long id,
             String skuCode,
             String name,
             String specJson,
@@ -27,8 +40,8 @@ public final class CatalogModels {
     }
 
     public record MediaView(
-            Long id,
-            Long skuId,
+            @JsonSerialize(using = ToStringSerializer.class) Long id,
+            @JsonSerialize(using = ToStringSerializer.class) Long skuId,
             String objectKey,
             String mimeType,
             long sizeBytes,
@@ -38,7 +51,7 @@ public final class CatalogModels {
     }
 
     public record ProductSummary(
-            Long id,
+            @JsonSerialize(using = ToStringSerializer.class) Long id,
             String title,
             String subtitle,
             CategoryView category,
@@ -49,7 +62,7 @@ public final class CatalogModels {
     }
 
     public record ProductDetail(
-            Long id,
+            @JsonSerialize(using = ToStringSerializer.class) Long id,
             String title,
             String subtitle,
             String description,

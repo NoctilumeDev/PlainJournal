@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Getter
@@ -18,6 +19,10 @@ public class CartItemEntity {
     private Long userId;
     private Long productId;
     private Long skuId;
+    private String productTitle;
+    private String skuName;
+    private String specJson;
+    private BigDecimal unitPrice;
     private Long quantity;
     private Boolean selected;
     private Instant createdAt;

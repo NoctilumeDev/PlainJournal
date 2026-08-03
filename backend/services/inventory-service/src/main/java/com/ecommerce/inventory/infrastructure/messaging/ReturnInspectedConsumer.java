@@ -3,6 +3,7 @@ package com.ecommerce.inventory.infrastructure.messaging;
 import com.ecommerce.inventory.application.model.InventoryModels.ReturnInspectedCommand;
 import com.ecommerce.inventory.application.model.InventoryModels.ReturnInspectedItem;
 import com.ecommerce.inventory.application.service.ReturnStockService;
+import com.ecommerce.platform.common.observability.ConsumerFailureRetryHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -26,13 +27,14 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @ConditionalOnProperty(prefix = "ecommerce.inventory.return-consumer", name = "enabled", havingValue = "true")
-public class ReturnInspectedConsumer {
+public class ReturnInspectedConsumer implements ConsumerFailureRetryHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ReturnInspectedConsumer.class);
 
     private final ReturnEventConsumerProperties properties;
     private final ReturnStockService returnStockService;
     private final ObjectMapper objectMapper;
+    private final ConsumerFailureRecorder failureRecorder;
     private final ClientServiceProvider provider = ClientServiceProvider.loadService();
     private final AtomicLong nextWarningAt = new AtomicLong();
     private volatile SimpleConsumer consumer;
@@ -40,10 +42,12 @@ public class ReturnInspectedConsumer {
     public ReturnInspectedConsumer(
             ReturnEventConsumerProperties properties,
             ReturnStockService returnStockService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ConsumerFailureRecorder failureRecorder) {
         this.properties = properties;
         this.returnStockService = returnStockService;
         this.objectMapper = objectMapper;
+        this.failureRecorder = failureRecorder;
     }
 
     @Scheduled(fixedDelayString = "${ecommerce.inventory.return-consumer.fixed-delay:1000}")
@@ -52,12 +56,32 @@ public class ReturnInspectedConsumer {
         try {
             active = consumer();
             for (MessageView message : active.receive(properties.batchSize(), properties.invisibleDuration())) {
+                ReturnInspectedCommand command;
                 try {
-                    returnStockService.stock(parse(message));
+                    command = parse(message);
+                } catch (Exception exception) {
+                    failureRecorder.recordTerminal(message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    log.error("ReturnInspected payload requires attention: messageId={}",
+                            message.getMessageId(), exception);
+                    continue;
+                }
+                try {
+                    returnStockService.stock(command);
+                    failureRecorder.markRecovered(message, properties.consumerGroup());
                     active.ack(message);
                 } catch (Exception exception) {
-                    log.warn("ReturnInspected processing failed and will be retried: messageId={}",
-                            message.getMessageId(), exception);
+                    boolean terminal = failureRecorder.record(
+                            message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    if (terminal) {
+                        log.error("ReturnInspected moved to the local compensation queue: messageId={}",
+                                message.getMessageId(), exception);
+                    } else {
+                        log.warn("ReturnInspected processing failed; durable MySQL retry now owns "
+                                        + "recovery: messageId={}",
+                                message.getMessageId(), exception);
+                    }
                 }
             }
             nextWarningAt.set(0);
@@ -68,7 +92,23 @@ public class ReturnInspectedConsumer {
     }
 
     private ReturnInspectedCommand parse(MessageView message) throws Exception {
-        JsonNode envelope = objectMapper.readTree(readBody(message.getBody()));
+        return parseEnvelope(objectMapper.readTree(readBody(message.getBody())));
+    }
+
+    @Override
+    public String consumerGroup() {
+        return properties.consumerGroup();
+    }
+
+    @Override
+    public void retry(String rawPayload) throws Exception {
+        returnStockService.stock(parseEnvelope(objectMapper.readTree(rawPayload)));
+    }
+
+    private ReturnInspectedCommand parseEnvelope(JsonNode envelope) {
+        if (envelope.path("payloadVersion").asInt(-1) != 1) {
+            throw new IllegalArgumentException("Unsupported ReturnInspected payload version");
+        }
         if (!"ReturnInspected".equals(envelope.path("eventType").asText())) {
             throw new IllegalArgumentException("Unexpected return event type");
         }

@@ -18,9 +18,18 @@ spring:
       config:
         group: ECOMMERCE
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${MARKETING_DB_NAME:ecom_marketing}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${MARKETING_DB_NAME:ecom_marketing}?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&allowPublicKeyRetrieval=true&useSSL=false
     username: ${MARKETING_DB_USER:ecom_marketing_app}
     password: ${MARKETING_DB_PASSWORD:}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16379}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 500ms
+      timeout: 500ms
+      lettuce:
+        shutdown-timeout: 100ms
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -30,17 +39,56 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 ecommerce:
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: 16
+    consumer-failure-retry:
+      scheduler: marketingControlScheduler
   foundation:
     configuration-source: local-default
   security:
     token:
       secret: ${IDENTITY_JWT_SECRET:}
       issuer: ecommerce-identity
+    metrics:
+      token: ${METRICS_SCRAPE_TOKEN:}
     internal:
-      token: ${INTERNAL_SERVICE_TOKEN:}
+      token: ${TRADE_INTERNAL_SERVICE_TOKEN:}
       allowed-callers:
         - trade-service
   marketing:
+    scheduling:
+      default-pool-size: 2
+      outbox-pool-size: 1
+      control-pool-size: 1
+      shutdown-await: 10s
+    flash-sale:
+      namespace: ${APP_ENV:local}
+      redis-enabled: ${MARKETING_FLASH_SALE_REDIS_ENABLED:true}
+      result-retention: 24h
+      processing-timeout: 2m
+      timeout-scan-delay: 5000
+      timeout-scan-batch-size: 100
+      pending-recovery-delay: 1000
+      pending-recovery-batch-size: 100
+    flash-sale-outbox:
+      enabled: ${MARKETING_FLASH_SALE_OUTBOX_ENABLED:true}
+      endpoints: ${ROCKETMQ_PROXY_ENDPOINT:127.0.0.1:18082}
+      topic: ecommerce-flash-sale-events
+      fixed-delay: 500
+      retry-delay: 2s
+      batch-size: 100
+      publisher-id: ${MARKETING_FLASH_SALE_OUTBOX_PUBLISHER_ID:${random.uuid}}
+      lease-duration: 30s
+    flash-sale-result-consumer:
+      enabled: ${MARKETING_FLASH_SALE_RESULT_CONSUMER_ENABLED:true}
+      endpoints: ${ROCKETMQ_PROXY_ENDPOINT:127.0.0.1:18082}
+      topic: ecommerce-flash-sale-events
+      consumer-group: marketing-flash-sale-result-v1
+      fixed-delay: 500
+      batch-size: 32
+      invisible-duration: 30s
+      await-duration: 5s
     order-consumer:
       enabled: ${MARKETING_ORDER_CONSUMER_ENABLED:true}
       endpoints: ${ROCKETMQ_PROXY_ENDPOINT:127.0.0.1:18082}
@@ -52,15 +100,25 @@ ecommerce:
       await-duration: 5s
 
 management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus,consumerfailures
   endpoint:
     health:
       probes:
         enabled: true
       show-details: never
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only
 
 logging:
   pattern:

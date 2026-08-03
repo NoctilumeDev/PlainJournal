@@ -1,6 +1,8 @@
 package com.ecommerce.identity;
 
+import com.ecommerce.identity.application.model.LoginContext;
 import com.ecommerce.identity.application.port.LoginAttemptStore;
+import com.ecommerce.identity.application.service.AuthenticationService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -12,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -97,6 +100,15 @@ class AuthenticationFlowIntegrationTest {
     }
 
     @Test
+    void loginDoesNotHoldADatabaseTransactionAcrossPasswordAndRedisWork() throws Exception {
+        Transactional transaction = AuthenticationService.class
+                .getMethod("login", String.class, String.class, LoginContext.class)
+                .getAnnotation(Transactional.class);
+
+        assertThat(transaction).isNull();
+    }
+
+    @Test
     void completesRegistrationLoginRefreshAndLogout() throws Exception {
         mockMvc.perform(post("/api/v1/identity/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -106,6 +118,7 @@ class AuthenticationFlowIntegrationTest {
                                 "displayName", "First Reader"
                         ))))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").isString())
                 .andExpect(jsonPath("$.data.email").value(EMAIL))
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.roles[0]").value("CUSTOMER"));
@@ -143,6 +156,7 @@ class AuthenticationFlowIntegrationTest {
         mockMvc.perform(get("/api/v1/identity/me")
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").isString())
                 .andExpect(jsonPath("$.data.email").value(EMAIL))
                 .andExpect(jsonPath("$.data.roles[0]").value("CUSTOMER"));
 

@@ -12,28 +12,29 @@ import com.ecommerce.payment.application.port.TradePort.PaymentContext;
 import com.ecommerce.payment.domain.OutboxStatus;
 import com.ecommerce.payment.domain.PaymentStatus;
 import com.ecommerce.payment.infrastructure.config.MockChannelProperties;
+import com.ecommerce.payment.infrastructure.persistence.entity.CallbackSecurityAuditEntity;
 import com.ecommerce.payment.infrastructure.persistence.entity.OutboxEventEntity;
 import com.ecommerce.payment.infrastructure.persistence.entity.PaymentCallbackLogEntity;
 import com.ecommerce.payment.infrastructure.persistence.entity.PaymentOrderEntity;
 import com.ecommerce.payment.infrastructure.persistence.entity.PaymentTransactionEntity;
+import com.ecommerce.payment.infrastructure.persistence.mapper.CallbackSecurityAuditMapper;
 import com.ecommerce.payment.infrastructure.persistence.mapper.OutboxEventMapper;
 import com.ecommerce.payment.infrastructure.persistence.mapper.PaymentCallbackLogMapper;
 import com.ecommerce.payment.infrastructure.persistence.mapper.PaymentOrderMapper;
 import com.ecommerce.payment.infrastructure.persistence.mapper.PaymentTransactionMapper;
+import com.ecommerce.platform.common.observability.MessagingTracing;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -46,48 +47,57 @@ public class PaymentService {
     private final PaymentOrderMapper paymentMapper;
     private final PaymentTransactionMapper transactionMapper;
     private final PaymentCallbackLogMapper callbackMapper;
+    private final CallbackSecurityAuditMapper securityAuditMapper;
     private final OutboxEventMapper outboxMapper;
     private final TradePort tradePort;
     private final MockChannelProperties channelProperties;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
-    private final Clock clock;
+    private final MessagingTracing messagingTracing;
 
     public PaymentService(
             PaymentOrderMapper paymentMapper,
             PaymentTransactionMapper transactionMapper,
             PaymentCallbackLogMapper callbackMapper,
+            CallbackSecurityAuditMapper securityAuditMapper,
             OutboxEventMapper outboxMapper,
             TradePort tradePort,
             MockChannelProperties channelProperties,
             ObjectMapper objectMapper,
             TransactionTemplate transactionTemplate,
-            Clock clock) {
+            MessagingTracing messagingTracing) {
         this.paymentMapper = paymentMapper;
         this.transactionMapper = transactionMapper;
         this.callbackMapper = callbackMapper;
+        this.securityAuditMapper = securityAuditMapper;
         this.outboxMapper = outboxMapper;
         this.tradePort = tradePort;
         this.channelProperties = channelProperties;
         this.objectMapper = objectMapper;
         this.transactionTemplate = transactionTemplate;
-        this.clock = clock;
+        this.messagingTracing = messagingTracing;
     }
 
     public PaymentView createPayment(CreatePaymentCommand command) {
-        String channel = command.channel().toUpperCase();
+        String channel = command.channel().toUpperCase(Locale.ROOT);
         if (!MOCK_CHANNEL.equals(channel)) {
             throw new PaymentException(PaymentError.UNSUPPORTED_CHANNEL);
         }
+        String requestHash = sha256(command.orderNo() + "|" + channel);
+        PaymentView existing = findStablePayment(
+                command.userId(), command.idempotencyKey(), command.orderNo(), channel, requestHash);
+        if (existing != null) {
+            return existing;
+        }
         PaymentContext context = tradePort.getPaymentContext(command.orderNo());
         if (!context.userId().equals(command.userId())) {
-            throw new PaymentException(PaymentError.FORBIDDEN);
+            throw new PaymentException(PaymentError.RESOURCE_NOT_FOUND);
         }
-        if (!"PENDING_PAYMENT".equals(context.status()) || !context.paymentDeadline().isAfter(clock.instant())) {
+        Instant now = paymentMapper.currentTime();
+        if (!"PENDING_PAYMENT".equals(context.status())
+                || !context.paymentDeadline().isAfter(now)) {
             throw new PaymentException(PaymentError.INVALID_STATE);
         }
-        String requestHash = sha256(context.orderNo() + "|" + channel);
-        Instant now = clock.instant();
         long id = IdWorker.getId();
 
         return Objects.requireNonNull(transactionTemplate.execute(ignored -> {
@@ -105,7 +115,7 @@ public class PaymentService {
             candidate.setVersion(0);
             candidate.setCreatedAt(now);
             candidate.setUpdatedAt(now);
-            paymentMapper.insertIfAbsent(candidate);
+            paymentMapper.insertOrLockExisting(candidate);
 
             PaymentOrderEntity payment = paymentMapper.selectByIdempotencyForUpdate(
                     command.userId(), command.idempotencyKey());
@@ -129,17 +139,36 @@ public class PaymentService {
     public PaymentView getPayment(Long userId, String paymentNo) {
         PaymentOrderEntity payment = requirePayment(paymentNo);
         if (!payment.getUserId().equals(userId)) {
-            throw new PaymentException(PaymentError.FORBIDDEN);
+            throw new PaymentException(PaymentError.RESOURCE_NOT_FOUND);
+        }
+        return view(payment);
+    }
+
+    public PaymentView getPaymentByIdempotencyKey(Long userId, String idempotencyKey) {
+        PaymentOrderEntity payment = paymentMapper.selectByIdempotency(userId, idempotencyKey);
+        if (payment == null) {
+            throw new PaymentException(PaymentError.RESOURCE_NOT_FOUND);
+        }
+        return view(payment);
+    }
+
+    public PaymentView getPaymentByOrder(Long userId, String orderNo) {
+        PaymentOrderEntity payment = paymentMapper.selectByOrder(orderNo);
+        if (payment == null || !payment.getUserId().equals(userId)) {
+            throw new PaymentException(PaymentError.RESOURCE_NOT_FOUND);
         }
         return view(payment);
     }
 
     public PaymentView processMockCallback(CallbackCommand command) {
-        Instant receivedAt = clock.instant();
-        PaymentError preflightError = preflightError(command, receivedAt);
-        if (preflightError != null) {
-            recordRejectedCallback(command, preflightError, false, receivedAt);
-            throw new PaymentException(preflightError);
+        Instant receivedAt = paymentMapper.currentTime();
+        if (!MockCallbackSignature.verify(command, channelProperties.callbackSecret())) {
+            recordUntrustedCallback(command, receivedAt);
+            throw new PaymentException(PaymentError.INVALID_SIGNATURE);
+        }
+        if (callbackExpired(command.timestamp(), receivedAt)) {
+            recordRejectedCallback(command, PaymentError.CALLBACK_EXPIRED, true, receivedAt);
+            throw new PaymentException(PaymentError.CALLBACK_EXPIRED);
         }
         try {
             return Objects.requireNonNull(transactionTemplate.execute(ignored -> processValidCallback(command, receivedAt)));
@@ -152,7 +181,7 @@ public class PaymentService {
     private PaymentView processValidCallback(CallbackCommand command, Instant receivedAt) {
         String requestHash = callbackHash(command);
         PaymentCallbackLogEntity candidate = callbackLog(command, requestHash, true, "RECEIVED", null, receivedAt);
-        callbackMapper.insertIfAbsent(candidate);
+        callbackMapper.insertOrLockExisting(candidate);
         PaymentCallbackLogEntity callback = callbackMapper.selectForUpdate(MOCK_CHANNEL, command.externalEventId());
         if (callback == null) {
             throw new PaymentException(PaymentError.CONCURRENT_MODIFICATION);
@@ -188,12 +217,13 @@ public class PaymentService {
         callback.setProcessingStatus("PROCESSED");
         callback.setProcessedAt(receivedAt);
         callback.setErrorMessage(null);
-        callbackMapper.updateById(callback);
+        requireUpdated(callbackMapper.updateById(callback));
         return view(payment);
     }
 
     private void applySuccess(PaymentOrderEntity payment, CallbackCommand command, Instant now) {
         if (PaymentStatus.SUCCESS.name().equals(payment.getStatus())) {
+            requireSameChannelTransactionNo(payment, command);
             return;
         }
         if (!PaymentStatus.PROCESSING.name().equals(payment.getStatus())) {
@@ -210,6 +240,7 @@ public class PaymentService {
 
     private void applyFailure(PaymentOrderEntity payment, CallbackCommand command, Instant now) {
         if (PaymentStatus.FAILED.name().equals(payment.getStatus())) {
+            requireSameChannelTransactionNo(payment, command);
             return;
         }
         if (!PaymentStatus.PROCESSING.name().equals(payment.getStatus())) {
@@ -227,6 +258,16 @@ public class PaymentService {
             CallbackCommand command,
             String status,
             Instant now) {
+        PaymentTransactionEntity existing = transactionMapper.selectByChannelTransactionNoForUpdate(
+                MOCK_CHANNEL, command.externalTransactionNo());
+        if (existing != null) {
+            if (!existing.getPaymentId().equals(payment.getId())
+                    || existing.getAmount().compareTo(command.amount()) != 0
+                    || !existing.getStatus().equals(status)) {
+                throw new PaymentException(PaymentError.IDEMPOTENCY_CONFLICT);
+            }
+            return;
+        }
         PaymentTransactionEntity transaction = new PaymentTransactionEntity();
         transaction.setId(IdWorker.getId());
         transaction.setPaymentId(payment.getId());
@@ -239,6 +280,15 @@ public class PaymentService {
         transactionMapper.insert(transaction);
     }
 
+    private void requireSameChannelTransactionNo(
+            PaymentOrderEntity payment,
+            CallbackCommand command) {
+        if (!Objects.equals(
+                payment.getChannelTransactionNo(), command.externalTransactionNo())) {
+            throw new PaymentException(PaymentError.IDEMPOTENCY_CONFLICT);
+        }
+    }
+
     private void appendPaymentSucceeded(PaymentOrderEntity payment, Instant now) {
         String eventId = UUID.randomUUID().toString();
         Map<String, Object> envelope = new LinkedHashMap<>();
@@ -249,7 +299,8 @@ public class PaymentService {
         envelope.put("aggregateVersion", payment.getVersion());
         envelope.put("occurredAt", now);
         envelope.put("producer", "payment-service");
-        envelope.put("traceId", MDC.get("traceId"));
+        envelope.put("traceId", messagingTracing.currentTraceId());
+        envelope.put("traceContext", messagingTracing.capture());
         envelope.put("payloadVersion", 1);
         envelope.put("payload", Map.of(
                 "paymentNo", payment.getPaymentNo(),
@@ -276,15 +327,28 @@ public class PaymentService {
         outboxMapper.insert(event);
     }
 
-    private PaymentError preflightError(CallbackCommand command, Instant now) {
-        long skew = Math.abs(now.getEpochSecond() - command.timestamp());
-        if (skew > channelProperties.callbackMaxSkew().toSeconds()) {
-            return PaymentError.CALLBACK_EXPIRED;
+    private boolean callbackExpired(long timestamp, Instant now) {
+        try {
+            return Math.abs(Math.subtractExact(now.getEpochSecond(), timestamp))
+                    > channelProperties.callbackMaxSkew().toSeconds();
+        } catch (ArithmeticException exception) {
+            return true;
         }
-        if (!MockCallbackSignature.verify(command, channelProperties.callbackSecret())) {
-            return PaymentError.INVALID_SIGNATURE;
-        }
-        return null;
+    }
+
+    private void recordUntrustedCallback(CallbackCommand command, Instant receivedAt) {
+        CallbackSecurityAuditEntity audit = new CallbackSecurityAuditEntity();
+        audit.setId(IdWorker.getId());
+        audit.setCallbackType("PAYMENT");
+        audit.setChannel(MOCK_CHANNEL);
+        audit.setClaimedExternalEventId(command.externalEventId());
+        audit.setReferenceNo(command.paymentNo());
+        audit.setRequestHash(callbackHash(command));
+        audit.setSignatureValid(false);
+        audit.setErrorCode(PaymentError.INVALID_SIGNATURE.code());
+        audit.setRawPayload(command.rawPayload());
+        audit.setReceivedAt(receivedAt);
+        transactionTemplate.executeWithoutResult(ignored -> securityAuditMapper.insert(audit));
     }
 
     private void recordRejectedCallback(
@@ -292,7 +356,7 @@ public class PaymentService {
             PaymentError error,
             boolean signatureValid,
             Instant receivedAt) {
-        transactionTemplate.executeWithoutResult(ignored -> callbackMapper.insertIfAbsent(callbackLog(
+        transactionTemplate.executeWithoutResult(ignored -> callbackMapper.insertOrLockExisting(callbackLog(
                 command, callbackHash(command), signatureValid, "REJECTED", error.code(), receivedAt)));
     }
 
@@ -328,6 +392,32 @@ public class PaymentService {
             throw new PaymentException(PaymentError.RESOURCE_NOT_FOUND);
         }
         return payment;
+    }
+
+    private PaymentView findStablePayment(
+            Long userId,
+            String idempotencyKey,
+            String orderNo,
+            String channel,
+            String requestHash) {
+        PaymentOrderEntity byIdempotency = paymentMapper.selectByIdempotency(userId, idempotencyKey);
+        if (byIdempotency != null) {
+            if (!constantEquals(byIdempotency.getRequestHash(), requestHash)) {
+                throw new PaymentException(PaymentError.IDEMPOTENCY_CONFLICT);
+            }
+            return view(byIdempotency);
+        }
+        PaymentOrderEntity byOrder = paymentMapper.selectByOrder(orderNo);
+        if (byOrder == null) {
+            return null;
+        }
+        if (!byOrder.getUserId().equals(userId)) {
+            throw new PaymentException(PaymentError.RESOURCE_NOT_FOUND);
+        }
+        if (!byOrder.getChannel().equals(channel)) {
+            throw new PaymentException(PaymentError.IDEMPOTENCY_CONFLICT);
+        }
+        return view(byOrder);
     }
 
     private PaymentView view(PaymentOrderEntity payment) {

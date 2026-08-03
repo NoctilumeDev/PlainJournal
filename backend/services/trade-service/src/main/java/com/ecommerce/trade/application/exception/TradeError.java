@@ -8,8 +8,11 @@ public enum TradeError {
     PRODUCT_UNAVAILABLE("PRODUCT_UNAVAILABLE", "A requested product or SKU is unavailable"),
     ADDRESS_UNAVAILABLE("ADDRESS_UNAVAILABLE", "The delivery address is unavailable"),
     CART_LIMIT_EXCEEDED("CART_LIMIT_EXCEEDED", "The cart item limit was exceeded"),
+    INVALID_CART_MERGE("INVALID_CART_MERGE", "The guest cart merge request is invalid"),
+    INVALID_CURSOR("INVALID_CURSOR", "The order continuation cursor is invalid"),
     REMOTE_DEPENDENCY_UNAVAILABLE("REMOTE_DEPENDENCY_UNAVAILABLE", "A required service is temporarily unavailable"),
     AFTER_SALE_ALREADY_EXISTS("AFTER_SALE_ALREADY_EXISTS", "The order already has an after-sale request"),
+    AFTER_SALE_WINDOW_EXPIRED("AFTER_SALE_WINDOW_EXPIRED", "The after-sale application window has expired"),
     CONCURRENT_MODIFICATION("CONCURRENT_MODIFICATION", "The order was modified by another request");
 
     private final String code;

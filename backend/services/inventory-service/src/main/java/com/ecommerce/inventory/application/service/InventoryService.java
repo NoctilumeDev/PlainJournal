@@ -37,15 +37,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -60,7 +57,6 @@ public class InventoryService {
     private final StockMovementMapper movementMapper;
     private final OutboxEventMapper outboxMapper;
     private final ObjectMapper objectMapper;
-    private final Clock clock;
 
     public InventoryService(
             WarehouseMapper warehouseMapper,
@@ -70,8 +66,7 @@ public class InventoryService {
             InventoryReservationItemMapper reservationItemMapper,
             StockMovementMapper movementMapper,
             OutboxEventMapper outboxMapper,
-            ObjectMapper objectMapper,
-            Clock clock) {
+            ObjectMapper objectMapper) {
         this.warehouseMapper = warehouseMapper;
         this.balanceMapper = balanceMapper;
         this.adjustmentMapper = adjustmentMapper;
@@ -80,12 +75,11 @@ public class InventoryService {
         this.movementMapper = movementMapper;
         this.outboxMapper = outboxMapper;
         this.objectMapper = objectMapper;
-        this.clock = clock;
     }
 
     @Transactional
     public WarehouseView createWarehouse(String code, String name) {
-        Instant now = clock.instant();
+        Instant now = reservationMapper.currentTime();
         WarehouseEntity warehouse = new WarehouseEntity();
         warehouse.setCode(code);
         warehouse.setName(name);
@@ -128,7 +122,7 @@ public class InventoryService {
         requireActiveWarehouse(warehouseId);
         String requestHash = sha256(String.join("|",
                 movementNo, warehouseId.toString(), skuId.toString(), Long.toString(quantityDelta), reason));
-        Instant now = clock.instant();
+        Instant now = reservationMapper.currentTime();
 
         StockAdjustmentEntity candidate = new StockAdjustmentEntity();
         candidate.setId(IdWorker.getId());
@@ -141,14 +135,14 @@ public class InventoryService {
         candidate.setStatus("PENDING");
         candidate.setCreatedAt(now);
         candidate.setUpdatedAt(now);
-        int inserted = adjustmentMapper.insertIfAbsent(candidate);
+        adjustmentMapper.insertOrLockExisting(candidate);
 
         StockAdjustmentEntity adjustment = adjustmentMapper.selectForUpdate(movementNo);
         if (adjustment == null) {
             throw new InventoryException(InventoryError.CONCURRENT_MODIFICATION);
         }
         requireSameHash(adjustment.getRequestHash(), requestHash);
-        if (inserted == 0) {
+        if (!candidate.getId().equals(adjustment.getId())) {
             if (!"APPLIED".equals(adjustment.getStatus())) {
                 throw new InventoryException(InventoryError.CONCURRENT_MODIFICATION);
             }
@@ -201,10 +195,13 @@ public class InventoryService {
 
     @Transactional
     public ReservationView reserve(ReserveInventoryCommand command) {
+        if (command == null || command.expiresAt() == null) {
+            throw new InventoryException(InventoryError.INVALID_STATE);
+        }
         List<ReservationLineCommand> items = normalizeItems(command.items());
         String requestHash = reservationHash(command, items);
         requireActiveWarehouse(command.warehouseId());
-        Instant now = clock.instant();
+        Instant now = reservationMapper.currentTime();
 
         InventoryReservationEntity candidate = new InventoryReservationEntity();
         candidate.setId(IdWorker.getId());
@@ -217,14 +214,20 @@ public class InventoryService {
         candidate.setVersion(0);
         candidate.setCreatedAt(now);
         candidate.setUpdatedAt(now);
-        int inserted = reservationMapper.insertIfAbsent(candidate);
+        reservationMapper.insertOrLockExisting(candidate);
 
         InventoryReservationEntity reservation = reservationMapper.selectForUpdate(command.reservationNo());
         if (reservation == null) {
             throw new InventoryException(InventoryError.CONCURRENT_MODIFICATION);
         }
         requireSameHash(reservation.getRequestHash(), requestHash);
-        if (inserted == 0) {
+        if (!candidate.getId().equals(reservation.getId())) {
+            return reservationView(reservation);
+        }
+
+        if (!reservation.getExpiresAt().isAfter(now)) {
+            transitionReservation(reservation, ReservationStatus.REJECTED, now);
+            appendReservationEvent(reservation, "InventoryReservationRejected", items, now);
             return reservationView(reservation);
         }
 
@@ -284,9 +287,21 @@ public class InventoryService {
         if (ReservationStatus.CONFIRMED.name().equals(reservation.getStatus())) {
             return reservationView(reservation);
         }
+        if (List.of(
+                ReservationStatus.EXPIRED.name(),
+                ReservationStatus.RELEASED.name(),
+                ReservationStatus.REJECTED.name()).contains(reservation.getStatus())) {
+            return reservationView(reservation);
+        }
         requireReserved(reservation);
+        Instant now = reservationMapper.currentTime();
+        if (!reservation.getExpiresAt().isAfter(now)) {
+            return releaseReservation(
+                    reservationNo,
+                    ReservationStatus.EXPIRED,
+                    true);
+        }
         List<InventoryReservationItemEntity> items = reservationItems(reservation.getId());
-        Instant now = clock.instant();
         for (InventoryReservationItemEntity item : items) {
             if (balanceMapper.confirm(reservation.getWarehouseId(), item.getSkuId(), item.getQuantity(), now) != 1) {
                 throw new InventoryException(InventoryError.CONCURRENT_MODIFICATION);
@@ -316,7 +331,8 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public List<String> findExpiredReservationNumbers(int limit) {
-        return reservationMapper.selectExpiredReservationNumbers(clock.instant(), limit);
+        return reservationMapper.selectExpiredReservationNumbers(
+                reservationMapper.currentTime(), limit);
     }
 
     private ReservationView releaseReservation(
@@ -328,7 +344,7 @@ public class InventoryService {
             return reservationView(reservation);
         }
         requireReserved(reservation);
-        Instant now = clock.instant();
+        Instant now = reservationMapper.currentTime();
         if (requireExpired && reservation.getExpiresAt().isAfter(now)) {
             throw new InventoryException(InventoryError.INVALID_STATE);
         }
@@ -468,7 +484,8 @@ public class InventoryService {
                 .map(item -> item.skuId() + ":" + item.quantity())
                 .collect(Collectors.joining(","));
         return sha256(String.join("|",
-                command.reservationNo(), command.orderNo(), command.warehouseId().toString(), itemText));
+                command.reservationNo(), command.orderNo(), command.warehouseId().toString(),
+                command.expiresAt().toString(), itemText));
     }
 
     private String sha256(String value) {

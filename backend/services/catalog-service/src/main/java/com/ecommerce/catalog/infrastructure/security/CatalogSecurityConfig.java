@@ -1,6 +1,8 @@
 package com.ecommerce.catalog.infrastructure.security;
 
 import com.ecommerce.platform.common.api.ApiResponse;
+import com.ecommerce.platform.common.security.MetricsScrapeAuthenticationFilter;
+import com.ecommerce.platform.common.security.MetricsScrapeProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -19,6 +21,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -26,7 +29,10 @@ import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(CatalogTokenProperties.class)
+@EnableConfigurationProperties({
+        CatalogTokenProperties.class,
+        MetricsScrapeProperties.class
+})
 public class CatalogSecurityConfig {
 
     @Bean
@@ -44,7 +50,10 @@ public class CatalogSecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain catalogSecurityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+    public SecurityFilterChain catalogSecurityFilterChain(
+            HttpSecurity http,
+            ObjectMapper objectMapper,
+            MetricsScrapeProperties metricsScrapeProperties) throws Exception {
         JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
         authoritiesConverter.setAuthoritiesClaimName("roles");
         authoritiesConverter.setAuthorityPrefix("ROLE_");
@@ -58,16 +67,25 @@ public class CatalogSecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 "/api/v1/catalog/status",
-                                "/actuator/health",
-                                "/actuator/info"
+                        "/actuator/health",
+                        "/actuator/health/**",
+                        "/actuator/info"
                         ).permitAll()
+                        .requestMatchers("/actuator/prometheus").hasRole("METRICS")
+                        .requestMatchers("/actuator/consumerfailures").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/catalog/categories",
                                 "/api/v1/catalog/brands",
                                 "/api/v1/catalog/products",
-                                "/api/v1/catalog/products/**"
+                                "/api/v1/catalog/products/**",
+                                "/api/v1/catalog/search/products"
                         ).permitAll()
                         .requestMatchers("/api/v1/catalog/admin/**").hasAnyRole("ADMIN", "OPERATOR")
+                        .requestMatchers(
+                                "/api/v1/catalog/review-eligibilities",
+                                "/api/v1/catalog/reviews",
+                                "/api/v1/catalog/reviews/**"
+                        ).hasRole("CUSTOMER")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(authenticationConverter))
@@ -84,6 +102,9 @@ public class CatalogSecurityConfig {
                             objectMapper.writeValue(response.getOutputStream(),
                                     ApiResponse.failure("FORBIDDEN", "Access is denied"));
                         }));
+        http.addFilterBefore(
+                new MetricsScrapeAuthenticationFilter(metricsScrapeProperties),
+                BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 }

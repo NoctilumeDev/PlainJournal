@@ -6,10 +6,15 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.Instant;
+
 public interface PricingLockMapper extends BaseMapper<PricingLockEntity> {
 
+    @Select("SELECT CURRENT_TIMESTAMP(3)")
+    Instant currentTime();
+
     @Insert("""
-            INSERT IGNORE INTO pricing_lock
+            INSERT INTO pricing_lock
                 (id, lock_no, order_no, user_id, request_hash, original_amount,
                  discount_amount, payable_amount, status, locked_at, released_at,
                  redeemed_at, version, created_at, updated_at)
@@ -19,8 +24,9 @@ public interface PricingLockMapper extends BaseMapper<PricingLockEntity> {
                  #{entity.payableAmount}, #{entity.status}, #{entity.lockedAt},
                  #{entity.releasedAt}, #{entity.redeemedAt}, #{entity.version},
                  #{entity.createdAt}, #{entity.updatedAt})
+            ON DUPLICATE KEY UPDATE id = id
             """)
-    int insertIfAbsent(@Param("entity") PricingLockEntity entity);
+    int insertOrLockExisting(@Param("entity") PricingLockEntity entity);
 
     @Select("SELECT * FROM pricing_lock WHERE order_no = #{orderNo} FOR UPDATE")
     PricingLockEntity selectByOrderNoForUpdate(@Param("orderNo") String orderNo);

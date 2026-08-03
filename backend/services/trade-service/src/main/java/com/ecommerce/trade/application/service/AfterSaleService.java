@@ -20,6 +20,7 @@ import com.ecommerce.trade.infrastructure.persistence.entity.AfterSaleOrderEntit
 import com.ecommerce.trade.infrastructure.persistence.entity.OrderItemEntity;
 import com.ecommerce.trade.infrastructure.persistence.entity.OutboxEventEntity;
 import com.ecommerce.trade.infrastructure.persistence.entity.TradeOrderEntity;
+import com.ecommerce.trade.infrastructure.config.AfterSaleProperties;
 import com.ecommerce.trade.infrastructure.persistence.mapper.AfterSaleHistoryMapper;
 import com.ecommerce.trade.infrastructure.persistence.mapper.AfterSaleItemMapper;
 import com.ecommerce.trade.infrastructure.persistence.mapper.AfterSaleOrderMapper;
@@ -27,6 +28,8 @@ import com.ecommerce.trade.infrastructure.persistence.mapper.ConsumedEventMapper
 import com.ecommerce.trade.infrastructure.persistence.mapper.OrderItemMapper;
 import com.ecommerce.trade.infrastructure.persistence.mapper.OutboxEventMapper;
 import com.ecommerce.trade.infrastructure.persistence.mapper.TradeOrderMapper;
+import com.ecommerce.trade.infrastructure.sharding.TradeShardRouter;
+import com.ecommerce.platform.common.idempotency.PayloadFingerprint;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.MDC;
@@ -37,7 +40,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -63,7 +65,8 @@ public class AfterSaleService {
     private final ConsumedEventMapper consumedEventMapper;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
-    private final Clock clock;
+    private final AfterSaleProperties properties;
+    private final TradeShardRouter shardRouter;
 
     public AfterSaleService(
             AfterSaleOrderMapper afterSaleMapper,
@@ -75,7 +78,8 @@ public class AfterSaleService {
             ConsumedEventMapper consumedEventMapper,
             ObjectMapper objectMapper,
             TransactionTemplate transactionTemplate,
-            Clock clock) {
+            AfterSaleProperties properties,
+            TradeShardRouter shardRouter) {
         this.afterSaleMapper = afterSaleMapper;
         this.itemMapper = itemMapper;
         this.historyMapper = historyMapper;
@@ -85,13 +89,17 @@ public class AfterSaleService {
         this.consumedEventMapper = consumedEventMapper;
         this.objectMapper = objectMapper;
         this.transactionTemplate = transactionTemplate;
-        this.clock = clock;
+        this.properties = properties;
+        this.shardRouter = shardRouter;
     }
 
     public AfterSaleView apply(ApplyAfterSaleCommand command) {
+        if (!shardRouter.isRouted()) {
+            return shardRouter.executeForUser(command.userId(), () -> apply(command));
+        }
         String requestHash = sha256(command.orderNo() + "|" + command.reason());
         long id = IdWorker.getId();
-        Instant now = clock.instant();
+        Instant now = orderMapper.currentTime();
         return Objects.requireNonNull(transactionTemplate.execute(ignored -> {
             TradeOrderEntity order = orderMapper.selectForUpdate(command.orderNo());
             if (order == null) {
@@ -100,6 +108,10 @@ public class AfterSaleService {
             requireOwner(order.getUserId(), command.userId());
             if (!OrderStatus.COMPLETED.name().equals(order.getStatus()) || order.getWarehouseId() == null) {
                 throw new TradeException(TradeError.INVALID_STATE);
+            }
+            if (orderMapper.currentTime()
+                    .isAfter(order.getUpdatedAt().plus(properties.applicationWindow()))) {
+                throw new TradeException(TradeError.AFTER_SALE_WINDOW_EXPIRED);
             }
 
             AfterSaleOrderEntity candidate = new AfterSaleOrderEntity();
@@ -119,7 +131,7 @@ public class AfterSaleService {
             candidate.setVersion(0);
             candidate.setCreatedAt(now);
             candidate.setUpdatedAt(now);
-            int inserted = afterSaleMapper.insertIfAbsent(candidate);
+            afterSaleMapper.insertOrLockExisting(candidate);
 
             AfterSaleOrderEntity afterSale = afterSaleMapper.selectByIdempotencyForUpdate(
                     command.userId(), command.idempotencyKey());
@@ -132,7 +144,7 @@ public class AfterSaleService {
             if (!constantEquals(afterSale.getRequestHash(), requestHash)) {
                 throw new TradeException(TradeError.IDEMPOTENCY_CONFLICT);
             }
-            if (inserted == 1) {
+            if (candidate.getId().equals(afterSale.getId())) {
                 insertSnapshotItems(afterSale, orderItems(order.getId()), now);
                 appendHistory(afterSale, null, AfterSaleStatus.APPLIED.name(), "APPLY_AFTER_SALE",
                         command.reason(), "CUSTOMER", command.userId().toString(), now);
@@ -143,6 +155,10 @@ public class AfterSaleService {
     }
 
     public AfterSaleView review(ReviewAfterSaleCommand command) {
+        if (!shardRouter.isRouted()) {
+            AfterSaleOrderEntity located = require(command.afterSaleNo());
+            return shardRouter.executeForUser(located.getUserId(), () -> review(command));
+        }
         return Objects.requireNonNull(transactionTemplate.execute(ignored -> {
             AfterSaleOrderEntity afterSale = requireLocked(command.afterSaleNo());
             AfterSaleStatus target = command.approved() ? AfterSaleStatus.WAIT_RETURN : AfterSaleStatus.REJECTED;
@@ -152,7 +168,7 @@ public class AfterSaleService {
             requireStatus(afterSale, AfterSaleStatus.APPLIED);
             afterSale.setReviewReason(command.reason());
             if (command.approved()) {
-                afterSale.setApprovedAt(clock.instant());
+                afterSale.setApprovedAt(orderMapper.currentTime());
             }
             transition(afterSale, target, command.approved() ? "APPROVE_AFTER_SALE" : "REJECT_AFTER_SALE",
                     command.reason(), "ADMIN", command.operatorId(),
@@ -162,6 +178,9 @@ public class AfterSaleService {
     }
 
     public AfterSaleView cancel(Long userId, String afterSaleNo) {
+        if (!shardRouter.isRouted()) {
+            return shardRouter.executeForUser(userId, () -> cancel(userId, afterSaleNo));
+        }
         return Objects.requireNonNull(transactionTemplate.execute(ignored -> {
             AfterSaleOrderEntity afterSale = requireLocked(afterSaleNo);
             requireOwner(afterSale.getUserId(), userId);
@@ -176,12 +195,18 @@ public class AfterSaleService {
     }
 
     public AfterSaleView getForUser(Long userId, String afterSaleNo) {
+        if (!shardRouter.isRouted()) {
+            return shardRouter.executeForUser(userId, () -> getForUser(userId, afterSaleNo));
+        }
         AfterSaleOrderEntity afterSale = require(afterSaleNo);
         requireOwner(afterSale.getUserId(), userId);
         return view(afterSale);
     }
 
     public List<AfterSaleView> listForUser(Long userId) {
+        if (!shardRouter.isRouted()) {
+            return shardRouter.executeForUser(userId, () -> listForUser(userId));
+        }
         return afterSaleMapper.selectList(new LambdaQueryWrapper<AfterSaleOrderEntity>()
                         .eq(AfterSaleOrderEntity::getUserId, userId)
                         .orderByDesc(AfterSaleOrderEntity::getCreatedAt))
@@ -206,9 +231,20 @@ public class AfterSaleService {
     }
 
     public void applyFulfillmentEvent(AfterSaleFulfillmentEventCommand command) {
+        if (!shardRouter.isRouted()) {
+            shardRouter.runForUser(command.userId(), () -> applyFulfillmentEvent(command));
+            return;
+        }
         transactionTemplate.executeWithoutResult(ignored -> {
-            if (consumedEventMapper.insertIfAbsent(
-                    command.eventId(), FULFILLMENT_CONSUMER_GROUP, clock.instant()) != 1) {
+            String payloadFingerprint = PayloadFingerprint.of(
+                    command.eventType(),
+                    command.afterSaleNo(),
+                    command.returnReceiptNo(),
+                    command.orderNo(),
+                    command.userId());
+            if (!registerConsumed(
+                    command.eventId(), FULFILLMENT_CONSUMER_GROUP,
+                    command.userId(), payloadFingerprint)) {
                 return;
             }
             AfterSaleOrderEntity afterSale = requireLocked(command.afterSaleNo());
@@ -227,9 +263,20 @@ public class AfterSaleService {
     }
 
     public void applyReturnStocked(ReturnStockedCommand command) {
+        if (!shardRouter.isRouted()) {
+            shardRouter.runForUser(command.userId(), () -> applyReturnStocked(command));
+            return;
+        }
         transactionTemplate.executeWithoutResult(ignored -> {
-            if (consumedEventMapper.insertIfAbsent(
-                    command.eventId(), INVENTORY_CONSUMER_GROUP, clock.instant()) != 1) {
+            String payloadFingerprint = PayloadFingerprint.of(
+                    command.afterSaleNo(),
+                    command.returnReceiptNo(),
+                    command.orderNo(),
+                    command.userId(),
+                    command.warehouseId());
+            if (!registerConsumed(
+                    command.eventId(), INVENTORY_CONSUMER_GROUP,
+                    command.userId(), payloadFingerprint)) {
                 return;
             }
             AfterSaleOrderEntity afterSale = requireLocked(command.afterSaleNo());
@@ -254,14 +301,30 @@ public class AfterSaleService {
     }
 
     public void applyRefundEvent(RefundEventCommand command) {
+        if (!shardRouter.isRouted()) {
+            shardRouter.runForUser(command.userId(), () -> applyRefundEvent(command));
+            return;
+        }
         transactionTemplate.executeWithoutResult(ignored -> {
-            if (consumedEventMapper.insertIfAbsent(
-                    command.eventId(), REFUND_CONSUMER_GROUP, clock.instant()) != 1) {
+            String payloadFingerprint = PayloadFingerprint.of(
+                    command.eventType(),
+                    command.refundNo(),
+                    command.afterSaleNo(),
+                    command.orderNo(),
+                    command.paymentNo(),
+                    command.userId(),
+                    canonicalDecimal(command.amount()));
+            if (!registerConsumed(
+                    command.eventId(), REFUND_CONSUMER_GROUP,
+                    command.userId(), payloadFingerprint)) {
                 return;
             }
             AfterSaleOrderEntity afterSale = requireLocked(command.afterSaleNo());
             requireEventIdentity(afterSale, command.orderNo(), command.userId());
+            TradeOrderEntity order = orderMapper.selectById(afterSale.getOrderId());
             if (afterSale.getRefundAmount().compareTo(command.amount()) != 0
+                    || order == null
+                    || !Objects.equals(order.getPaymentNo(), command.paymentNo())
                     || (afterSale.getRefundNo() != null && !afterSale.getRefundNo().equals(command.refundNo()))) {
                 throw new TradeException(TradeError.IDEMPOTENCY_CONFLICT);
             }
@@ -274,11 +337,12 @@ public class AfterSaleService {
                         .contains(afterSale.getStatus())) {
                     throw new TradeException(TradeError.INVALID_STATE);
                 }
-                afterSale.setCompletedAt(clock.instant());
+                afterSale.setCompletedAt(orderMapper.currentTime());
                 transition(afterSale, AfterSaleStatus.COMPLETED, "REFUND_SUCCEEDED", null,
                         "SYSTEM", "payment-service", "AfterSaleCompleted");
             } else if ("RefundFailed".equals(command.eventType())) {
-                if (AfterSaleStatus.REFUND_FAILED.name().equals(afterSale.getStatus())) {
+                if (List.of(AfterSaleStatus.REFUND_FAILED.name(), AfterSaleStatus.COMPLETED.name())
+                        .contains(afterSale.getStatus())) {
                     return;
                 }
                 requireStatus(afterSale, AfterSaleStatus.REFUNDING);
@@ -288,6 +352,29 @@ public class AfterSaleService {
                 throw new TradeException(TradeError.IDEMPOTENCY_CONFLICT);
             }
         });
+    }
+
+    private boolean registerConsumed(
+            String eventId,
+            String consumerGroup,
+            Long ownerUserId,
+            String payloadFingerprint) {
+        if (consumedEventMapper.insertIfAbsent(
+                eventId, consumerGroup, ownerUserId, payloadFingerprint,
+                orderMapper.currentTime()) == 1) {
+            return true;
+        }
+        Long storedOwner = consumedEventMapper.selectOwnerUserId(eventId, consumerGroup);
+        String storedFingerprint = consumedEventMapper.selectPayloadFingerprint(eventId, consumerGroup);
+        if (!Objects.equals(storedOwner, ownerUserId)
+                || !PayloadFingerprint.matches(storedFingerprint, payloadFingerprint)) {
+            throw new TradeException(TradeError.IDEMPOTENCY_CONFLICT);
+        }
+        return false;
+    }
+
+    private String canonicalDecimal(BigDecimal value) {
+        return value == null ? null : value.stripTrailingZeros().toPlainString();
     }
 
     private void applyReturnShipmentSubmitted(AfterSaleOrderEntity afterSale) {
@@ -354,7 +441,7 @@ public class AfterSaleService {
             String operatorId,
             String eventType) {
         String from = afterSale.getStatus();
-        Instant now = clock.instant();
+        Instant now = orderMapper.currentTime();
         afterSale.setStatus(target.name());
         afterSale.setUpdatedAt(now);
         requireUpdated(afterSaleMapper.updateById(afterSale));

@@ -6,6 +6,7 @@ import com.ecommerce.fulfillment.application.exception.FulfillmentError;
 import com.ecommerce.fulfillment.application.exception.FulfillmentException;
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.AddTraceCommand;
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.DeliveryAddress;
+import com.ecommerce.fulfillment.application.model.FulfillmentModels.FulfillmentStatusHistoryView;
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.FulfillmentView;
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.LogisticsTraceView;
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.OrderPaidCommand;
@@ -13,11 +14,13 @@ import com.ecommerce.fulfillment.application.model.FulfillmentModels.ShipCommand
 import com.ecommerce.fulfillment.domain.FulfillmentStatus;
 import com.ecommerce.fulfillment.domain.LogisticsNodeType;
 import com.ecommerce.fulfillment.domain.OutboxStatus;
+import com.ecommerce.fulfillment.infrastructure.persistence.entity.FulfillmentExceptionResolutionEntity;
 import com.ecommerce.fulfillment.infrastructure.persistence.entity.FulfillmentOrderEntity;
 import com.ecommerce.fulfillment.infrastructure.persistence.entity.FulfillmentStatusHistoryEntity;
 import com.ecommerce.fulfillment.infrastructure.persistence.entity.LogisticsTraceEntity;
 import com.ecommerce.fulfillment.infrastructure.persistence.entity.OutboxEventEntity;
 import com.ecommerce.fulfillment.infrastructure.persistence.mapper.ConsumedEventMapper;
+import com.ecommerce.fulfillment.infrastructure.persistence.mapper.FulfillmentExceptionResolutionMapper;
 import com.ecommerce.fulfillment.infrastructure.persistence.mapper.FulfillmentOrderMapper;
 import com.ecommerce.fulfillment.infrastructure.persistence.mapper.FulfillmentStatusHistoryMapper;
 import com.ecommerce.fulfillment.infrastructure.persistence.mapper.LogisticsTraceMapper;
@@ -33,7 +36,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -52,8 +54,9 @@ public class FulfillmentService {
     private final LogisticsTraceMapper traceMapper;
     private final OutboxEventMapper outboxMapper;
     private final ConsumedEventMapper consumedEventMapper;
+    private final FulfillmentExceptionResolutionMapper exceptionResolutionMapper;
+    private final ShipmentGeoService shipmentGeoService;
     private final ObjectMapper objectMapper;
-    private final Clock clock;
 
     public FulfillmentService(
             FulfillmentOrderMapper orderMapper,
@@ -61,22 +64,39 @@ public class FulfillmentService {
             LogisticsTraceMapper traceMapper,
             OutboxEventMapper outboxMapper,
             ConsumedEventMapper consumedEventMapper,
-            ObjectMapper objectMapper,
-            Clock clock) {
+            FulfillmentExceptionResolutionMapper exceptionResolutionMapper,
+            ShipmentGeoService shipmentGeoService,
+            ObjectMapper objectMapper) {
         this.orderMapper = orderMapper;
         this.historyMapper = historyMapper;
         this.traceMapper = traceMapper;
         this.outboxMapper = outboxMapper;
         this.consumedEventMapper = consumedEventMapper;
+        this.exceptionResolutionMapper = exceptionResolutionMapper;
+        this.shipmentGeoService = shipmentGeoService;
         this.objectMapper = objectMapper;
-        this.clock = clock;
     }
 
     @Transactional
     public FulfillmentView createFromOrderPaid(OrderPaidCommand command) {
+        String payloadFingerprint = ConsumedEventFingerprint.of(objectMapper, command);
         if (consumedEventMapper.insertIfAbsent(
-                command.eventId(), ORDER_PAID_CONSUMER_GROUP, clock.instant()) != 1) {
-            return view(requireByOrderNo(command.orderNo()));
+                command.eventId(),
+                ORDER_PAID_CONSUMER_GROUP,
+                payloadFingerprint,
+                orderMapper.currentTime()) != 1) {
+            String storedFingerprint = consumedEventMapper.selectPayloadFingerprint(
+                    command.eventId(), ORDER_PAID_CONSUMER_GROUP);
+            if (!ConsumedEventFingerprint.matches(storedFingerprint, payloadFingerprint)) {
+                throw new FulfillmentException(FulfillmentError.IDEMPOTENCY_CONFLICT);
+            }
+            FulfillmentOrderEntity repeated = orderMapper.selectByOrderNoForUpdate(command.orderNo());
+            if (repeated == null
+                    || !repeated.getUserId().equals(command.userId())
+                    || !addressMatches(repeated, command.deliveryAddress())) {
+                throw new FulfillmentException(FulfillmentError.IDEMPOTENCY_CONFLICT);
+            }
+            return view(repeated);
         }
 
         FulfillmentOrderEntity existing = orderMapper.selectByOrderNoForUpdate(command.orderNo());
@@ -88,7 +108,7 @@ public class FulfillmentService {
             return view(existing);
         }
 
-        Instant now = clock.instant();
+        Instant now = orderMapper.currentTime();
         long id = IdWorker.getId();
         FulfillmentOrderEntity order = new FulfillmentOrderEntity();
         order.setId(id);
@@ -114,7 +134,7 @@ public class FulfillmentService {
             return view(order);
         }
         requireStatus(order, FulfillmentStatus.CREATED);
-        order.setPickedAt(clock.instant());
+        order.setPickedAt(orderMapper.currentTime());
         transition(order, FulfillmentStatus.PICKING, "START_PICKING", null,
                 "WAREHOUSE", operatorId, null);
         return view(order);
@@ -127,7 +147,7 @@ public class FulfillmentService {
             return view(order);
         }
         requireStatus(order, FulfillmentStatus.PICKING);
-        order.setPackedAt(clock.instant());
+        order.setPackedAt(orderMapper.currentTime());
         transition(order, FulfillmentStatus.PACKED, "MARK_PACKED", null,
                 "WAREHOUSE", operatorId, null);
         return view(order);
@@ -144,7 +164,7 @@ public class FulfillmentService {
         requireStatus(order, FulfillmentStatus.PACKED);
         order.setCarrier(command.carrier());
         order.setTrackingNo(command.trackingNo());
-        order.setShippedAt(clock.instant());
+        order.setShippedAt(orderMapper.currentTime());
         try {
             transition(order, FulfillmentStatus.SHIPPED, "SHIP", null,
                     "WAREHOUSE", command.operatorId(), "ShipmentDispatched");
@@ -173,7 +193,7 @@ public class FulfillmentService {
         }
 
         FulfillmentStatus target = targetForTrace(order, node);
-        Instant now = clock.instant();
+        Instant now = orderMapper.currentTime();
         LogisticsTraceEntity trace = new LogisticsTraceEntity();
         trace.setId(IdWorker.getId());
         trace.setFulfillmentId(order.getId());
@@ -189,6 +209,7 @@ public class FulfillmentService {
         trace.setOccurredAt(command.occurredAt());
         trace.setCreatedAt(now);
         traceMapper.insert(trace);
+        shipmentGeoService.recordLatestPosition(order, trace, now);
 
         if (node == LogisticsNodeType.SIGNED) {
             order.setSignedAt(command.occurredAt());
@@ -221,11 +242,106 @@ public class FulfillmentService {
         return view(order);
     }
 
-    public FulfillmentView getForUser(String orderNo, Long userId) {
-        FulfillmentOrderEntity order = requireByOrderNo(orderNo);
-        if (!order.getUserId().equals(userId)) {
-            throw new FulfillmentException(FulfillmentError.ACCESS_DENIED);
+    @Transactional
+    public FulfillmentView resolveException(
+            String fulfillmentNo,
+            String commandId,
+            String reason,
+            String operatorId) {
+        FulfillmentOrderEntity order = requireLocked(fulfillmentNo);
+        String resumeStatus = historyMapper.selectLatestExceptionSourceStatus(order.getId());
+        FulfillmentStatus resume = safeResumeStatus(resumeStatus);
+        String normalizedReason = reason.strip();
+        String requestHash = exceptionResolutionHash(
+                fulfillmentNo, operatorId, normalizedReason);
+        Instant now = orderMapper.currentTime();
+
+        FulfillmentExceptionResolutionEntity candidate =
+                new FulfillmentExceptionResolutionEntity();
+        candidate.setId(IdWorker.getId());
+        candidate.setCommandId(commandId);
+        candidate.setRequestHash(requestHash);
+        candidate.setFulfillmentId(order.getId());
+        candidate.setFulfillmentNo(order.getFulfillmentNo());
+        candidate.setResumeStatus(resume.name());
+        candidate.setOperatorId(operatorId);
+        candidate.setReason(normalizedReason);
+        candidate.setCreatedAt(now);
+        exceptionResolutionMapper.insertOrLockExisting(candidate);
+
+        FulfillmentExceptionResolutionEntity resolution =
+                exceptionResolutionMapper.selectByCommandIdForUpdate(commandId);
+        if (resolution == null) {
+            throw new FulfillmentException(FulfillmentError.CONCURRENT_MODIFICATION);
         }
+        if (!constantEquals(resolution.getRequestHash(), requestHash)
+                || !resolution.getFulfillmentId().equals(order.getId())
+                || !resolution.getResumeStatus().equals(resume.name())) {
+            throw new FulfillmentException(FulfillmentError.IDEMPOTENCY_CONFLICT);
+        }
+        if (!candidate.getId().equals(resolution.getId())) {
+            if (!resolution.getResumeStatus().equals(order.getStatus())) {
+                throw new FulfillmentException(FulfillmentError.IDEMPOTENCY_CONFLICT);
+            }
+            return view(order);
+        }
+        requireStatus(order, FulfillmentStatus.EXCEPTION);
+        transition(order, resume, "RESOLVE_EXCEPTION", normalizedReason,
+                "ADMIN", operatorId, "FulfillmentExceptionResolved");
+        return view(order);
+    }
+
+    public FulfillmentView getForUser(String orderNo, Long userId) {
+        FulfillmentOrderEntity order = orderMapper.selectByOrderNo(orderNo);
+        if (order == null || !order.getUserId().equals(userId)) {
+            throw new FulfillmentException(FulfillmentError.RESOURCE_NOT_FOUND);
+        }
+        return view(order);
+    }
+
+    @Transactional
+    public FulfillmentView confirmReceipt(String orderNo, Long userId) {
+        FulfillmentOrderEntity order = orderMapper.selectByOrderNoForUpdate(orderNo);
+        if (order == null || !order.getUserId().equals(userId)) {
+            throw new FulfillmentException(FulfillmentError.RESOURCE_NOT_FOUND);
+        }
+        if (FulfillmentStatus.SIGNED.name().equals(order.getStatus())) {
+            return view(order);
+        }
+        FulfillmentStatus current = FulfillmentStatus.valueOf(order.getStatus());
+        if (!List.of(FulfillmentStatus.SHIPPED, FulfillmentStatus.IN_TRANSIT,
+                FulfillmentStatus.DELIVERING).contains(current)
+                || order.getCarrier() == null
+                || order.getTrackingNo() == null) {
+            throw new FulfillmentException(FulfillmentError.INVALID_STATE);
+        }
+
+        Instant now = orderMapper.currentTime();
+        AddTraceCommand command = new AddTraceCommand(
+                "customer-confirm:" + order.getOrderNo(),
+                LogisticsNodeType.SIGNED.name(),
+                "Customer confirmed receipt",
+                null,
+                null,
+                null,
+                now,
+                userId.toString());
+        LogisticsTraceEntity trace = new LogisticsTraceEntity();
+        trace.setId(IdWorker.getId());
+        trace.setFulfillmentId(order.getId());
+        trace.setCarrier(order.getCarrier());
+        trace.setTrackingNo(order.getTrackingNo());
+        trace.setExternalEventId(command.externalEventId());
+        trace.setRequestHash(traceHash(command));
+        trace.setNodeType(command.nodeType());
+        trace.setDescription(command.description());
+        trace.setOccurredAt(now);
+        trace.setCreatedAt(now);
+        traceMapper.insert(trace);
+
+        order.setSignedAt(now);
+        transition(order, FulfillmentStatus.SIGNED, "CONFIRM_RECEIPT", null,
+                "CUSTOMER", userId.toString(), "ShipmentSigned");
         return view(order);
     }
 
@@ -322,10 +438,55 @@ public class FulfillmentService {
         }
     }
 
+    private FulfillmentStatus safeResumeStatus(String value) {
+        if (value == null) {
+            throw new FulfillmentException(FulfillmentError.INVALID_STATE);
+        }
+        FulfillmentStatus status;
+        try {
+            status = FulfillmentStatus.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            throw new FulfillmentException(FulfillmentError.INVALID_STATE);
+        }
+        if (!List.of(FulfillmentStatus.PICKING, FulfillmentStatus.SHIPPED,
+                FulfillmentStatus.IN_TRANSIT, FulfillmentStatus.DELIVERING).contains(status)) {
+            throw new FulfillmentException(FulfillmentError.INVALID_STATE);
+        }
+        return status;
+    }
+
+    private String exceptionResolutionHash(
+            String fulfillmentNo,
+            String operatorId,
+            String reason) {
+        return sha256(hashPart(fulfillmentNo)
+                + hashPart(operatorId)
+                + hashPart(reason));
+    }
+
+    private String hashPart(String value) {
+        return value.length() + ":" + value;
+    }
+
+    private String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
+    private boolean constantEquals(String left, String right) {
+        return MessageDigest.isEqual(
+                left.getBytes(StandardCharsets.UTF_8),
+                right.getBytes(StandardCharsets.UTF_8));
+    }
+
     private void transition(FulfillmentOrderEntity order, FulfillmentStatus target, String command,
                             String reason, String operatorType, String operatorId, String eventType) {
         String from = order.getStatus();
-        Instant now = clock.instant();
+        Instant now = orderMapper.currentTime();
         order.setStatus(target.name());
         order.setVersion(order.getVersion() + 1);
         order.setUpdatedAt(now);
@@ -395,15 +556,6 @@ public class FulfillmentService {
         return order;
     }
 
-    private FulfillmentOrderEntity requireByOrderNo(String orderNo) {
-        FulfillmentOrderEntity order = orderMapper.selectOne(new LambdaQueryWrapper<FulfillmentOrderEntity>()
-                .eq(FulfillmentOrderEntity::getOrderNo, orderNo));
-        if (order == null) {
-            throw new FulfillmentException(FulfillmentError.RESOURCE_NOT_FOUND);
-        }
-        return order;
-    }
-
     private void requireStatus(FulfillmentOrderEntity order, FulfillmentStatus expected) {
         if (!expected.name().equals(order.getStatus())) {
             throw new FulfillmentException(FulfillmentError.INVALID_STATE);
@@ -445,6 +597,15 @@ public class FulfillmentService {
     }
 
     private FulfillmentView view(FulfillmentOrderEntity order) {
+        List<FulfillmentStatusHistoryView> history = historyMapper.selectList(
+                        new LambdaQueryWrapper<FulfillmentStatusHistoryEntity>()
+                                .eq(FulfillmentStatusHistoryEntity::getFulfillmentId, order.getId())
+                                .orderByAsc(FulfillmentStatusHistoryEntity::getCreatedAt)
+                                .orderByAsc(FulfillmentStatusHistoryEntity::getId))
+                .stream().map(item -> new FulfillmentStatusHistoryView(
+                        item.getFromStatus(), item.getToStatus(), item.getCommand(), item.getReason(),
+                        item.getOperatorType(), item.getOperatorId(), item.getCreatedAt()))
+                .toList();
         List<LogisticsTraceView> traces = traceMapper.selectList(
                         new LambdaQueryWrapper<LogisticsTraceEntity>()
                                 .eq(LogisticsTraceEntity::getFulfillmentId, order.getId())
@@ -459,7 +620,7 @@ public class FulfillmentService {
                 order.getProvinceCode(), order.getCity(), order.getCityCode(), order.getDistrict(),
                 order.getDistrictCode(), order.getDetailAddress(), order.getPostalCode());
         return new FulfillmentView(order.getFulfillmentNo(), order.getOrderNo(), order.getUserId(), address,
-                order.getStatus(), order.getCarrier(), order.getTrackingNo(), traces, order.getVersion(),
+                order.getStatus(), order.getCarrier(), order.getTrackingNo(), history, traces, order.getVersion(),
                 order.getCreatedAt(), order.getUpdatedAt(), order.getPickedAt(), order.getPackedAt(),
                 order.getShippedAt(), order.getSignedAt());
     }

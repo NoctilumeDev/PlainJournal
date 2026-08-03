@@ -58,6 +58,22 @@ public class PaymentController {
         return ApiResponse.success(paymentService.getPayment(Long.valueOf(jwt.getSubject()), paymentNo));
     }
 
+    @GetMapping("/payments/by-idempotency-key/{key}")
+    public ApiResponse<PaymentView> paymentByIdempotencyKey(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable @Size(min = 8, max = 64) @Pattern(regexp = BUSINESS_NO_PATTERN) String key) {
+        return ApiResponse.success(paymentService.getPaymentByIdempotencyKey(
+                Long.valueOf(jwt.getSubject()), key));
+    }
+
+    @GetMapping("/payments/by-order/{orderNo}")
+    public ApiResponse<PaymentView> paymentByOrder(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable @Size(max = 64) @Pattern(regexp = BUSINESS_NO_PATTERN) String orderNo) {
+        return ApiResponse.success(paymentService.getPaymentByOrder(
+                Long.valueOf(jwt.getSubject()), orderNo));
+    }
+
     @PostMapping("/callbacks/mock")
     public ApiResponse<PaymentView> mockCallback(@Valid @RequestBody MockCallbackRequest request) {
         return ApiResponse.success(paymentService.processMockCallback(new CallbackCommand(

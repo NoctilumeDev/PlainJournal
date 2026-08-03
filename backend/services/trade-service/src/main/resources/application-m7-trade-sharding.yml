@@ -1,0 +1,23 @@
+spring:
+  flyway:
+    enabled: false
+
+ecommerce:
+  trade:
+    sharding:
+      enabled: true
+      sql-show: ${TRADE_SHARDING_SQL_SHOW:false}
+      connection-timeout: 5s
+      maximum-pool-size: ${TRADE_SHARDING_POOL_SIZE:8}
+      minimum-idle: 0
+      shards:
+        - name: ds_0
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          jdbc-url: ${TRADE_SHARD_0_URL:jdbc:mysql://127.0.0.1:13306/ecom_trade_shard_0?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true}
+          username: ${TRADE_SHARD_DB_USER:ecom_trade_shard_app}
+          password: ${TRADE_SHARD_DB_PASSWORD:}
+        - name: ds_1
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          jdbc-url: ${TRADE_SHARD_1_URL:jdbc:mysql://127.0.0.1:13326/ecom_trade_shard_1?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true}
+          username: ${TRADE_SHARD_DB_USER:ecom_trade_shard_app}
+          password: ${TRADE_SHARD_DB_PASSWORD:}

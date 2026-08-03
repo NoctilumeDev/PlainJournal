@@ -54,10 +54,10 @@ public class PaymentExceptionHandler {
     private HttpStatus statusFor(PaymentError error) {
         return switch (error) {
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case FORBIDDEN -> HttpStatus.FORBIDDEN;
             case INVALID_SIGNATURE -> HttpStatus.UNAUTHORIZED;
             case REMOTE_DEPENDENCY_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
             case CALLBACK_EXPIRED, AMOUNT_MISMATCH, INVALID_STATE, IDEMPOTENCY_CONFLICT,
+                    REFUND_RETRY_NOT_ALLOWED, PAYMENT_EXCEPTION_REFUND_NOT_ALLOWED,
                     UNSUPPORTED_CHANNEL, CONCURRENT_MODIFICATION -> HttpStatus.CONFLICT;
         };
     }

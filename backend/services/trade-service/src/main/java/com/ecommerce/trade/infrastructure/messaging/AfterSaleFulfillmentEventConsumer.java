@@ -2,6 +2,7 @@ package com.ecommerce.trade.infrastructure.messaging;
 
 import com.ecommerce.trade.application.model.TradeModels.AfterSaleFulfillmentEventCommand;
 import com.ecommerce.trade.application.service.AfterSaleService;
+import com.ecommerce.platform.common.observability.ConsumerFailureRetryHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -25,7 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Component
 @ConditionalOnProperty(
         prefix = "ecommerce.trade.after-sale-fulfillment-consumer", name = "enabled", havingValue = "true")
-public class AfterSaleFulfillmentEventConsumer {
+public class AfterSaleFulfillmentEventConsumer implements ConsumerFailureRetryHandler {
 
     private static final Logger log = LoggerFactory.getLogger(AfterSaleFulfillmentEventConsumer.class);
     private static final String TAGS = "ReturnShipmentSubmitted||ReturnReceived";
@@ -34,6 +35,7 @@ public class AfterSaleFulfillmentEventConsumer {
     private final AfterSaleFulfillmentConsumerProperties properties;
     private final AfterSaleService afterSaleService;
     private final ObjectMapper objectMapper;
+    private final ConsumerFailureRecorder failureRecorder;
     private final ClientServiceProvider provider = ClientServiceProvider.loadService();
     private final AtomicLong nextWarningAt = new AtomicLong();
     private volatile SimpleConsumer consumer;
@@ -41,10 +43,12 @@ public class AfterSaleFulfillmentEventConsumer {
     public AfterSaleFulfillmentEventConsumer(
             AfterSaleFulfillmentConsumerProperties properties,
             AfterSaleService afterSaleService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ConsumerFailureRecorder failureRecorder) {
         this.properties = properties;
         this.afterSaleService = afterSaleService;
         this.objectMapper = objectMapper;
+        this.failureRecorder = failureRecorder;
     }
 
     @Scheduled(fixedDelayString = "${ecommerce.trade.after-sale-fulfillment-consumer.fixed-delay:1000}")
@@ -53,12 +57,32 @@ public class AfterSaleFulfillmentEventConsumer {
         try {
             active = consumer();
             for (MessageView message : active.receive(properties.batchSize(), properties.invisibleDuration())) {
+                AfterSaleFulfillmentEventCommand command;
                 try {
-                    afterSaleService.applyFulfillmentEvent(parse(message));
+                    command = parse(message);
+                } catch (Exception exception) {
+                    failureRecorder.recordTerminal(message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    log.error("After-sale fulfillment payload requires attention: messageId={}",
+                            message.getMessageId(), exception);
+                    continue;
+                }
+                try {
+                    afterSaleService.applyFulfillmentEvent(command);
+                    failureRecorder.markRecovered(message, properties.consumerGroup());
                     active.ack(message);
                 } catch (Exception exception) {
-                    log.warn("After-sale fulfillment event failed and will be retried: messageId={}",
-                            message.getMessageId(), exception);
+                    boolean terminal = failureRecorder.record(
+                            message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    if (terminal) {
+                        log.error("After-sale fulfillment event moved to the local compensation queue: messageId={}",
+                                message.getMessageId(), exception);
+                    } else {
+                        log.warn("After-sale fulfillment event failed; durable MySQL retry now owns "
+                                        + "recovery: messageId={}",
+                                message.getMessageId(), exception);
+                    }
                 }
             }
             nextWarningAt.set(0);
@@ -69,7 +93,24 @@ public class AfterSaleFulfillmentEventConsumer {
     }
 
     private AfterSaleFulfillmentEventCommand parse(MessageView message) throws Exception {
-        JsonNode envelope = objectMapper.readTree(readBody(message.getBody()));
+        return parseEnvelope(objectMapper.readTree(readBody(message.getBody())));
+    }
+
+    @Override
+    public String consumerGroup() {
+        return properties.consumerGroup();
+    }
+
+    @Override
+    public void retry(String rawPayload) throws Exception {
+        afterSaleService.applyFulfillmentEvent(
+                parseEnvelope(objectMapper.readTree(rawPayload)));
+    }
+
+    private AfterSaleFulfillmentEventCommand parseEnvelope(JsonNode envelope) {
+        if (envelope.path("payloadVersion").asInt(-1) != 1) {
+            throw new IllegalArgumentException("Unsupported after-sale fulfillment payload version");
+        }
         String eventType = requiredText(envelope, "eventType");
         if (!EVENT_TYPES.contains(eventType)) {
             throw new IllegalArgumentException("Unexpected after-sale fulfillment event type");

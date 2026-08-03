@@ -55,9 +55,11 @@ public class TradeExceptionHandler {
         return switch (error) {
             case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case INVALID_CART_MERGE, INVALID_CURSOR -> HttpStatus.BAD_REQUEST;
             case REMOTE_DEPENDENCY_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
             case PRODUCT_UNAVAILABLE, ADDRESS_UNAVAILABLE, INVALID_STATE, IDEMPOTENCY_CONFLICT,
-                    CART_LIMIT_EXCEEDED, AFTER_SALE_ALREADY_EXISTS, CONCURRENT_MODIFICATION -> HttpStatus.CONFLICT;
+                    CART_LIMIT_EXCEEDED, AFTER_SALE_ALREADY_EXISTS, AFTER_SALE_WINDOW_EXPIRED,
+                    CONCURRENT_MODIFICATION -> HttpStatus.CONFLICT;
         };
     }
 }

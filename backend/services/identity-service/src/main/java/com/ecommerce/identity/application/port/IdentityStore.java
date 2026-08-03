@@ -9,6 +9,8 @@ import java.util.Optional;
 
 public interface IdentityStore {
 
+    Instant currentTime();
+
     boolean accountExistsByEmail(String normalizedEmail);
 
     Optional<UserAccount> findAccountByEmail(String normalizedEmail);

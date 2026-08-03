@@ -1,6 +1,8 @@
 package com.ecommerce.inventory.infrastructure.security;
 
 import com.ecommerce.platform.common.api.ApiResponse;
+import com.ecommerce.platform.common.security.MetricsScrapeAuthenticationFilter;
+import com.ecommerce.platform.common.security.MetricsScrapeProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -27,7 +29,11 @@ import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties({InventoryTokenProperties.class, InternalServiceProperties.class})
+@EnableConfigurationProperties({
+        InventoryTokenProperties.class,
+        InternalServiceProperties.class,
+        MetricsScrapeProperties.class
+})
 public class InventorySecurityConfig {
 
     @Bean
@@ -48,7 +54,8 @@ public class InventorySecurityConfig {
     public SecurityFilterChain inventorySecurityFilterChain(
             HttpSecurity http,
             ObjectMapper objectMapper,
-            InternalServiceAuthenticationFilter internalServiceAuthenticationFilter) throws Exception {
+            InternalServiceAuthenticationFilter internalServiceAuthenticationFilter,
+            MetricsScrapeProperties metricsScrapeProperties) throws Exception {
         JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
         authoritiesConverter.setAuthoritiesClaimName("roles");
         authoritiesConverter.setAuthorityPrefix("ROLE_");
@@ -63,9 +70,16 @@ public class InventorySecurityConfig {
                         .requestMatchers(
                                 "/api/v1/inventory/status",
                                 "/actuator/health",
+                                "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
+                        .requestMatchers("/actuator/prometheus").hasAnyRole("ADMIN", "METRICS")
+                        .requestMatchers(
+                                "/actuator/metrics", "/actuator/metrics/**",
+                                "/actuator/consumerfailures", "/actuator/consumerfailures/**"
+                        ).hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/inventory/stocks/**").permitAll()
+                        .requestMatchers("/api/v1/inventory/admin/reconciliation/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/inventory/admin/**").hasAnyRole("ADMIN", "WAREHOUSE")
                         .requestMatchers("/api/v1/inventory/internal/**").hasRole("INTERNAL_SERVICE")
                         .anyRequest().authenticated())
@@ -83,7 +97,10 @@ public class InventorySecurityConfig {
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             objectMapper.writeValue(response.getOutputStream(),
                                     ApiResponse.failure("FORBIDDEN", "Access is denied"));
-                        }));
+                }));
+        http.addFilterBefore(
+                new MetricsScrapeAuthenticationFilter(metricsScrapeProperties),
+                BearerTokenAuthenticationFilter.class);
         http.addFilterBefore(internalServiceAuthenticationFilter, BearerTokenAuthenticationFilter.class);
         return http.build();
     }

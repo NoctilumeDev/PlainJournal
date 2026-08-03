@@ -24,15 +24,22 @@ public class TradeOrderEntity {
     private String reservationNo;
     private String warehouseCode;
     private Long warehouseId;
+    private String orderSource;
+    private String sourceReference;
     private String status;
     private BigDecimal originalAmount;
     private BigDecimal discountAmount;
     private BigDecimal totalAmount;
     private String marketingLockNo;
+    private String paymentNo;
+    private String exceptionRefundNo;
+    private String fulfillmentNo;
     private Instant paymentDeadline;
     private String closeReason;
     private Integer recoveryAttempts;
     private Instant nextRecoveryAt;
+    private String recoveryClaimOwner;
+    private Instant recoveryClaimUntil;
     private String lastError;
     @Version
     private Integer version;

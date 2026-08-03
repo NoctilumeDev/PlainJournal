@@ -1,0 +1,25 @@
+ecommerce:
+  foundation:
+    configuration-source: nacos
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: 16
+  security:
+    token:
+      issuer: ecommerce-identity
+  notification:
+    events:
+      consumer-group: ecommerce-notification-domain-events
+      payment-topic: ecommerce-payment-events
+      logistics-topic: ecommerce-logistics-events
+      await-duration: 5s
+      invisible-duration: 20s
+      batch-size: 20
+    email:
+      enabled: false
+      worker-enabled: false
+      from: no-reply@plainjournal.local
+      maximum-attempts: 5
+      retry-delay: 10s
+      lease-duration: 30s
+      batch-size: 20

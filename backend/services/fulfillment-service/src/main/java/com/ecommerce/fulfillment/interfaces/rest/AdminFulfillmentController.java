@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -97,6 +98,19 @@ public class AdminFulfillmentController {
             @AuthenticationPrincipal Jwt jwt) {
         return ApiResponse.success(fulfillmentService.markException(
                 fulfillmentNo, request.reason(), jwt.getSubject()));
+    }
+
+    @PostMapping("/{fulfillmentNo}/exception/resolve")
+    public ApiResponse<FulfillmentView> resolveException(
+            @PathVariable @NotBlank @Size(max = 64) @Pattern(regexp = BUSINESS_NO_PATTERN)
+            String fulfillmentNo,
+            @RequestHeader("Idempotency-Key")
+            @NotBlank @Size(max = 64) @Pattern(regexp = BUSINESS_NO_PATTERN)
+            String commandId,
+            @Valid @RequestBody ExceptionRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ApiResponse.success(fulfillmentService.resolveException(
+                fulfillmentNo, commandId, request.reason(), jwt.getSubject()));
     }
 
     public record ShipRequest(

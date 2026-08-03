@@ -3,7 +3,7 @@ server:
 
 spring:
   config:
-    import: "optional:nacos:"
+    import: []
   cloud:
     nacos:
       discovery:
@@ -28,7 +28,16 @@ ecommerce:
     token:
       secret: test-only-fulfillment-jwt-secret-with-at-least-32-characters
       issuer: ecommerce-identity-test
+    metrics:
+      token: test-only-metrics-scrape-token-with-at-least-32-characters
   fulfillment:
+    geo:
+      cache-enabled: false
+      mysql-spatial-enabled: false
+      namespace: test
+      max-radius-meters: 2000000
+      max-results: 200
+      rebuild-limit: 5000
     outbox:
       enabled: false
       endpoints: 127.0.0.1:18082
@@ -36,6 +45,8 @@ ecommerce:
       fixed-delay: 2000
       retry-delay: 0s
       batch-size: 50
+      publisher-id: fulfillment-test
+      lease-duration: 30s
     order-consumer:
       enabled: false
     after-sale-consumer:
@@ -45,3 +56,25 @@ logging:
   level:
     root: warn
     com.alibaba.nacos: error
+
+management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+          - consumerfailures
+  endpoint:
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only

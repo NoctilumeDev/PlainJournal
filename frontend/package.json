@@ -1,0 +1,49 @@
+{
+  "name": "plain-journal-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "dev:storefront": "pnpm --filter @plain-journal/storefront-web dev",
+    "dev:admin": "pnpm --filter @plain-journal/admin-web dev",
+    "dev:mock-api": "node e2e/mock-api.mjs",
+    "preview:storefront": "pnpm --filter @plain-journal/storefront-web exec vite preview --host 127.0.0.1 --port 18300 --strictPort",
+    "preview:admin": "pnpm --filter @plain-journal/admin-web exec vite preview --host 127.0.0.1 --port 18301 --strictPort",
+    "demo:start": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/production-fixture.ps1 -Action start",
+    "demo:status": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/production-fixture.ps1 -Action status",
+    "demo:stop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/production-fixture.ps1 -Action stop",
+    "container:verify": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/production-container-fixture.ps1 -Action verify",
+    "container:status": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/production-container-fixture.ps1 -Action status",
+    "container:stop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/production-container-fixture.ps1 -Action stop",
+    "release:screenshots": "node tools/capture-release-screenshots.mjs",
+    "images:generate": "python tools/image-variants.py",
+    "images:check": "python tools/image-variants.py --check",
+    "check:boundaries": "node --test tools/layer-boundaries.test.mjs && node tools/check-layer-boundaries.mjs",
+    "check:delivery": "node --test tools/delivery-readiness.test.mjs && node tools/check-delivery-readiness.mjs",
+    "check:production-deploy": "node --test tools/production-deployment.test.mjs && node tools/check-production-deployment.mjs",
+    "check:release": "node --test tools/release-readiness.test.mjs && node tools/check-release-readiness.mjs",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "build": "pnpm -r --if-present run build",
+    "e2e": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-e2e.ps1",
+    "e2e:production": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-production-e2e.ps1",
+    "e2e:production:built": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-production-e2e.ps1 -SkipBuild",
+    "e2e:v4": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-e2e.ps1 -ConfigPath playwright.v4.config.ts -StorefrontOnly",
+    "e2e:v5": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-e2e.ps1 -ConfigPath playwright.v5.config.ts -StorefrontOnly",
+    "e2e:v5-2": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-e2e.ps1 -ConfigPath playwright.v5-2.config.ts -StorefrontOnly",
+    "e2e:v5-3": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-e2e.ps1 -ConfigPath playwright.v5-3.config.ts -StorefrontOnly",
+    "e2e:v6-1": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-e2e.ps1 -ConfigPath playwright.v6-1.config.ts -StorefrontOnly",
+    "e2e:v6-2": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-e2e.ps1 -ConfigPath playwright.v6-2.config.ts -StorefrontOnly",
+    "e2e:v6-3": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-e2e.ps1 -ConfigPath playwright.v6-3.config.ts -StorefrontOnly",
+    "e2e:v6-4": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/run-e2e.ps1 -ConfigPath playwright.v6-4.config.ts -AdminOnly",
+    "check": "pnpm check:boundaries && pnpm check:delivery && pnpm check:production-deploy && pnpm check:release && pnpm typecheck && pnpm test && pnpm build && pnpm e2e && pnpm e2e:production:built"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.61.1"
+  }
+}

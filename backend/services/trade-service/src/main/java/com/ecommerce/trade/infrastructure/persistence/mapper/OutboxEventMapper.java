@@ -11,44 +11,102 @@ import java.util.List;
 
 public interface OutboxEventMapper extends BaseMapper<OutboxEventEntity> {
 
-    @Update("""
-            UPDATE outbox_event
-            SET status = 'PENDING', claimed_at = NULL, updated_at = #{now}
-            WHERE status = 'PUBLISHING' AND claimed_at < #{staleBefore}
-            """)
-    int resetStaleClaims(@Param("staleBefore") Instant staleBefore, @Param("now") Instant now);
+    @Select("SELECT CURRENT_TIMESTAMP(3)")
+    Instant currentTime();
+
+    @Select("SELECT COUNT(*) FROM outbox_event WHERE status <> 'PUBLISHED'")
+    long countUnpublished();
+
+    @Select("SELECT MIN(created_at) FROM outbox_event WHERE status <> 'PUBLISHED'")
+    Instant selectOldestUnpublishedCreatedAt();
 
     @Select("""
-            SELECT * FROM outbox_event
-            WHERE status = 'PENDING' AND next_attempt_at <= #{now}
-            ORDER BY created_at
+            SELECT id
+            FROM outbox_event
+            WHERE status = 'PUBLISHING' AND claim_until <= #{now}
+            ORDER BY claim_until, id
             LIMIT #{limit}
+            FOR UPDATE SKIP LOCKED
             """)
-    List<OutboxEventEntity> selectPublishable(@Param("now") Instant now, @Param("limit") int limit);
+    List<String> selectExpiredClaimIdsForUpdate(
+            @Param("now") Instant now,
+            @Param("limit") int limit);
 
     @Update("""
             UPDATE outbox_event
-            SET status = 'PUBLISHING', claimed_at = #{now}, updated_at = #{now}
+            SET status = 'PENDING', claimed_at = NULL, claim_owner = NULL,
+                claim_until = NULL, updated_at = #{now}
+            WHERE id = #{id} AND status = 'PUBLISHING' AND claim_until <= #{now}
+            """)
+    int resetStaleClaim(@Param("id") String id, @Param("now") Instant now);
+
+    @Select("""
+            SELECT candidate.*
+            FROM outbox_event candidate
+            WHERE candidate.status = 'PENDING'
+              AND candidate.next_attempt_at <= #{now}
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM outbox_event predecessor
+                  WHERE predecessor.aggregate_type = candidate.aggregate_type
+                    AND predecessor.aggregate_id = candidate.aggregate_id
+                    AND predecessor.status <> 'PUBLISHED'
+                    AND (
+                        predecessor.aggregate_version < candidate.aggregate_version
+                        OR (
+                            predecessor.aggregate_version = candidate.aggregate_version
+                            AND predecessor.created_at < candidate.created_at
+                        )
+                        OR (
+                            predecessor.aggregate_version = candidate.aggregate_version
+                            AND predecessor.created_at = candidate.created_at
+                            AND predecessor.id < candidate.id
+                        )
+                    )
+              )
+            ORDER BY candidate.created_at, candidate.id
+            LIMIT #{limit}
+            FOR UPDATE SKIP LOCKED
+            """)
+    List<OutboxEventEntity> selectPublishableForUpdate(
+            @Param("now") Instant now,
+            @Param("limit") int limit);
+
+    @Update("""
+            UPDATE outbox_event
+            SET status = 'PUBLISHING', claimed_at = #{claimedAt},
+                claim_owner = #{owner}, claim_until = #{claimUntil}, updated_at = #{claimedAt}
             WHERE id = #{id} AND status = 'PENDING'
             """)
-    int claim(@Param("id") String id, @Param("now") Instant now);
+    int claim(
+            @Param("id") String id,
+            @Param("owner") String owner,
+            @Param("claimedAt") Instant claimedAt,
+            @Param("claimUntil") Instant claimUntil);
 
     @Update("""
             UPDATE outbox_event
             SET status = 'PUBLISHED', published_at = #{now}, claimed_at = NULL,
-                last_error = NULL, updated_at = #{now}
-            WHERE id = #{id} AND status = 'PUBLISHING'
+                claim_owner = NULL, claim_until = NULL, last_error = NULL, updated_at = #{now}
+            WHERE id = #{id} AND status = 'PUBLISHING' AND claim_owner = #{owner}
+              AND claim_until > #{now}
             """)
-    int markPublished(@Param("id") String id, @Param("now") Instant now);
+    int markPublished(
+            @Param("id") String id,
+            @Param("owner") String owner,
+            @Param("now") Instant now);
 
     @Update("""
             UPDATE outbox_event
             SET status = 'PENDING', attempts = attempts + 1, next_attempt_at = #{nextAttemptAt},
-                claimed_at = NULL, last_error = #{error}, updated_at = #{now}
-            WHERE id = #{id} AND status = 'PUBLISHING'
+                claimed_at = NULL, claim_owner = NULL, claim_until = NULL,
+                last_error = #{error}, updated_at = #{now}
+            WHERE id = #{id} AND status = 'PUBLISHING' AND claim_owner = #{owner}
+              AND claim_until > #{now}
             """)
     int markFailed(
             @Param("id") String id,
+            @Param("owner") String owner,
             @Param("nextAttemptAt") Instant nextAttemptAt,
             @Param("error") String error,
             @Param("now") Instant now);

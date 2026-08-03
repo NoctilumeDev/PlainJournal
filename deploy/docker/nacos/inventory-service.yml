@@ -1,10 +1,18 @@
 ecommerce:
   foundation:
     configuration-source: nacos
+  messaging:
+    consumer-failure-retry:
+      scheduler: inventoryControlScheduler
   security:
     token:
       issuer: ecommerce-identity
   inventory:
+    scheduling:
+      default-pool-size: 2
+      outbox-pool-size: 1
+      control-pool-size: 1
+      shutdown-await: 10s
     reservation:
       default-ttl: 30m
       expiry-enabled: true
@@ -14,9 +22,13 @@ ecommerce:
       enabled: true
       endpoints: 127.0.0.1:18082
       topic: ecommerce-inventory-events
-      fixed-delay: 2000
+      fixed-delay: 500
       retry-delay: 5s
-      batch-size: 50
+      batch-size: 200
+      parallelism: 8
+      publisher-id: ${INVENTORY_OUTBOX_PUBLISHER_ID:${random.uuid}}
+      lease-duration: ${INVENTORY_OUTBOX_LEASE_DURATION:60s}
+      shutdown-await: 10s
     order-consumer:
       enabled: true
       endpoints: 127.0.0.1:18082

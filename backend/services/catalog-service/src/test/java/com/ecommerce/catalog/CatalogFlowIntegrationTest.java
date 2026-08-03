@@ -16,9 +16,11 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -88,6 +90,8 @@ class CatalogFlowIntegrationTest {
         );
         JsonNode created = responseJson(adminPost("/api/v1/catalog/admin/products", productRequest));
         long productId = created.at("/data/id").asLong();
+        assertThat(created.at("/data/id").isTextual()).isTrue();
+        assertThat(created.at("/data/skus/0/id").isTextual()).isTrue();
         assertThat(created.at("/data/status").asText()).isEqualTo("DRAFT");
         assertThat(created.at("/data/skus/0/salePrice").decimalValue()).isEqualByComparingTo("129.90");
 
@@ -114,6 +118,9 @@ class CatalogFlowIntegrationTest {
         mockMvc.perform(get("/api/v1/catalog/products"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").isString())
+                .andExpect(jsonPath("$.data.items[0].category.id").isString())
+                .andExpect(jsonPath("$.data.items[0].brand.id").isString())
                 .andExpect(jsonPath("$.data.items[0].minimumPrice").value(129.90));
 
         when(objectStorage.createUploadUrl(eq("product-media"), any(), any()))
@@ -124,19 +131,40 @@ class CatalogFlowIntegrationTest {
         String objectKey = intent.at("/data/objectKey").asText();
         assertThat(objectKey).startsWith("products/" + productId + "/").endsWith(".png");
 
+        AtomicBoolean statInsideTransaction = new AtomicBoolean(true);
         when(objectStorage.stat("product-media", objectKey))
-                .thenReturn(new ObjectStorage.StoredObject(68, "image/png"));
+                .thenAnswer(ignored -> {
+                    statInsideTransaction.set(
+                            TransactionSynchronizationManager.isActualTransactionActive());
+                    return new ObjectStorage.StoredObject(68, "image/png");
+                });
         when(objectStorage.createDownloadUrl(eq("product-media"), eq(objectKey), any()))
-                .thenReturn("http://storage.invalid/download");
+                .thenAnswer(ignored -> {
+                    assertThat(TransactionSynchronizationManager.isActualTransactionActive())
+                            .isFalse();
+                    return "http://storage.invalid/download";
+                });
         adminPost("/api/v1/catalog/admin/products/" + productId + "/media", Map.of(
                 "objectKey", objectKey,
                 "sortOrder", 0
         ));
+        assertThat(statInsideTransaction).isFalse();
 
         mockMvc.perform(get("/api/v1/catalog/products/{id}", productId))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").isString())
+                .andExpect(jsonPath("$.data.skus[0].id").isString())
+                .andExpect(jsonPath("$.data.media[0].id").isString())
                 .andExpect(jsonPath("$.data.media[0].mimeType").value("image/png"))
                 .andExpect(jsonPath("$.data.media[0].url").value("http://storage.invalid/download"));
+        mockMvc.perform(get("/api/v1/catalog/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].coverUrl")
+                        .value("http://storage.invalid/download"));
+        mockMvc.perform(get("/api/v1/catalog/products/cursor"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].coverUrl")
+                        .value("http://storage.invalid/download"));
 
         when(objectStorage.createDownloadUrl(eq("product-media"), eq(objectKey), any()))
                 .thenThrow(new CatalogException(CatalogError.MEDIA_STORAGE_UNAVAILABLE));
@@ -170,6 +198,81 @@ class CatalogFlowIntegrationTest {
                         ))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("INVALID_STATE"));
+
+        mockMvc.perform(post("/api/v1/catalog/admin/products")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "categoryId", categoryId,
+                                "brandId", brandId,
+                                "title", "Excessive precision",
+                                "skus", List.of(Map.of(
+                                        "skuCode", "INVALID-PRECISION",
+                                        "name", "Invalid",
+                                        "specJson", "{}",
+                                        "salePrice", "19.999"
+                                ))
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void cursorPaginationIsStableAndRejectsMalformedCursors() throws Exception {
+        long categoryId = dataId(adminPost("/api/v1/catalog/admin/categories", Map.of(
+                "name", "Cursor Category", "slug", "cursor-category", "sortOrder", 30)));
+        long brandId = dataId(adminPost("/api/v1/catalog/admin/brands", Map.of(
+                "name", "Cursor Brand", "slug", "cursor-brand")));
+        for (int index = 1; index <= 3; index++) {
+            createPublishedProduct(categoryId, brandId, index);
+        }
+
+        JsonNode first = responseJson(mockMvc.perform(get("/api/v1/catalog/products/cursor")
+                        .param("size", "2")
+                        .param("categoryId", Long.toString(categoryId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(2))
+                .andExpect(jsonPath("$.data.hasMore").value(true))
+                .andExpect(jsonPath("$.data.nextCursor").isString())
+                .andReturn().getResponse().getContentAsString());
+        String cursor = first.at("/data/nextCursor").asText();
+
+        JsonNode second = responseJson(mockMvc.perform(get("/api/v1/catalog/products/cursor")
+                        .param("size", "2")
+                        .param("categoryId", Long.toString(categoryId))
+                        .param("cursor", cursor))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.hasMore").value(false))
+                .andExpect(jsonPath("$.data.nextCursor").isEmpty())
+                .andReturn().getResponse().getContentAsString());
+
+        List<String> productIds = new java.util.ArrayList<>();
+        first.at("/data/items").forEach(item -> productIds.add(item.get("id").asText()));
+        second.at("/data/items").forEach(item -> productIds.add(item.get("id").asText()));
+        assertThat(productIds).hasSize(3).doesNotHaveDuplicates();
+
+        mockMvc.perform(get("/api/v1/catalog/products/cursor")
+                        .param("cursor", "not-a-cursor"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CURSOR"));
+    }
+
+    private void createPublishedProduct(long categoryId, long brandId, int index) throws Exception {
+        JsonNode created = responseJson(adminPost("/api/v1/catalog/admin/products", Map.of(
+                "categoryId", categoryId,
+                "brandId", brandId,
+                "title", "Cursor Product " + index,
+                "skus", List.of(Map.of(
+                        "skuCode", "CURSOR-SKU-" + index,
+                        "name", "Cursor SKU " + index,
+                        "specJson", "{}",
+                        "salePrice", "29.90"
+                ))
+        )));
+        adminPost(
+                "/api/v1/catalog/admin/products/" + created.at("/data/id").asText() + "/publish",
+                Map.of("expectedVersion", 0));
     }
 
     private String adminPost(String uri, Object body) throws Exception {

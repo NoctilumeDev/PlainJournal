@@ -2,6 +2,7 @@ package com.ecommerce.trade.infrastructure.messaging;
 
 import com.ecommerce.trade.application.model.TradeModels.FulfillmentEventCommand;
 import com.ecommerce.trade.application.service.TradeOrderService;
+import com.ecommerce.platform.common.observability.ConsumerFailureRetryHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -24,7 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @ConditionalOnProperty(prefix = "ecommerce.trade.fulfillment-consumer", name = "enabled", havingValue = "true")
-public class FulfillmentEventConsumer {
+public class FulfillmentEventConsumer implements ConsumerFailureRetryHandler {
 
     private static final Logger log = LoggerFactory.getLogger(FulfillmentEventConsumer.class);
     private static final String TAG_EXPRESSION = "FulfillmentCreated||ShipmentDispatched||ShipmentSigned";
@@ -34,6 +35,7 @@ public class FulfillmentEventConsumer {
     private final FulfillmentEventConsumerProperties properties;
     private final TradeOrderService orderService;
     private final ObjectMapper objectMapper;
+    private final ConsumerFailureRecorder failureRecorder;
     private final ClientServiceProvider provider = ClientServiceProvider.loadService();
     private final AtomicLong nextWarningAt = new AtomicLong();
     private volatile SimpleConsumer consumer;
@@ -41,10 +43,12 @@ public class FulfillmentEventConsumer {
     public FulfillmentEventConsumer(
             FulfillmentEventConsumerProperties properties,
             TradeOrderService orderService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ConsumerFailureRecorder failureRecorder) {
         this.properties = properties;
         this.orderService = orderService;
         this.objectMapper = objectMapper;
+        this.failureRecorder = failureRecorder;
     }
 
     @Scheduled(fixedDelayString = "${ecommerce.trade.fulfillment-consumer.fixed-delay:1000}")
@@ -53,13 +57,7 @@ public class FulfillmentEventConsumer {
         try {
             active = consumer();
             for (MessageView message : active.receive(properties.batchSize(), properties.invisibleDuration())) {
-                try {
-                    orderService.applyFulfillmentEvent(parse(message));
-                    active.ack(message);
-                } catch (Exception exception) {
-                    log.warn("Fulfillment event processing failed and will be retried: messageId={}",
-                            message.getMessageId(), exception);
-                }
+                processMessage(message, active);
             }
             nextWarningAt.set(0);
         } catch (Exception exception) {
@@ -68,8 +66,54 @@ public class FulfillmentEventConsumer {
         }
     }
 
+    void processMessage(MessageView message, SimpleConsumer active) throws Exception {
+        FulfillmentEventCommand command;
+        try {
+            command = parse(message);
+        } catch (Exception exception) {
+            failureRecorder.recordTerminal(message, properties.consumerGroup(), exception);
+            active.ack(message);
+            log.error("Fulfillment event payload is not retryable and requires attention: messageId={}",
+                    message.getMessageId(), exception);
+            return;
+        }
+        try {
+            orderService.applyFulfillmentEvent(command);
+            failureRecorder.markRecovered(message, properties.consumerGroup());
+            active.ack(message);
+        } catch (Exception exception) {
+            boolean terminal = failureRecorder.record(message, properties.consumerGroup(), exception);
+            active.ack(message);
+            if (terminal) {
+                log.error("Fulfillment event processing exhausted retries and requires attention: messageId={}",
+                        message.getMessageId(), exception);
+            } else {
+                log.warn("Fulfillment event processing failed; durable MySQL retry now owns "
+                                + "recovery: messageId={}",
+                        message.getMessageId(), exception);
+            }
+        }
+    }
+
     private FulfillmentEventCommand parse(MessageView message) throws Exception {
-        JsonNode envelope = objectMapper.readTree(readBody(message.getBody()));
+        return parseEnvelope(objectMapper.readTree(readBody(message.getBody())));
+    }
+
+    @Override
+    public String consumerGroup() {
+        return properties.consumerGroup();
+    }
+
+    @Override
+    public void retry(String rawPayload) throws Exception {
+        orderService.applyFulfillmentEvent(
+                parseEnvelope(objectMapper.readTree(rawPayload)));
+    }
+
+    private FulfillmentEventCommand parseEnvelope(JsonNode envelope) {
+        if (envelope.path("payloadVersion").asInt(-1) != 1) {
+            throw new IllegalArgumentException("Unsupported fulfillment event payload version");
+        }
         String eventType = requiredText(envelope, "eventType");
         if (!EVENT_TYPES.contains(eventType)) {
             throw new IllegalArgumentException("Unexpected fulfillment event type");
@@ -80,7 +124,7 @@ public class FulfillmentEventConsumer {
                 eventType,
                 requiredText(payload, "fulfillmentNo"),
                 requiredText(payload, "orderNo"),
-                payload.path("userId").longValue());
+                requiredPositiveLong(payload, "userId"));
     }
 
     private String requiredText(JsonNode node, String field) {
@@ -89,6 +133,14 @@ public class FulfillmentEventConsumer {
             throw new IllegalArgumentException("Missing event field: " + field);
         }
         return value.asText();
+    }
+
+    private Long requiredPositiveLong(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || !value.canConvertToLong() || value.longValue() <= 0) {
+            throw new IllegalArgumentException("Missing or invalid event field: " + field);
+        }
+        return value.longValue();
     }
 
     private byte[] readBody(ByteBuffer source) {

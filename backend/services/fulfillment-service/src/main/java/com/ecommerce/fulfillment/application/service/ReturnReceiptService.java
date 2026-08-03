@@ -28,7 +28,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,7 +46,6 @@ public class ReturnReceiptService {
     private final ConsumedEventMapper consumedEventMapper;
     private final OutboxEventMapper outboxMapper;
     private final ObjectMapper objectMapper;
-    private final Clock clock;
 
     public ReturnReceiptService(
             ReturnReceiptMapper receiptMapper,
@@ -55,22 +53,34 @@ public class ReturnReceiptService {
             ReturnStatusHistoryMapper historyMapper,
             ConsumedEventMapper consumedEventMapper,
             OutboxEventMapper outboxMapper,
-            ObjectMapper objectMapper,
-            Clock clock) {
+            ObjectMapper objectMapper) {
         this.receiptMapper = receiptMapper;
         this.itemMapper = itemMapper;
         this.historyMapper = historyMapper;
         this.consumedEventMapper = consumedEventMapper;
         this.outboxMapper = outboxMapper;
         this.objectMapper = objectMapper;
-        this.clock = clock;
     }
 
     @Transactional
     public ReturnReceiptView createFromAfterSaleApproved(AfterSaleApprovedCommand command) {
+        String payloadFingerprint = approvalFingerprint(command);
         if (consumedEventMapper.insertIfAbsent(
-                command.eventId(), AFTER_SALE_APPROVED_CONSUMER_GROUP, clock.instant()) != 1) {
-            return view(requireByAfterSaleNo(command.afterSaleNo()));
+                command.eventId(),
+                AFTER_SALE_APPROVED_CONSUMER_GROUP,
+                payloadFingerprint,
+                receiptMapper.currentTime()) != 1) {
+            String storedFingerprint = consumedEventMapper.selectPayloadFingerprint(
+                    command.eventId(), AFTER_SALE_APPROVED_CONSUMER_GROUP);
+            if (!ConsumedEventFingerprint.matches(storedFingerprint, payloadFingerprint)) {
+                throw new FulfillmentException(FulfillmentError.IDEMPOTENCY_CONFLICT);
+            }
+            ReturnReceiptEntity repeated = receiptMapper.selectByAfterSaleNoForUpdate(command.afterSaleNo());
+            if (repeated == null) {
+                throw new FulfillmentException(FulfillmentError.IDEMPOTENCY_CONFLICT);
+            }
+            requireSameApproval(repeated, command);
+            return view(repeated);
         }
         ReturnReceiptEntity existing = receiptMapper.selectByAfterSaleNoForUpdate(command.afterSaleNo());
         if (existing != null) {
@@ -79,7 +89,7 @@ public class ReturnReceiptService {
         }
         validateApproval(command);
 
-        Instant now = clock.instant();
+        Instant now = receiptMapper.currentTime();
         long id = IdWorker.getId();
         ReturnReceiptEntity receipt = new ReturnReceiptEntity();
         receipt.setId(id);
@@ -127,7 +137,7 @@ public class ReturnReceiptService {
         requireStatus(receipt, ReturnReceiptStatus.WAIT_SHIPMENT);
         receipt.setCarrier(command.carrier());
         receipt.setTrackingNo(command.trackingNo());
-        receipt.setShippedAt(clock.instant());
+        receipt.setShippedAt(receiptMapper.currentTime());
         try {
             transition(receipt, ReturnReceiptStatus.RETURNING, "SUBMIT_RETURN_SHIPMENT", null,
                     "CUSTOMER", userId.toString(), "ReturnShipmentSubmitted");
@@ -145,7 +155,7 @@ public class ReturnReceiptService {
             return view(receipt);
         }
         requireStatus(receipt, ReturnReceiptStatus.RETURNING);
-        receipt.setReceivedAt(clock.instant());
+        receipt.setReceivedAt(receiptMapper.currentTime());
         transition(receipt, ReturnReceiptStatus.RECEIVED, "RECEIVE_RETURN", null,
                 "WAREHOUSE", operatorId, "ReturnReceived");
         return view(receipt);
@@ -159,7 +169,7 @@ public class ReturnReceiptService {
         }
         requireStatus(receipt, ReturnReceiptStatus.RECEIVED);
         receipt.setInspectionRemark(remark);
-        receipt.setInspectedAt(clock.instant());
+        receipt.setInspectedAt(receiptMapper.currentTime());
         transition(receipt, ReturnReceiptStatus.INSPECTED, "INSPECT_RETURN", remark,
                 "WAREHOUSE", operatorId, "ReturnInspected");
         return view(receipt);
@@ -241,6 +251,21 @@ public class ReturnReceiptService {
         }
     }
 
+    private String approvalFingerprint(AfterSaleApprovedCommand command) {
+        Map<String, Object> canonical = new LinkedHashMap<>();
+        canonical.put("eventId", command.eventId());
+        canonical.put("afterSaleNo", command.afterSaleNo());
+        canonical.put("orderNo", command.orderNo());
+        canonical.put("userId", command.userId());
+        canonical.put("warehouseId", command.warehouseId());
+        canonical.put("reservationNo", command.reservationNo());
+        canonical.put("refundAmount", command.refundAmount());
+        canonical.put("items", command.items().stream()
+                .sorted(java.util.Comparator.comparingInt(AfterSaleApprovedItem::lineNo))
+                .toList());
+        return ConsumedEventFingerprint.of(objectMapper, canonical);
+    }
+
     private void transition(
             ReturnReceiptEntity receipt,
             ReturnReceiptStatus target,
@@ -250,7 +275,7 @@ public class ReturnReceiptService {
             String operatorId,
             String eventType) {
         String from = receipt.getStatus();
-        Instant now = clock.instant();
+        Instant now = receiptMapper.currentTime();
         receipt.setStatus(target.name());
         receipt.setVersion(receipt.getVersion() + 1);
         receipt.setUpdatedAt(now);
@@ -343,15 +368,6 @@ public class ReturnReceiptService {
     private ReturnReceiptEntity require(String returnReceiptNo) {
         ReturnReceiptEntity receipt = receiptMapper.selectOne(new LambdaQueryWrapper<ReturnReceiptEntity>()
                 .eq(ReturnReceiptEntity::getReturnReceiptNo, returnReceiptNo));
-        if (receipt == null) {
-            throw new FulfillmentException(FulfillmentError.RESOURCE_NOT_FOUND);
-        }
-        return receipt;
-    }
-
-    private ReturnReceiptEntity requireByAfterSaleNo(String afterSaleNo) {
-        ReturnReceiptEntity receipt = receiptMapper.selectOne(new LambdaQueryWrapper<ReturnReceiptEntity>()
-                .eq(ReturnReceiptEntity::getAfterSaleNo, afterSaleNo));
         if (receipt == null) {
             throw new FulfillmentException(FulfillmentError.RESOURCE_NOT_FOUND);
         }

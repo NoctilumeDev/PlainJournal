@@ -1,0 +1,102 @@
+server:
+  port: 0
+
+spring:
+  config:
+    import: []
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+  datasource:
+    url: jdbc:h2:mem:chat;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+ecommerce:
+  foundation:
+    configuration-source: local-default
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: 16
+  security:
+    token:
+      secret: test-only-chat-jwt-secret-with-at-least-32-characters
+      issuer: ecommerce-identity-test
+    metrics:
+      token: test-only-metrics-token-with-at-least-32-characters
+  chat:
+    attachments:
+      namespace: test
+      endpoint: http://127.0.0.1:19000
+      username: test-minio-user
+      password: test-minio-password
+      bucket: chat-attachments
+      upload-expiry: 10m
+      download-expiry: 5m
+      intent-ttl: 30m
+      maximum-size: 10MB
+      inspection-bytes: 1024
+      cleanup-enabled: false
+      cleanup-initial-delay: 30000
+      cleanup-fixed-delay: 30000
+      cleanup-batch-size: 20
+      cleanup-recovery-age: 5m
+      scan:
+        enabled: false
+        host: 127.0.0.1
+        port: 13310
+        connect-timeout: 1s
+        read-timeout: 5s
+        initial-delay: 0
+        fixed-delay: 250
+        batch-size: 5
+        lease-duration: 15s
+        maximum-attempts: 2
+        scanner-id: chat-test
+        maximum-response-bytes: 4096
+    outbox:
+      enabled: false
+      topic: ecommerce-chat-events-test
+    realtime:
+      enabled: false
+      node-id: chat-test
+
+management:
+  tracing:
+    enabled: false
+  otlp:
+    tracing:
+      export:
+        enabled: false
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+          - consumerfailures
+  endpoint:
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only
+
+logging:
+  level:
+    root: warn
+    com.alibaba.nacos: error

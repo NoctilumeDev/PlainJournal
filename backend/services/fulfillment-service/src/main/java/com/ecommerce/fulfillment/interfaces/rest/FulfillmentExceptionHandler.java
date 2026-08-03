@@ -51,9 +51,10 @@ public class FulfillmentExceptionHandler {
 
     private HttpStatus statusFor(FulfillmentError error) {
         return switch (error) {
-            case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case RESOURCE_NOT_FOUND, POSITION_NOT_AVAILABLE -> HttpStatus.NOT_FOUND;
             case ACCESS_DENIED -> HttpStatus.FORBIDDEN;
-            case INVALID_TRACE -> HttpStatus.BAD_REQUEST;
+            case INVALID_TRACE, INVALID_GEO_QUERY -> HttpStatus.BAD_REQUEST;
+            case GEO_CACHE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
             case INVALID_STATE, IDEMPOTENCY_CONFLICT, DUPLICATE_TRACKING,
                     CONCURRENT_MODIFICATION -> HttpStatus.CONFLICT;
         };

@@ -12,7 +12,6 @@ import com.ecommerce.identity.infrastructure.persistence.mapper.UserAddressMappe
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
@@ -23,12 +22,10 @@ public class AddressService {
 
     private final UserAddressMapper addressMapper;
     private final UserAccountMapper userMapper;
-    private final Clock clock;
 
-    public AddressService(UserAddressMapper addressMapper, UserAccountMapper userMapper, Clock clock) {
+    public AddressService(UserAddressMapper addressMapper, UserAccountMapper userMapper) {
         this.addressMapper = addressMapper;
         this.userMapper = userMapper;
-        this.clock = clock;
     }
 
     @Transactional
@@ -39,7 +36,7 @@ public class AddressService {
         if (count >= MAX_ADDRESSES) {
             throw new IdentityException(IdentityError.ADDRESS_LIMIT_REACHED);
         }
-        Instant now = clock.instant();
+        Instant now = userMapper.currentTime();
         boolean defaultAddress = count == 0 || command.setDefault();
         if (defaultAddress) {
             addressMapper.clearDefault(userId, now);
@@ -78,7 +75,7 @@ public class AddressService {
     public AddressView update(Long userId, Long addressId, AddressCommand command) {
         lockUser(userId);
         UserAddressEntity address = requireLocked(userId, addressId);
-        Instant now = clock.instant();
+        Instant now = userMapper.currentTime();
         if (command.setDefault()) {
             addressMapper.clearDefault(userId, now);
             address.setIsDefault(true);
@@ -96,7 +93,7 @@ public class AddressService {
         if (Boolean.TRUE.equals(address.getIsDefault())) {
             return view(address);
         }
-        Instant now = clock.instant();
+        Instant now = userMapper.currentTime();
         addressMapper.clearDefault(userId, now);
         address.setIsDefault(true);
         address.setUpdatedAt(now);
@@ -118,7 +115,7 @@ public class AddressService {
                             .last("LIMIT 1"));
             if (replacement != null) {
                 replacement.setIsDefault(true);
-                replacement.setUpdatedAt(clock.instant());
+                replacement.setUpdatedAt(userMapper.currentTime());
                 requireUpdated(addressMapper.updateById(replacement));
             }
         }

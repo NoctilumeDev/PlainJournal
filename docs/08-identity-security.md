@@ -29,7 +29,24 @@
 
 JWT 密钥只存在本地忽略的 `.env` 或部署环境的密钥系统中，不发布到 Nacos，也不写入源码。日志禁止输出密码、access token 和 refresh token。
 
-## 3. 角色基线
+## 3. 浏览器会话边界
+
+M4 第二、第三批采用与现有 Identity API 相容的设备会话策略：
+
+- access token 只保存在前端内存，不写入 `localStorage`；
+- refresh token 保存在当前设备，用于刷新页面后的会话恢复；
+- 恢复时先调用 `/auth/refresh` 完成令牌轮换，再用新 access token 调用 `/me`；
+- 并发恢复复用同一个 Promise，避免同一 refresh token 被并发旋转；
+- 服务端注销确认成功后才清除本机会话；
+- 注销网络失败或超时时保留会话并明确显示“结果未知”，用户可稍后重试或显式选择“仅清除此设备”。
+
+refresh token 仍由 JavaScript 可读，这是当前“响应体返回 refresh token”契约下的明确边界。后续若切换为 `HttpOnly + Secure + SameSite` Cookie，需要同时补齐 CSRF、跨域、刷新轮换和多端设备管理，不能只改前端存储位置。
+
+`UserProfile.id` 和 `AddressView.id` 已按 DTO 局部序列化为 JSON string，避免 Snowflake ID 在浏览器中静默丢失精度。没有启用全局 `Long -> string`。
+
+顾客端 `/account/addresses` 已接通完整地址管理：新增或修改只有在 Identity 返回成功后才显示确认；切换默认地址以后端返回事实重载列表；删除使用原位确认，失败或结果未知时不关闭确认并不宣称删除成功。进入编辑状态后焦点移动到表单标题，状态与错误分别使用语义化 `status`/`alert`。
+
+## 4. 角色基线
 
 当前预置角色为：
 
@@ -42,24 +59,28 @@ JWT 密钥只存在本地忽略的 `.env` 或部署环境的密钥系统中，�
 
 Spring Security 将 JWT 的 `roles` 声明映射为 `ROLE_*` authority。新增管理接口时使用 `@PreAuthorize` 或统一授权服务约束权限，不能只依赖前端隐藏按钮。
 
-## 4. 已验证场景
+管理端当前只接受 `ADMIN` 或 `OPERATOR` 进入工作区。普通 `CUSTOMER` 即使账号密码验证成功，也会进入明确的权限不足页面；前端会清除本地管理会话，并尝试撤销刚签发的 refresh token。员工账号仍不开放自助注册。
+
+## 5. 已验证场景
 
 - H2 隔离测试：注册、重复邮箱、错误密码、受保护接口、刷新旋转、注销与哈希存储。
 - 并发测试：两个请求同时刷新同一令牌，只允许一个成功。
 - 地址测试：默认地址切换、删除接替、输入校验、跨用户修改拒绝和 20 条上限规则。
 - 内部接口测试：只有携带本地服务令牌的 `trade-service` 能读取指定用户自有地址；其他调用者和地址越权均拒绝。
 - 真实环境烟测：Gateway、Nacos、MySQL、Flyway、JWT 全链路，无 Mock。
+- M4 第二批真实最小链路：注册、登录、刷新轮换、`/me`、地址创建和注销均通过 Gateway；用户与地址 ID 为 JSON string；注销后原 refresh token 返回 401。
+- M4 第三批真实最小链路：地址列表、新增、编辑、默认地址切换、删除取消和最终删除均通过 Gateway；页面刷新后的会话恢复正常，所有地址 ID 保持 JSON string。
 - 烟测结束自动删除临时账号并停止应用进程，不污染开发数据。
 
 执行命令：
 
 ```powershell
-cd C:\Users\lenovo\Desktop\ecommerce-platform\backend
+cd C:\Users\lenovo\Desktop\PlainJournal\backend
 mvn clean verify
 ./run-foundation-smoke.ps1
 ```
 
-## 5. 明确边界与下一步
+## 6. 明确边界与下一步
 
 - Access Token 是短期自包含令牌，注销不会立即使已签发令牌失效，最长保留 15 分钟。需要即时冻结时，再增加 Redis 账号版本或黑名单校验，并保留数据库降级策略。
 - 当前 HS256 适合首个服务切片。业务服务增多后改用非对称密钥或标准授权服务器，使业务服务只持有公钥，不能签发令牌。

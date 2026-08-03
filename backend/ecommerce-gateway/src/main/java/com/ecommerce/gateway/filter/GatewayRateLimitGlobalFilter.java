@@ -21,6 +21,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Component
 public class GatewayRateLimitGlobalFilter implements GlobalFilter, Ordered {
@@ -28,6 +29,8 @@ public class GatewayRateLimitGlobalFilter implements GlobalFilter, Ordered {
     private static final String LOGIN_PATH = "/api/v1/identity/auth/login";
     private static final String REGISTRATION_PATH = "/api/v1/identity/auth/register";
     private static final String REFRESH_PATH = "/api/v1/identity/auth/refresh";
+    private static final Pattern FLASH_SALE_ADMISSION_PATH = Pattern.compile(
+            "^/api/v1/marketing/flash-sales/[^/]+/admissions$");
 
     private final GatewayRateLimiter rateLimiter;
     private final GatewayRateLimitProperties properties;
@@ -68,14 +71,18 @@ public class GatewayRateLimitGlobalFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return Ordered.HIGHEST_PRECEDENCE + 10;
+        return HIGHEST_PRECEDENCE + 10;
     }
 
     private Optional<NamedPolicy> selectPolicy(ServerWebExchange exchange) {
         if (exchange.getRequest().getMethod() != HttpMethod.POST) {
             return Optional.empty();
         }
-        return switch (exchange.getRequest().getURI().getPath()) {
+        String path = exchange.getRequest().getURI().getPath();
+        if (FLASH_SALE_ADMISSION_PATH.matcher(path).matches()) {
+            return Optional.of(new NamedPolicy("flash-sale", properties.flashSale()));
+        }
+        return switch (path) {
             case LOGIN_PATH -> Optional.of(new NamedPolicy("login", properties.login()));
             case REGISTRATION_PATH -> Optional.of(new NamedPolicy("registration", properties.registration()));
             case REFRESH_PATH -> Optional.of(new NamedPolicy("refresh", properties.refresh()));

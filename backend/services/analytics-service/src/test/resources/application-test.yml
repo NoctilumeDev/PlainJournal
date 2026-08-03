@@ -1,0 +1,67 @@
+server:
+  port: 0
+
+spring:
+  config:
+    import: []
+  cloud:
+    nacos:
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+  datasource:
+    url: jdbc:h2:mem:analytics;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+ecommerce:
+  foundation:
+    configuration-source: local-default
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: 2
+  security:
+    token:
+      secret: test-only-analytics-jwt-secret-32-characters
+      issuer: ecommerce-identity-test
+    metrics:
+      token: test-only-metrics-token-with-at-least-32-characters
+  analytics:
+    zone-id: Asia/Shanghai
+    maximum-range-days: 366
+    reconciliation-row-limit: 10000
+    events:
+      enabled: false
+
+management:
+  tracing:
+    enabled: false
+  otlp:
+    tracing:
+      export:
+        enabled: false
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,consumerfailures
+  endpoint:
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only
+
+logging:
+  level:
+    root: warn
+    com.alibaba.nacos: error

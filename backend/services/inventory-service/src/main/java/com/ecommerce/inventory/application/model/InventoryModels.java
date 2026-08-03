@@ -1,5 +1,8 @@
 package com.ecommerce.inventory.application.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -8,11 +11,20 @@ public final class InventoryModels {
     private InventoryModels() {
     }
 
-    public record WarehouseView(Long id, String code, String name, String status, int version) {
+    public record WarehouseView(
+            @JsonSerialize(using = ToStringSerializer.class)
+            Long id,
+            String code,
+            String name,
+            String status,
+            int version
+    ) {
     }
 
     public record StockPosition(
+            @JsonSerialize(using = ToStringSerializer.class)
             Long warehouseId,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long skuId,
             long onHand,
             long reserved,
@@ -21,7 +33,13 @@ public final class InventoryModels {
     ) {
     }
 
-    public record StockSummary(Long skuId, long onHand, long reserved, long available) {
+    public record StockSummary(
+            @JsonSerialize(using = ToStringSerializer.class)
+            Long skuId,
+            long onHand,
+            long reserved,
+            long available
+    ) {
     }
 
     public record ReservationLineCommand(Long skuId, long quantity) {
@@ -39,12 +57,17 @@ public final class InventoryModels {
         }
     }
 
-    public record ReservationItemView(Long skuId, long quantity) {
+    public record ReservationItemView(
+            @JsonSerialize(using = ToStringSerializer.class)
+            Long skuId,
+            long quantity
+    ) {
     }
 
     public record ReservationView(
             String reservationNo,
             String orderNo,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long warehouseId,
             String status,
             Instant expiresAt,
@@ -82,12 +105,26 @@ public final class InventoryModels {
             String afterSaleNo,
             String returnReceiptNo,
             String orderNo,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long userId,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long warehouseId,
             String reservationNo,
             String status,
             Instant createdAt,
             Instant stockedAt
+    ) {
+    }
+
+    public record ReconciliationIssueView(
+            String domain,
+            String referenceNo,
+            String issueType,
+            String status,
+            int occurrences,
+            Instant firstDetectedAt,
+            Instant lastDetectedAt,
+            Instant resolvedAt
     ) {
     }
 }

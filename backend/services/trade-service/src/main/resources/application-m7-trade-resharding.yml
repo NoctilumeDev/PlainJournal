@@ -1,0 +1,33 @@
+spring:
+  flyway:
+    enabled: false
+
+ecommerce:
+  trade:
+    sharding:
+      enabled: true
+      sql-show: ${TRADE_RESHARDING_SQL_SHOW:false}
+      connection-timeout: 5s
+      maximum-pool-size: ${TRADE_RESHARDING_POOL_SIZE:4}
+      minimum-idle: 0
+      shards:
+        - name: ds_0
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          jdbc-url: ${TRADE_RESHARD_0_URL:jdbc:mysql://127.0.0.1:13306/ecom_trade_reshard_0?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true}
+          username: ${TRADE_RESHARD_DB_USER:ecom_trade_reshard_app}
+          password: ${TRADE_RESHARD_DB_PASSWORD:}
+        - name: ds_1
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          jdbc-url: ${TRADE_RESHARD_1_URL:jdbc:mysql://127.0.0.1:13326/ecom_trade_reshard_1?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true}
+          username: ${TRADE_RESHARD_DB_USER:ecom_trade_reshard_app}
+          password: ${TRADE_RESHARD_DB_PASSWORD:}
+        - name: ds_2
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          jdbc-url: ${TRADE_RESHARD_2_URL:jdbc:mysql://127.0.0.1:13306/ecom_trade_reshard_2?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true}
+          username: ${TRADE_RESHARD_DB_USER:ecom_trade_reshard_app}
+          password: ${TRADE_RESHARD_DB_PASSWORD:}
+        - name: ds_3
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          jdbc-url: ${TRADE_RESHARD_3_URL:jdbc:mysql://127.0.0.1:13326/ecom_trade_reshard_3?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true}
+          username: ${TRADE_RESHARD_DB_USER:ecom_trade_reshard_app}
+          password: ${TRADE_RESHARD_DB_PASSWORD:}

@@ -1,0 +1,43 @@
+.async-state {
+  min-height: 18rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  max-width: var(--pj-reading-width);
+  padding-block: var(--pj-space-7);
+}
+
+.async-state h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 2.5vw, 2.5rem);
+  font-weight: 520;
+  line-height: var(--pj-line-height-tight);
+}
+
+.async-state p {
+  color: var(--pj-color-muted);
+}
+
+.loading-line {
+  width: min(32rem, 80%);
+  height: 0.6rem;
+  margin-bottom: var(--pj-space-3);
+  background:
+    color-mix(
+      in srgb,
+      var(--pj-color-muted-air) 18%,
+      var(--pj-color-canvas)
+    );
+  animation: loading-pulse 1.2s infinite alternate;
+}
+
+.loading-line--short {
+  width: min(20rem, 55%);
+}
+
+@keyframes loading-pulse {
+  to {
+    opacity: 0.4;
+  }
+}

@@ -2,6 +2,7 @@ package com.ecommerce.payment.infrastructure.messaging;
 
 import com.ecommerce.payment.application.model.PaymentModels.RefundRequestedCommand;
 import com.ecommerce.payment.application.service.RefundService;
+import com.ecommerce.platform.common.observability.ConsumerFailureRetryHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -24,13 +25,14 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @ConditionalOnProperty(prefix = "ecommerce.payment.refund-consumer", name = "enabled", havingValue = "true")
-public class RefundRequestedConsumer {
+public class RefundRequestedConsumer implements ConsumerFailureRetryHandler {
 
     private static final Logger log = LoggerFactory.getLogger(RefundRequestedConsumer.class);
 
     private final RefundEventConsumerProperties properties;
     private final RefundService refundService;
     private final ObjectMapper objectMapper;
+    private final ConsumerFailureRecorder failureRecorder;
     private final ClientServiceProvider provider = ClientServiceProvider.loadService();
     private final AtomicLong nextWarningAt = new AtomicLong();
     private volatile SimpleConsumer consumer;
@@ -38,10 +40,12 @@ public class RefundRequestedConsumer {
     public RefundRequestedConsumer(
             RefundEventConsumerProperties properties,
             RefundService refundService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ConsumerFailureRecorder failureRecorder) {
         this.properties = properties;
         this.refundService = refundService;
         this.objectMapper = objectMapper;
+        this.failureRecorder = failureRecorder;
     }
 
     @Scheduled(fixedDelayString = "${ecommerce.payment.refund-consumer.fixed-delay:1000}")
@@ -50,12 +54,32 @@ public class RefundRequestedConsumer {
         try {
             active = consumer();
             for (MessageView message : active.receive(properties.batchSize(), properties.invisibleDuration())) {
+                RefundRequestedCommand command;
                 try {
-                    refundService.createFromRefundRequested(parse(message));
+                    command = parse(message);
+                } catch (Exception exception) {
+                    failureRecorder.recordTerminal(message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    log.error("RefundRequested payload requires attention: messageId={}",
+                            message.getMessageId(), exception);
+                    continue;
+                }
+                try {
+                    refundService.createFromRefundRequested(command);
+                    failureRecorder.markRecovered(message, properties.consumerGroup());
                     active.ack(message);
                 } catch (Exception exception) {
-                    log.warn("RefundRequested processing failed and will be retried: messageId={}",
-                            message.getMessageId(), exception);
+                    boolean terminal = failureRecorder.record(
+                            message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    if (terminal) {
+                        log.error("RefundRequested moved to the local compensation queue: messageId={}",
+                                message.getMessageId(), exception);
+                    } else {
+                        log.warn("RefundRequested processing failed; durable MySQL retry now owns "
+                                        + "recovery: messageId={}",
+                                message.getMessageId(), exception);
+                    }
                 }
             }
             nextWarningAt.set(0);
@@ -66,7 +90,24 @@ public class RefundRequestedConsumer {
     }
 
     private RefundRequestedCommand parse(MessageView message) throws Exception {
-        JsonNode envelope = objectMapper.readTree(readBody(message.getBody()));
+        return parseEnvelope(objectMapper.readTree(readBody(message.getBody())));
+    }
+
+    @Override
+    public String consumerGroup() {
+        return properties.consumerGroup();
+    }
+
+    @Override
+    public void retry(String rawPayload) throws Exception {
+        refundService.createFromRefundRequested(
+                parseEnvelope(objectMapper.readTree(rawPayload)));
+    }
+
+    private RefundRequestedCommand parseEnvelope(JsonNode envelope) {
+        if (envelope.path("payloadVersion").asInt(-1) != 1) {
+            throw new IllegalArgumentException("Unsupported RefundRequested payload version");
+        }
         if (!"RefundRequested".equals(envelope.path("eventType").asText())) {
             throw new IllegalArgumentException("Unexpected refund event type");
         }

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "name": "catalog-list-baseline",
+  "requests": 1000,
+  "concurrency": 20,
+  "warmupRequests": 100,
+  "timeoutMs": 5000,
+  "maxErrorRate": 0,
+  "scenarios": [
+    {
+      "name": "catalog-list",
+      "method": "GET",
+      "url": "http://127.0.0.1:18000/api/v1/catalog/products?page=1&size=20",
+      "expectedStatuses": [
+        200
+      ],
+      "expectedJsonCode": "OK",
+      "weight": 1
+    }
+  ]
+}

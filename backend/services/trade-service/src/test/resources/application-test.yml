@@ -3,7 +3,7 @@ server:
 
 spring:
   config:
-    import: "optional:nacos:"
+    import: []
   cloud:
     nacos:
       discovery:
@@ -24,19 +24,60 @@ spring:
 ecommerce:
   foundation:
     configuration-source: local-default
+  messaging:
+    consumer-failure-retry:
+      scheduler: tradeConsumerFailureScheduler
   security:
     token:
       secret: test-only-trade-jwt-secret-with-at-least-32-characters
       issuer: ecommerce-identity-test
+    metrics:
+      token: test-only-metrics-scrape-token-with-at-least-32-characters
     internal:
-      token: test-internal-service-token-1234567890
-      caller: trade-service
+      token: test-payment-internal-token-with-at-least-32-characters
       allowed-callers:
         - payment-service
+  clients:
+    internal:
+      token: test-trade-internal-token-with-at-least-32-characters
+      caller: trade-service
   trade:
+    scheduling:
+      default-pool-size: 1
+      order-recovery-pool-size: 1
+      outbox-pool-size: 1
+      flash-sale-pool-size: 2
+      consumer-failure-pool-size: 1
+      shutdown-await: 2s
     client:
-      connect-timeout: 1s
-      read-timeout: 2s
+      service-discovery-enabled: true
+      connect-timeout: 100ms
+      read-timeout: 250ms
+      synchronous-boundary:
+        total-budget: 1s
+        query-max-attempts: 2
+        retry-wait: 25ms
+        query-max-concurrent-calls: 4
+        command-max-concurrent-calls: 2
+        bulkhead-max-wait: 0ms
+        sliding-window-size: 4
+        minimum-number-of-calls: 2
+        failure-rate-threshold: 50
+        open-state-wait: 100ms
+        half-open-calls: 1
+      marketing-pricing-lock:
+        connect-timeout: 100ms
+        read-timeout: 250ms
+        total-budget: 1s
+        max-attempts: 2
+        retry-wait: 25ms
+        max-concurrent-calls: 4
+        bulkhead-max-wait: 0ms
+        sliding-window-size: 4
+        minimum-number-of-calls: 2
+        failure-rate-threshold: 50
+        open-state-wait: 100ms
+        half-open-calls: 1
     order:
       default-warehouse-code: PRIMARY
       payment-timeout: 15m
@@ -44,13 +85,33 @@ ecommerce:
       recovery-enabled: false
       recovery-delay: 5000
       recovery-batch-size: 50
+      recovery-lease: 30s
+    after-sale:
+      application-window: 30d
     outbox:
       enabled: false
       endpoints: 127.0.0.1:18082
       topic: ecommerce-order-events
+      flash-sale-topic: ecommerce-flash-sale-events
       fixed-delay: 2000
       retry-delay: 0s
       batch-size: 100
+      parallelism: 1
+      publisher-id: trade-test
+      lease-duration: 30s
+      shutdown-await: 1s
+    flash-sale-consumer:
+      enabled: false
+      endpoints: 127.0.0.1:18082
+      topic: ecommerce-flash-sale-events
+      consumer-group: trade-flash-sale-admission-v1
+      batch-size: 32
+      invisible-duration: 30s
+      await-duration: 5s
+      max-attempts: 16
+      recovery-delay: 1000
+      recovery-batch-size: 100
+      recovery-lease: 30s
     payment-consumer:
       enabled: false
     fulfillment-consumer:
@@ -66,3 +127,40 @@ logging:
   level:
     root: warn
     com.alibaba.nacos: error
+
+management:
+  tracing:
+    enabled: true
+    baggage:
+      enabled: false
+    sampling:
+      probability: 1.0
+    propagation:
+      type: W3C
+  otlp:
+    tracing:
+      export:
+        enabled: false
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+          - consumerfailures
+          - businessprocesses
+  endpoint:
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only
+    businessprocesses:
+      access: read-only

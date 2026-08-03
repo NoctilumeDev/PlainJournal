@@ -1,9 +1,12 @@
 server:
   port: ${TRADE_SERVICE_PORT:18104}
+  shutdown: ${SERVER_SHUTDOWN:graceful}
 
 spring:
   application:
     name: trade-service
+  lifecycle:
+    timeout-per-shutdown-phase: ${SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE:20s}
   config:
     import:
       - optional:nacos:trade-service.yml?group=ECOMMERCE&refreshEnabled=true
@@ -15,10 +18,13 @@ spring:
       discovery:
         group: ECOMMERCE
         ip: ${SERVICE_IP:127.0.0.1}
+        metadata:
+          instance-id: ${SERVICE_INSTANCE_ID:local}
+          release-id: ${SERVICE_RELEASE_ID:local}
       config:
         group: ECOMMERCE
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${TRADE_DB_NAME:ecom_trade}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${TRADE_DB_NAME:ecom_trade}?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true
     username: ${TRADE_DB_USER:ecom_trade_app}
     password: ${TRADE_DB_PASSWORD:}
     hikari:
@@ -38,19 +44,77 @@ mybatis-plus:
       id-type: assign_id
 
 ecommerce:
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: 16
+    consumer-failure-retry:
+      scheduler: tradeConsumerFailureScheduler
   security:
     token:
       secret: ${IDENTITY_JWT_SECRET:}
       issuer: ecommerce-identity
+    metrics:
+      token: ${METRICS_SCRAPE_TOKEN:}
     internal:
-      token: ${INTERNAL_SERVICE_TOKEN:}
+      token: ${PAYMENT_INTERNAL_SERVICE_TOKEN:}
       allowed-callers:
         - payment-service
+  clients:
+    internal:
+      token: ${TRADE_INTERNAL_SERVICE_TOKEN:}
       caller: trade-service
   trade:
+    fault-injection:
+      enabled: ${TRADE_FAULT_INJECTION_ENABLED:false}
+      exit-code: ${TRADE_FAULT_INJECTION_EXIT_CODE:91}
+    scheduling:
+      default-pool-size: 1
+      order-recovery-pool-size: 1
+      outbox-pool-size: 1
+      flash-sale-pool-size: 2
+      consumer-failure-pool-size: 1
+      shutdown-await: 10s
     client:
-      connect-timeout: 2s
-      read-timeout: 4s
+      service-discovery-enabled: ${TRADE_SERVICE_DISCOVERY_ENABLED:true}
+      connect-timeout: 500ms
+      read-timeout: 1500ms
+      catalog-base-url: ${TRADE_CATALOG_BASE_URL:http://catalog-service}
+      identity-base-url: ${TRADE_IDENTITY_BASE_URL:http://identity-service}
+      inventory-base-url: ${TRADE_INVENTORY_BASE_URL:http://inventory-service}
+      marketing-base-url: ${TRADE_MARKETING_BASE_URL:http://marketing-service}
+      synchronous-boundary:
+        total-budget: 5s
+        query-max-attempts: 2
+        retry-wait: 100ms
+        query-max-concurrent-calls: 16
+        command-max-concurrent-calls: 8
+        bulkhead-max-wait: 250ms
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        open-state-wait: 10s
+        half-open-calls: 2
+      marketing-pricing-lock:
+        connect-timeout: 500ms
+        read-timeout: 1500ms
+        total-budget: 5s
+        max-attempts: 2
+        retry-wait: 100ms
+        max-concurrent-calls: 8
+        bulkhead-max-wait: 250ms
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        open-state-wait: 10s
+        half-open-calls: 2
+    distributed-id:
+      enabled: ${TRADE_DISTRIBUTED_ID_ENABLED:true}
+      worker-id: ${TRADE_DISTRIBUTED_ID_WORKER_ID:}
+      namespace: ${TRADE_DISTRIBUTED_ID_NAMESPACE:trade-service}
+      lease-duration: ${TRADE_DISTRIBUTED_ID_LEASE_DURATION:30s}
+      renewal-interval: ${TRADE_DISTRIBUTED_ID_RENEWAL_INTERVAL:10s}
+      epoch: ${TRADE_DISTRIBUTED_ID_EPOCH:2026-01-01T00:00:00Z}
+      instance-id: ${SERVICE_INSTANCE_ID:local}
     order:
       default-warehouse-code: PRIMARY
       payment-timeout: 15m
@@ -58,13 +122,34 @@ ecommerce:
       recovery-enabled: true
       recovery-delay: 5000
       recovery-batch-size: 50
+      recovery-lease: 30s
+    after-sale:
+      application-window: 30d
     outbox:
       enabled: ${TRADE_OUTBOX_ENABLED:true}
       endpoints: ${ROCKETMQ_PROXY_ENDPOINT:127.0.0.1:18082}
       topic: ecommerce-order-events
+      flash-sale-topic: ecommerce-flash-sale-events
       fixed-delay: 2000
       retry-delay: 5s
       batch-size: 50
+      parallelism: 8
+      publisher-id: ${TRADE_OUTBOX_PUBLISHER_ID:${random.uuid}}
+      lease-duration: ${TRADE_OUTBOX_LEASE_DURATION:60s}
+      shutdown-await: ${TRADE_OUTBOX_SHUTDOWN_AWAIT:10s}
+    flash-sale-consumer:
+      enabled: ${TRADE_FLASH_SALE_CONSUMER_ENABLED:true}
+      endpoints: ${ROCKETMQ_PROXY_ENDPOINT:127.0.0.1:18082}
+      topic: ecommerce-flash-sale-events
+      consumer-group: trade-flash-sale-admission-v1
+      fixed-delay: 200
+      batch-size: 32
+      invisible-duration: 30s
+      await-duration: 5s
+      max-attempts: 16
+      recovery-delay: 1000
+      recovery-batch-size: 100
+      recovery-lease: 30s
     payment-consumer:
       enabled: ${TRADE_PAYMENT_CONSUMER_ENABLED:true}
       endpoints: ${ROCKETMQ_PROXY_ENDPOINT:127.0.0.1:18082}
@@ -110,17 +195,56 @@ ecommerce:
       batch-size: 16
       invisible-duration: 30s
       await-duration: 5s
+    reconciliation:
+      enabled: ${TRADE_RECONCILIATION_ENABLED:true}
+      fixed-delay: 10000
+      initial-delay: 10000
+      scan-limit: 500
 
 management:
+  tracing:
+    enabled: true
+    baggage:
+      enabled: false
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+    propagation:
+      type: W3C
+  otlp:
+    tracing:
+      export:
+        enabled: ${OTLP_TRACING_EXPORT_ENABLED:false}
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://127.0.0.1:14318/v1/traces}
+      transport: http
+      connect-timeout: 1s
+      timeout: 3s
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   endpoints:
     web:
       exposure:
-        include: health,info
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+          - consumerfailures
+          - businessprocesses
   endpoint:
     health:
       probes:
         enabled: true
       show-details: never
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only
+    businessprocesses:
+      access: read-only
 
 logging:
   pattern:

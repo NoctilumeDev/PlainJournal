@@ -24,6 +24,7 @@ public class ProductSpuEntity {
     private String status;
     @Version
     private Integer version;
+    private Long searchRevision;
     private Instant createdAt;
     private Instant updatedAt;
 }

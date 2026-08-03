@@ -14,6 +14,7 @@ import com.ecommerce.catalog.application.service.CatalogService;
 import com.ecommerce.platform.common.api.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -144,8 +145,8 @@ public class AdminCatalogController {
             @NotBlank @Size(max = 64) @Pattern(regexp = "[A-Za-z0-9._-]+") String skuCode,
             @NotBlank @Size(max = 160) String name,
             @NotBlank @Size(max = 2000) String specJson,
-            @NotNull @DecimalMin(value = "0.01") BigDecimal salePrice,
-            @DecimalMin(value = "0.01") BigDecimal marketPrice
+            @NotNull @DecimalMin(value = "0.01") @Digits(integer = 16, fraction = 2) BigDecimal salePrice,
+            @DecimalMin(value = "0.01") @Digits(integer = 16, fraction = 2) BigDecimal marketPrice
     ) {
     }
 
@@ -162,8 +163,8 @@ public class AdminCatalogController {
     public record UpdateSkuRequest(
             @NotBlank @Size(max = 160) String name,
             @NotBlank @Size(max = 2000) String specJson,
-            @NotNull @DecimalMin(value = "0.01") BigDecimal salePrice,
-            @DecimalMin(value = "0.01") BigDecimal marketPrice,
+            @NotNull @DecimalMin(value = "0.01") @Digits(integer = 16, fraction = 2) BigDecimal salePrice,
+            @DecimalMin(value = "0.01") @Digits(integer = 16, fraction = 2) BigDecimal marketPrice,
             @NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
             @PositiveOrZero int expectedVersion
     ) {

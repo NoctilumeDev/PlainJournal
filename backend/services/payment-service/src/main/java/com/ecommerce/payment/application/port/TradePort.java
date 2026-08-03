@@ -11,6 +11,7 @@ public interface TradePort {
             String orderNo,
             Long userId,
             String reservationNo,
+            String paymentNo,
             String status,
             BigDecimal totalAmount,
             Instant paymentDeadline

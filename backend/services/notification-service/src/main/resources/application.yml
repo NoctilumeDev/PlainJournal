@@ -1,0 +1,130 @@
+server:
+  port: ${NOTIFICATION_SERVICE_PORT:18109}
+  shutdown: ${SERVER_SHUTDOWN:graceful}
+
+spring:
+  application:
+    name: notification-service
+  lifecycle:
+    timeout-per-shutdown-phase: ${SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE:20s}
+  config:
+    import:
+      - optional:nacos:notification-service.yml?group=ECOMMERCE&refreshEnabled=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_HOST:127.0.0.1}:${NACOS_CLIENT_PORT:8848}
+      username: ${NACOS_USERNAME:nacos}
+      password: ${NACOS_ADMIN_PASSWORD:}
+      discovery:
+        group: ECOMMERCE
+        ip: ${SERVICE_IP:127.0.0.1}
+        metadata:
+          instance-id: ${SERVICE_INSTANCE_ID:local}
+          release-id: ${SERVICE_RELEASE_ID:local}
+      config:
+        group: ECOMMERCE
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:13306}/${NOTIFICATION_DB_NAME:ecom_notification}?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${NOTIFICATION_DB_USER:ecom_notification_app}
+    password: ${NOTIFICATION_DB_PASSWORD:}
+    hikari:
+      connection-timeout: 5000
+      maximum-pool-size: 8
+      minimum-idle: 1
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+  mail:
+    host: ${NOTIFICATION_SMTP_HOST:127.0.0.1}
+    port: ${NOTIFICATION_SMTP_PORT:25}
+    username: ${NOTIFICATION_SMTP_USERNAME:}
+    password: ${NOTIFICATION_SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${NOTIFICATION_SMTP_AUTH:false}
+          starttls:
+            enable: ${NOTIFICATION_SMTP_STARTTLS:false}
+          connectiontimeout: ${NOTIFICATION_SMTP_CONNECT_TIMEOUT_MS:2000}
+          timeout: ${NOTIFICATION_SMTP_READ_TIMEOUT_MS:5000}
+          writetimeout: ${NOTIFICATION_SMTP_WRITE_TIMEOUT_MS:5000}
+
+ecommerce:
+  foundation:
+    configuration-source: local-default
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: ${NOTIFICATION_CONSUMER_FAILURE_MAX_DELIVERY_ATTEMPTS:16}
+  security:
+    token:
+      secret: ${IDENTITY_JWT_SECRET:}
+      issuer: ecommerce-identity
+    metrics:
+      token: ${METRICS_SCRAPE_TOKEN:}
+  notification:
+    events:
+      enabled: ${NOTIFICATION_EVENTS_ENABLED:true}
+      endpoints: ${ROCKETMQ_ENDPOINTS:127.0.0.1:18082}
+      consumer-group: ${NOTIFICATION_CONSUMER_GROUP:ecommerce-notification-domain-events}
+      payment-topic: ${NOTIFICATION_PAYMENT_TOPIC:ecommerce-payment-events}
+      logistics-topic: ${NOTIFICATION_LOGISTICS_TOPIC:ecommerce-logistics-events}
+      initial-delay: ${NOTIFICATION_EVENTS_INITIAL_DELAY:2000}
+      fixed-delay: ${NOTIFICATION_EVENTS_FIXED_DELAY:500}
+      await-duration: ${NOTIFICATION_EVENTS_AWAIT_DURATION:5s}
+      invisible-duration: ${NOTIFICATION_EVENTS_INVISIBLE_DURATION:20s}
+      batch-size: ${NOTIFICATION_EVENTS_BATCH_SIZE:20}
+    email:
+      enabled: ${NOTIFICATION_EMAIL_ENABLED:false}
+      worker-enabled: ${NOTIFICATION_EMAIL_WORKER_ENABLED:false}
+      from: ${NOTIFICATION_EMAIL_FROM:no-reply@plainjournal.local}
+      worker-id: ${SERVICE_INSTANCE_ID:notification-local}
+      maximum-attempts: ${NOTIFICATION_EMAIL_MAXIMUM_ATTEMPTS:5}
+      retry-delay: ${NOTIFICATION_EMAIL_RETRY_DELAY:10s}
+      lease-duration: ${NOTIFICATION_EMAIL_LEASE_DURATION:30s}
+      batch-size: ${NOTIFICATION_EMAIL_BATCH_SIZE:20}
+      initial-delay: ${NOTIFICATION_EMAIL_INITIAL_DELAY:2000}
+      fixed-delay: ${NOTIFICATION_EMAIL_FIXED_DELAY:1000}
+
+management:
+  tracing:
+    enabled: true
+    baggage:
+      enabled: false
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+    propagation:
+      type: W3C
+  otlp:
+    tracing:
+      export:
+        enabled: ${OTLP_TRACING_EXPORT_ENABLED:false}
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://127.0.0.1:14318/v1/traces}
+      transport: http
+      connect-timeout: 1s
+      timeout: 3s
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,consumerfailures
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+    metrics:
+      access: read-only
+    prometheus:
+      access: read-only
+    consumerfailures:
+      access: read-only
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
+  level:
+    com.alibaba.nacos: warn

@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.run
+**/.vite
+**/coverage
+**/test-results
+**/playwright-report
+.git
+.gitignore
+*.log

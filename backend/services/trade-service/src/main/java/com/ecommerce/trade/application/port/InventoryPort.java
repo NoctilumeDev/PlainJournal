@@ -11,6 +11,8 @@ public interface InventoryPort {
 
     ReservationSnapshot getReservation(String reservationNo);
 
+    ReservationSnapshot confirm(String reservationNo);
+
     ReservationSnapshot release(String reservationNo);
 
     record WarehouseSnapshot(Long id, String code, String status) {
@@ -31,6 +33,16 @@ public interface InventoryPort {
         }
     }
 
-    record ReservationSnapshot(String reservationNo, String status, Long warehouseId) {
+    record ReservationSnapshot(
+            String reservationNo,
+            String orderNo,
+            String status,
+            Long warehouseId,
+            Instant expiresAt,
+            List<ReservationLine> items
+    ) {
+        public ReservationSnapshot {
+            items = List.copyOf(items);
+        }
     }
 }

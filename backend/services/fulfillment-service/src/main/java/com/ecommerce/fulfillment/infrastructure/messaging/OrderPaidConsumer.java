@@ -3,6 +3,7 @@ package com.ecommerce.fulfillment.infrastructure.messaging;
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.OrderPaidCommand;
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.DeliveryAddress;
 import com.ecommerce.fulfillment.application.service.OrderPaidHandler;
+import com.ecommerce.platform.common.observability.ConsumerFailureRetryHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -24,13 +25,14 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @ConditionalOnProperty(prefix = "ecommerce.fulfillment.order-consumer", name = "enabled", havingValue = "true")
-public class OrderPaidConsumer {
+public class OrderPaidConsumer implements ConsumerFailureRetryHandler {
 
     private static final Logger log = LoggerFactory.getLogger(OrderPaidConsumer.class);
 
     private final OrderEventConsumerProperties properties;
     private final OrderPaidHandler handler;
     private final ObjectMapper objectMapper;
+    private final ConsumerFailureRecorder failureRecorder;
     private final ClientServiceProvider provider = ClientServiceProvider.loadService();
     private final AtomicLong nextWarningAt = new AtomicLong();
     private volatile SimpleConsumer consumer;
@@ -38,10 +40,12 @@ public class OrderPaidConsumer {
     public OrderPaidConsumer(
             OrderEventConsumerProperties properties,
             OrderPaidHandler handler,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ConsumerFailureRecorder failureRecorder) {
         this.properties = properties;
         this.handler = handler;
         this.objectMapper = objectMapper;
+        this.failureRecorder = failureRecorder;
     }
 
     @Scheduled(fixedDelayString = "${ecommerce.fulfillment.order-consumer.fixed-delay:1000}")
@@ -50,13 +54,7 @@ public class OrderPaidConsumer {
         try {
             active = consumer();
             for (MessageView message : active.receive(properties.batchSize(), properties.invisibleDuration())) {
-                try {
-                    handler.handle(parse(message));
-                    active.ack(message);
-                } catch (Exception exception) {
-                    log.warn("OrderPaid processing failed and will be retried: messageId={}",
-                            message.getMessageId(), exception);
-                }
+                processMessage(message, active);
             }
             nextWarningAt.set(0);
         } catch (Exception exception) {
@@ -65,8 +63,53 @@ public class OrderPaidConsumer {
         }
     }
 
+    void processMessage(MessageView message, SimpleConsumer active) throws Exception {
+        OrderPaidCommand command;
+        try {
+            command = parse(message);
+        } catch (Exception exception) {
+            failureRecorder.recordTerminal(message, properties.consumerGroup(), exception);
+            active.ack(message);
+            log.error("OrderPaid payload is not retryable and requires attention: messageId={}",
+                    message.getMessageId(), exception);
+            return;
+        }
+        try {
+            handler.handle(command);
+            failureRecorder.markRecovered(message, properties.consumerGroup());
+            active.ack(message);
+        } catch (Exception exception) {
+            boolean terminal = failureRecorder.record(message, properties.consumerGroup(), exception);
+            active.ack(message);
+            if (terminal) {
+                log.error("OrderPaid processing exhausted retries and requires attention: messageId={}",
+                        message.getMessageId(), exception);
+            } else {
+                log.warn("OrderPaid processing failed; durable MySQL retry now owns recovery: "
+                                + "messageId={}",
+                        message.getMessageId(), exception);
+            }
+        }
+    }
+
     private OrderPaidCommand parse(MessageView message) throws Exception {
-        JsonNode envelope = objectMapper.readTree(readBody(message.getBody()));
+        return parseEnvelope(objectMapper.readTree(readBody(message.getBody())));
+    }
+
+    @Override
+    public String consumerGroup() {
+        return properties.consumerGroup();
+    }
+
+    @Override
+    public void retry(String rawPayload) throws Exception {
+        handler.handle(parseEnvelope(objectMapper.readTree(rawPayload)));
+    }
+
+    private OrderPaidCommand parseEnvelope(JsonNode envelope) {
+        if (envelope.path("payloadVersion").asInt(-1) != 1) {
+            throw new IllegalArgumentException("Unsupported OrderPaid payload version");
+        }
         if (!"OrderPaid".equals(envelope.path("eventType").asText())) {
             throw new IllegalArgumentException("Unexpected order event type");
         }
@@ -100,10 +143,23 @@ public class OrderPaidConsumer {
 
     private Long requiredLong(JsonNode node, String field) {
         JsonNode value = node.get(field);
-        if (value == null || !value.canConvertToLong() || value.longValue() <= 0) {
-            throw new IllegalArgumentException("Missing or invalid event field: " + field);
+        if (value != null && value.isIntegralNumber() && value.canConvertToLong() && value.longValue() > 0) {
+            return value.longValue();
         }
-        return value.longValue();
+        if (value != null && value.isTextual()) {
+            String text = value.textValue();
+            if (text != null && text.matches("[0-9]+")) {
+                try {
+                    long parsed = Long.parseLong(text);
+                    if (parsed > 0) {
+                        return parsed;
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Fall through to the stable validation error below.
+                }
+            }
+        }
+        throw new IllegalArgumentException("Missing or invalid event field: " + field);
     }
 
     private String optionalText(JsonNode node, String field) {

@@ -2,9 +2,13 @@ package com.ecommerce.marketing.application.model;
 
 import com.ecommerce.marketing.domain.BenefitType;
 import com.ecommerce.marketing.domain.RegionLevel;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public final class MarketingModels {
@@ -54,6 +58,7 @@ public final class MarketingModels {
 
     public record BenefitView(
             String benefitNo,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long userId,
             String ruleCode,
             BenefitType benefitType,
@@ -86,13 +91,14 @@ public final class MarketingModels {
             List<String> benefitNos
     ) {
         public LockPricingCommand {
-            lines = List.copyOf(lines);
-            benefitNos = benefitNos == null ? List.of() : List.copyOf(benefitNos);
+            lines = immutableCopyAllowingNulls(lines);
+            benefitNos = benefitNos == null ? List.of() : immutableCopyAllowingNulls(benefitNos);
         }
     }
 
     public record DiscountAllocation(
             int lineNo,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long skuId,
             String benefitNo,
             String ruleCode,
@@ -113,9 +119,38 @@ public final class MarketingModels {
         }
     }
 
+    public record PreviewPricingCommand(
+            Long userId,
+            BigDecimal originalAmount,
+            DeliveryRegion deliveryRegion,
+            List<PricingLine> lines,
+            List<String> benefitNos
+    ) {
+        public PreviewPricingCommand {
+            lines = immutableCopyAllowingNulls(lines);
+            benefitNos = benefitNos == null ? List.of() : immutableCopyAllowingNulls(benefitNos);
+        }
+    }
+
+    public record PricingPreviewView(
+            BigDecimal originalAmount,
+            BigDecimal couponDiscount,
+            BigDecimal redPacketDiscount,
+            BigDecimal subsidyDiscount,
+            BigDecimal discountAmount,
+            BigDecimal payableAmount,
+            List<AppliedBenefit> appliedBenefits,
+            Instant calculatedAt
+    ) {
+        public PricingPreviewView {
+            appliedBenefits = List.copyOf(appliedBenefits);
+        }
+    }
+
     public record PricingLockView(
             String lockNo,
             String orderNo,
+            @JsonSerialize(using = ToStringSerializer.class)
             Long userId,
             BigDecimal originalAmount,
             BigDecimal couponDiscount,
@@ -133,5 +168,11 @@ public final class MarketingModels {
         public PricingLockView {
             appliedBenefits = List.copyOf(appliedBenefits);
         }
+    }
+
+    private static <T> List<T> immutableCopyAllowingNulls(List<T> values) {
+        return values == null
+                ? null
+                : Collections.unmodifiableList(new ArrayList<>(values));
     }
 }

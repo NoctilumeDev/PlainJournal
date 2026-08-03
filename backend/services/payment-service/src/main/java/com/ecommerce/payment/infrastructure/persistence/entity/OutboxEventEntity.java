@@ -24,6 +24,8 @@ public class OutboxEventEntity {
     private Integer attempts;
     private Instant nextAttemptAt;
     private Instant claimedAt;
+    private String claimOwner;
+    private Instant claimUntil;
     private Instant publishedAt;
     private String lastError;
     private Instant createdAt;

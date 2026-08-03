@@ -45,6 +45,11 @@ public class MyBatisIdentityStore implements IdentityStore {
     }
 
     @Override
+    public Instant currentTime() {
+        return accountMapper.currentTime();
+    }
+
+    @Override
     public boolean accountExistsByEmail(String normalizedEmail) {
         return accountMapper.exists(new LambdaQueryWrapper<UserAccountEntity>()
                 .eq(UserAccountEntity::getEmail, normalizedEmail));

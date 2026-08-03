@@ -67,6 +67,11 @@ class ReturnStockFlowIntegrationTest {
         ReturnStockView eventDuplicate = returnStockService.stock(command);
         ReturnStockView logicalDuplicate = returnStockService.stock(command(
                 "00000000-0000-0000-0000-000000000502", seed.warehouseId(), 2));
+        assertThatThrownBy(() -> returnStockService.stock(command(
+                command.eventId(), seed.warehouseId(), 1)))
+                .isInstanceOf(InventoryException.class)
+                .satisfies(exception -> assertThat(((InventoryException) exception).error())
+                        .isEqualTo(InventoryError.IDEMPOTENCY_CONFLICT));
 
         assertThat(first.status()).isEqualTo("STOCKED");
         assertThat(eventDuplicate.stockedAt()).isCloseTo(first.stockedAt(), within(1, ChronoUnit.MILLIS));
@@ -101,6 +106,22 @@ class ReturnStockFlowIntegrationTest {
                 .isZero();
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM consumed_event", Integer.class))
                 .isZero();
+    }
+
+    @Test
+    void rejectsUnverifiableLegacyReturnInspectedEventIdentity() {
+        Seed seed = confirmedReservation();
+        ReturnInspectedCommand command = command(
+                "00000000-0000-0000-0000-000000000505", seed.warehouseId(), 2);
+        returnStockService.stock(command);
+        jdbcTemplate.update(
+                "UPDATE consumed_event SET payload_fingerprint = NULL WHERE event_id = ?",
+                command.eventId());
+
+        assertThatThrownBy(() -> returnStockService.stock(command))
+                .isInstanceOf(InventoryException.class)
+                .satisfies(exception -> assertThat(((InventoryException) exception).error())
+                        .isEqualTo(InventoryError.IDEMPOTENCY_CONFLICT));
     }
 
     @Test

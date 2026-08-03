@@ -1,6 +1,8 @@
 package com.ecommerce.trade.infrastructure.security;
 
 import com.ecommerce.platform.common.api.ApiResponse;
+import com.ecommerce.platform.common.security.MetricsScrapeAuthenticationFilter;
+import com.ecommerce.platform.common.security.MetricsScrapeProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -24,7 +26,11 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 
 @Configuration
-@EnableConfigurationProperties({TradeTokenProperties.class, InternalServiceProperties.class})
+@EnableConfigurationProperties({
+        TradeTokenProperties.class,
+        InternalServiceProperties.class,
+        MetricsScrapeProperties.class
+})
 public class TradeSecurityConfig {
 
     @Bean
@@ -45,7 +51,8 @@ public class TradeSecurityConfig {
     public SecurityFilterChain tradeSecurityFilterChain(
             HttpSecurity http,
             ObjectMapper objectMapper,
-            InternalServiceAuthenticationFilter internalServiceAuthenticationFilter) throws Exception {
+            InternalServiceAuthenticationFilter internalServiceAuthenticationFilter,
+            MetricsScrapeProperties metricsScrapeProperties) throws Exception {
         JwtGrantedAuthoritiesConverter authorities = new JwtGrantedAuthoritiesConverter();
         authorities.setAuthoritiesClaimName("roles");
         authorities.setAuthorityPrefix("ROLE_");
@@ -56,7 +63,19 @@ public class TradeSecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/v1/trade/status", "/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers(
+                                "/api/v1/trade/status",
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/info",
+                                "/api/v1/trade/status/distributed-id"
+                        ).permitAll()
+                        .requestMatchers("/actuator/prometheus").hasAnyRole("ADMIN", "METRICS")
+                        .requestMatchers(
+                                "/actuator/metrics", "/actuator/metrics/**",
+                                "/actuator/consumerfailures", "/actuator/consumerfailures/**",
+                                "/actuator/businessprocesses", "/actuator/businessprocesses/**"
+                        ).hasRole("ADMIN")
                         .requestMatchers("/api/v1/trade/internal/**").hasRole("INTERNAL_SERVICE")
                         .requestMatchers("/api/v1/trade/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/trade/**").hasAnyRole("CUSTOMER", "ADMIN")
@@ -75,6 +94,9 @@ public class TradeSecurityConfig {
                     objectMapper.writeValue(response.getOutputStream(),
                             ApiResponse.failure("FORBIDDEN", "Access is denied"));
                 }));
+        http.addFilterBefore(
+                new MetricsScrapeAuthenticationFilter(metricsScrapeProperties),
+                BearerTokenAuthenticationFilter.class);
         http.addFilterBefore(internalServiceAuthenticationFilter, BearerTokenAuthenticationFilter.class);
         return http.build();
     }

@@ -1,0 +1,20 @@
+ecommerce:
+  foundation:
+    configuration-source: nacos
+  messaging:
+    consumer-failure:
+      max-delivery-attempts: 16
+  security:
+    token:
+      issuer: ecommerce-identity
+  analytics:
+    zone-id: Asia/Shanghai
+    maximum-range-days: 366
+    reconciliation-row-limit: 10000
+    events:
+      consumer-group: ecommerce-analytics-domain-events
+      trade-topic: ecommerce-order-events
+      payment-topic: ecommerce-payment-events
+      await-duration: 5s
+      invisible-duration: 20s
+      batch-size: 20

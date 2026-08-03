@@ -3,7 +3,7 @@ server:
 
 spring:
   config:
-    import: "optional:nacos:"
+    import: []
   cloud:
     nacos:
       discovery:
@@ -24,7 +24,7 @@ ecommerce:
     configuration-source: local-default
   security:
     internal:
-      token: test-internal-service-token-with-at-least-32-characters
+      token: test-trade-internal-token-with-at-least-32-characters
       allowed-callers:
         - trade-service
     login-attempt:

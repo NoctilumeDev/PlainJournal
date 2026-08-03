@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>com.ecommerce.platform</groupId>
-        <artifactId>ecommerce-platform-backend</artifactId>
+        <artifactId>plainjournal-backend</artifactId>
         <version>0.1.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -23,5 +23,8 @@
         <module>payment-service</module>
         <module>fulfillment-service</module>
         <module>marketing-service</module>
+        <module>chat-service</module>
+        <module>notification-service</module>
+        <module>analytics-service</module>
     </modules>
 </project>

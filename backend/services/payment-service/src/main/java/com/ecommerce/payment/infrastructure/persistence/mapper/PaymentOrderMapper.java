@@ -6,10 +6,15 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.Instant;
+
 public interface PaymentOrderMapper extends BaseMapper<PaymentOrderEntity> {
 
+    @Select("SELECT CURRENT_TIMESTAMP(3)")
+    Instant currentTime();
+
     @Insert("""
-            INSERT IGNORE INTO payment_order
+            INSERT INTO payment_order
                 (id, payment_no, order_no, user_id, reservation_no, idempotency_key,
                  request_hash, channel, status, amount, version, created_at, updated_at)
             VALUES
@@ -17,15 +22,25 @@ public interface PaymentOrderMapper extends BaseMapper<PaymentOrderEntity> {
                  #{entity.reservationNo}, #{entity.idempotencyKey}, #{entity.requestHash},
                  #{entity.channel}, #{entity.status}, #{entity.amount}, #{entity.version},
                  #{entity.createdAt}, #{entity.updatedAt})
+            ON DUPLICATE KEY UPDATE id = id
             """)
-    int insertIfAbsent(@Param("entity") PaymentOrderEntity entity);
+    int insertOrLockExisting(@Param("entity") PaymentOrderEntity entity);
 
     @Select("SELECT * FROM payment_order WHERE user_id = #{userId} AND idempotency_key = #{key} FOR UPDATE")
     PaymentOrderEntity selectByIdempotencyForUpdate(@Param("userId") Long userId, @Param("key") String key);
 
+    @Select("SELECT * FROM payment_order WHERE user_id = #{userId} AND idempotency_key = #{key}")
+    PaymentOrderEntity selectByIdempotency(@Param("userId") Long userId, @Param("key") String key);
+
     @Select("SELECT * FROM payment_order WHERE order_no = #{orderNo} FOR UPDATE")
     PaymentOrderEntity selectByOrderForUpdate(@Param("orderNo") String orderNo);
 
+    @Select("SELECT * FROM payment_order WHERE order_no = #{orderNo}")
+    PaymentOrderEntity selectByOrder(@Param("orderNo") String orderNo);
+
     @Select("SELECT * FROM payment_order WHERE payment_no = #{paymentNo} FOR UPDATE")
     PaymentOrderEntity selectByPaymentNoForUpdate(@Param("paymentNo") String paymentNo);
+
+    @Select("SELECT * FROM payment_order WHERE payment_no = #{paymentNo}")
+    PaymentOrderEntity selectByPaymentNo(@Param("paymentNo") String paymentNo);
 }

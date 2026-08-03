@@ -1,0 +1,156 @@
+groups:
+  - name: plainjournal-service-health
+    rules:
+      - alert: PlainJournalOperationalServiceDown
+        expr: up{job="plainjournal-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} cannot be scraped"
+          description: "Prometheus has failed to scrape {{ $labels.instance }} for at least one minute."
+
+  - name: plainjournal-event-consistency
+    rules:
+      - alert: PlainJournalReconciliationIssueOpen
+        expr: ecommerce_reconciliation_issue_open > 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} reconciliation found an inconsistent fact"
+          description: "At least one owner-domain reconciliation issue remains open."
+
+      - alert: PlainJournalOutboxBacklogGrowing
+        expr: ecommerce_outbox_pending_events > 50
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} has an Outbox backlog"
+          description: "More than 50 events have not reached PUBLISHED for two minutes."
+
+      - alert: PlainJournalOutboxEventStuck
+        expr: ecommerce_outbox_oldest_age_seconds > 300
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} has an old unpublished event"
+          description: "The oldest unpublished Outbox event is older than five minutes."
+
+      - alert: PlainJournalConsumerNeedsAttention
+        expr: ecommerce_consumer_failure_active_events{status="needs_attention"} > 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} has a terminal consumer failure"
+          description: "At least one consumed message exhausted automatic retries and needs intervention."
+
+      - alert: PlainJournalConsumerRetryStuck
+        expr: ecommerce_consumer_failure_oldest_age_seconds > 300
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} consumer recovery is delayed"
+          description: "The oldest active consumer failure is older than five minutes."
+
+  - name: plainjournal-synchronous-resilience
+    rules:
+      - alert: PlainJournalSynchronousCircuitOpen
+        expr: resilience4j_circuitbreaker_state{name=~"paymentTradePaymentContext|tradeMarketingPricingLock",state="open"} == 1
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.name }} circuit breaker is open"
+          description: "A governed synchronous dependency has rejected calls for at least 30 seconds."
+
+      - alert: PlainJournalSynchronousCallRejected
+        expr: increase(ecommerce_http_client_resilience_rejections_total[5m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} to {{ $labels.dependency }} call was rejected"
+          description: "The {{ $labels.guard }} guard rejected at least one {{ $labels.operation }} call."
+
+  - name: plainjournal-business-convergence
+    rules:
+      - record: ecommerce_flash_sale_estimated_drain_seconds
+        expr: |
+          sum by (service) (ecommerce_flash_sale_processing_pending)
+          /
+          clamp_min(
+            sum by (service) (rate(ecommerce_flash_sale_processing_completed_total[1m])),
+            0.001
+          )
+
+      - alert: PlainJournalFlashSaleQueueStalled
+        expr: |
+          ecommerce_flash_sale_processing_pending{service="trade-service"} > 0
+          and
+          sum by (service) (
+            rate(ecommerce_flash_sale_processing_completed_total{service="trade-service"}[2m])
+          ) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The flash-sale order queue is not draining"
+          description: "Accepted requests remain pending while no terminal processing result has been recorded."
+
+      - alert: PlainJournalFlashSaleQueueAging
+        expr: ecommerce_flash_sale_processing_oldest_age_seconds{service="trade-service"} > 120
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The flash-sale order queue is aging"
+          description: "The oldest accepted request has remained non-terminal for more than two minutes."
+
+      - alert: PlainJournalFlashSaleNeedsAttention
+        expr: ecommerce_flash_sale_processing_needs_attention{service="trade-service"} > 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "A flash-sale request exhausted automatic recovery"
+          description: "At least one request is in NEEDS_ATTENTION and requires diagnosis."
+
+      - alert: PlainJournalScheduledTaskDelayed
+        expr: ecommerce_task_scheduler_completion_age_seconds{service="trade-service",task="order_recovery"} > 15
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} {{ $labels.task }} scheduler is delayed"
+          description: "The governed task has not completed for more than 15 seconds despite its five-second cadence."
+
+      - alert: PlainJournalBusinessProcessFailed
+        expr: ecommerce_business_process_active_processes{status=~"payment_exception|refund_failed|failed|needs_attention"} > 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} has a failed {{ $labels.domain }} process"
+          description: "A {{ $labels.domain }} process is in {{ $labels.status }} and requires diagnosis."
+
+      - alert: PlainJournalBusinessProcessAging
+        expr: ecommerce_business_process_oldest_age_seconds{status=~"pending_stock|canceling|processing|refunding"} > 300
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} {{ $labels.domain }} convergence is delayed"
+          description: "The oldest {{ $labels.status }} process has remained active for more than five minutes."
+
+      - alert: PlainJournalReturnFlowAging
+        expr: ecommerce_business_process_oldest_age_seconds{domain="after_sale",status=~"applied|wait_return|returning|received"} > 86400
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "An after-sale process has not advanced for one day"
+          description: "{{ $labels.service }} still has an old {{ $labels.status }} after-sale process."

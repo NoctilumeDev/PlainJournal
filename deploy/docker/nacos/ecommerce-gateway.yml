@@ -16,3 +16,6 @@ ecommerce:
       refresh:
         limit: 30
         window: 1m
+      flash-sale:
+        limit: 60
+        window: 1s

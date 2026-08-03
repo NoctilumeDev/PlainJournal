@@ -1,0 +1,38 @@
+name: plainjournal-frontend
+
+x-build-args: &plainjournal-build-args
+  PLAINJOURNAL_OCI_CREATED: "${PLAINJOURNAL_OCI_CREATED:-unknown}"
+  PLAINJOURNAL_OCI_REVISION: "${PLAINJOURNAL_OCI_REVISION:-unknown}"
+  PLAINJOURNAL_OCI_SOURCE: "${PLAINJOURNAL_OCI_SOURCE:-https://github.com/NoctilumeDev/PlainJournal}"
+  PLAINJOURNAL_OCI_VERSION: "${PLAINJOURNAL_OCI_VERSION:-local}"
+
+services:
+  storefront-web:
+    image: "${PLAINJOURNAL_IMAGE_PREFIX:-plainjournal}/storefront-web:${PLAINJOURNAL_FRONTEND_TAG:-local}"
+    build:
+      context: ../..
+      dockerfile: deploy/nginx/Dockerfile
+      target: storefront
+      args: *plainjournal-build-args
+    environment:
+      PLAINJOURNAL_GATEWAY_HOST: "${PLAINJOURNAL_GATEWAY_HOST:-host.docker.internal}"
+      PLAINJOURNAL_GATEWAY_PORT: "${PLAINJOURNAL_GATEWAY_PORT:-18000}"
+      PLAINJOURNAL_LISTEN_PORT: "8080"
+    ports:
+      - "127.0.0.1:18300:8080"
+    restart: unless-stopped
+
+  admin-web:
+    image: "${PLAINJOURNAL_IMAGE_PREFIX:-plainjournal}/admin-web:${PLAINJOURNAL_FRONTEND_TAG:-local}"
+    build:
+      context: ../..
+      dockerfile: deploy/nginx/Dockerfile
+      target: admin
+      args: *plainjournal-build-args
+    environment:
+      PLAINJOURNAL_GATEWAY_HOST: "${PLAINJOURNAL_GATEWAY_HOST:-host.docker.internal}"
+      PLAINJOURNAL_GATEWAY_PORT: "${PLAINJOURNAL_GATEWAY_PORT:-18000}"
+      PLAINJOURNAL_LISTEN_PORT: "8080"
+    ports:
+      - "127.0.0.1:18301:8080"
+    restart: unless-stopped

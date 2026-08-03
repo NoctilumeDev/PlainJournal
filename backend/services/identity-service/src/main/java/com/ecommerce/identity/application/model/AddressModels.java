@@ -1,5 +1,8 @@
 package com.ecommerce.identity.application.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+
 import java.time.Instant;
 
 public final class AddressModels {
@@ -23,6 +26,7 @@ public final class AddressModels {
     }
 
     public record AddressView(
+            @JsonSerialize(using = ToStringSerializer.class)
             Long id,
             String recipientName,
             String phone,

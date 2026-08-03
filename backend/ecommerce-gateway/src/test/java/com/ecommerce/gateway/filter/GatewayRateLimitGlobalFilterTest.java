@@ -83,6 +83,32 @@ class GatewayRateLimitGlobalFilterTest {
         assertThat(forwarded).isTrue();
     }
 
+    @Test
+    void appliesIndependentPolicyToFlashSaleAdmissions() {
+        GatewayRateLimiter limiter = (name, client, policy, now) -> {
+            assertThat(name).isEqualTo("flash-sale");
+            assertThat(policy.limit()).isEqualTo(60);
+            assertThat(policy.window()).isEqualTo(Duration.ofSeconds(1));
+            return Mono.just(false);
+        };
+        GatewayRateLimitGlobalFilter filter = new GatewayRateLimitGlobalFilter(
+                limiter,
+                properties(true),
+                new ObjectMapper().findAndRegisterModules(),
+                Clock.fixed(Instant.parse("2026-07-22T00:00:00Z"), ZoneOffset.UTC)
+        );
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/marketing/flash-sales/FSA100/admissions")
+                        .remoteAddress(new InetSocketAddress("127.0.0.1", 12345))
+        );
+
+        StepVerifier.create(filter.filter(exchange, ignored -> Mono.empty())).verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(exchange.getResponse().getHeaders().getFirst("Retry-After")).isEqualTo("1");
+        assertThat(exchange.getResponse().getHeaders().getFirst("X-RateLimit-Policy")).isEqualTo("flash-sale");
+    }
+
     private GatewayRateLimitProperties properties(boolean enabled) {
         GatewayRateLimitProperties.Policy policy = new GatewayRateLimitProperties.Policy(10, Duration.ofMinutes(1));
         return new GatewayRateLimitProperties(
@@ -93,7 +119,8 @@ class GatewayRateLimitGlobalFilterTest {
                 1000,
                 policy,
                 new GatewayRateLimitProperties.Policy(5, Duration.ofMinutes(1)),
-                new GatewayRateLimitProperties.Policy(30, Duration.ofMinutes(1))
+                new GatewayRateLimitProperties.Policy(30, Duration.ofMinutes(1)),
+                new GatewayRateLimitProperties.Policy(60, Duration.ofSeconds(1))
         );
     }
 }

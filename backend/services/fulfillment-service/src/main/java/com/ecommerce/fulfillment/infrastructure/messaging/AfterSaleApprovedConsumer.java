@@ -3,6 +3,7 @@ package com.ecommerce.fulfillment.infrastructure.messaging;
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.AfterSaleApprovedCommand;
 import com.ecommerce.fulfillment.application.model.FulfillmentModels.AfterSaleApprovedItem;
 import com.ecommerce.fulfillment.application.service.ReturnReceiptService;
+import com.ecommerce.platform.common.observability.ConsumerFailureRetryHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
@@ -27,13 +28,14 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @ConditionalOnProperty(prefix = "ecommerce.fulfillment.after-sale-consumer", name = "enabled", havingValue = "true")
-public class AfterSaleApprovedConsumer {
+public class AfterSaleApprovedConsumer implements ConsumerFailureRetryHandler {
 
     private static final Logger log = LoggerFactory.getLogger(AfterSaleApprovedConsumer.class);
 
     private final AfterSaleEventConsumerProperties properties;
     private final ReturnReceiptService returnReceiptService;
     private final ObjectMapper objectMapper;
+    private final ConsumerFailureRecorder failureRecorder;
     private final ClientServiceProvider provider = ClientServiceProvider.loadService();
     private final AtomicLong nextWarningAt = new AtomicLong();
     private volatile SimpleConsumer consumer;
@@ -41,10 +43,12 @@ public class AfterSaleApprovedConsumer {
     public AfterSaleApprovedConsumer(
             AfterSaleEventConsumerProperties properties,
             ReturnReceiptService returnReceiptService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            ConsumerFailureRecorder failureRecorder) {
         this.properties = properties;
         this.returnReceiptService = returnReceiptService;
         this.objectMapper = objectMapper;
+        this.failureRecorder = failureRecorder;
     }
 
     @Scheduled(fixedDelayString = "${ecommerce.fulfillment.after-sale-consumer.fixed-delay:1000}")
@@ -53,12 +57,32 @@ public class AfterSaleApprovedConsumer {
         try {
             active = consumer();
             for (MessageView message : active.receive(properties.batchSize(), properties.invisibleDuration())) {
+                AfterSaleApprovedCommand command;
                 try {
-                    returnReceiptService.createFromAfterSaleApproved(parse(message));
+                    command = parse(message);
+                } catch (Exception exception) {
+                    failureRecorder.recordTerminal(message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    log.error("AfterSaleApproved payload requires attention: messageId={}",
+                            message.getMessageId(), exception);
+                    continue;
+                }
+                try {
+                    returnReceiptService.createFromAfterSaleApproved(command);
+                    failureRecorder.markRecovered(message, properties.consumerGroup());
                     active.ack(message);
                 } catch (Exception exception) {
-                    log.warn("AfterSaleApproved processing failed and will be retried: messageId={}",
-                            message.getMessageId(), exception);
+                    boolean terminal = failureRecorder.record(
+                            message, properties.consumerGroup(), exception);
+                    active.ack(message);
+                    if (terminal) {
+                        log.error("AfterSaleApproved moved to the local compensation queue: messageId={}",
+                                message.getMessageId(), exception);
+                    } else {
+                        log.warn("AfterSaleApproved processing failed; durable MySQL retry now owns "
+                                        + "recovery: messageId={}",
+                                message.getMessageId(), exception);
+                    }
                 }
             }
             nextWarningAt.set(0);
@@ -69,7 +93,24 @@ public class AfterSaleApprovedConsumer {
     }
 
     private AfterSaleApprovedCommand parse(MessageView message) throws Exception {
-        JsonNode envelope = objectMapper.readTree(readBody(message.getBody()));
+        return parseEnvelope(objectMapper.readTree(readBody(message.getBody())));
+    }
+
+    @Override
+    public String consumerGroup() {
+        return properties.consumerGroup();
+    }
+
+    @Override
+    public void retry(String rawPayload) throws Exception {
+        returnReceiptService.createFromAfterSaleApproved(
+                parseEnvelope(objectMapper.readTree(rawPayload)));
+    }
+
+    private AfterSaleApprovedCommand parseEnvelope(JsonNode envelope) {
+        if (envelope.path("payloadVersion").asInt(-1) != 1) {
+            throw new IllegalArgumentException("Unsupported AfterSaleApproved payload version");
+        }
         if (!"AfterSaleApproved".equals(envelope.path("eventType").asText())) {
             throw new IllegalArgumentException("Unexpected after-sale event type");
         }
