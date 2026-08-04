@@ -16,7 +16,7 @@ if ($EventCount % 2 -ne 0) {
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $envFile = Join-Path $repositoryRoot 'deploy\docker\.env'
-$tradeJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service-1.0.1-SNAPSHOT.jar'
+$tradeJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service-1.0.2-SNAPSHOT.jar'
 $runDirectory = Join-Path $PSScriptRoot '.run'
 $networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
 $topic = 'plainjournal-m3-outbox-probe-v1'
@@ -48,9 +48,13 @@ $javaExecutable = if ($env:JAVA_HOME -and
 } else {
     (Get-Command java -CommandType Application -ErrorAction Stop).Source
 }
-$javaVersionLine = (& $javaExecutable -version 2>&1 | Select-Object -First 1).ToString()
-if ($javaVersionLine -notmatch 'version "17(\.|")') {
-    throw "JDK 17 is required, but $javaExecutable reports: $javaVersionLine"
+$javaVersionOutput = (& $javaExecutable -version 2>&1 | Out-String).Trim()
+$javaVersionLine = $javaVersionOutput -split "\r?\n" |
+    Where-Object { $_ -match 'version "' } |
+    Select-Object -First 1
+if ([string]::IsNullOrWhiteSpace($javaVersionLine) -or
+    $javaVersionLine -notmatch 'version "17(\.|")') {
+    throw "JDK 17 is required, but $javaExecutable reports: $javaVersionOutput"
 }
 
 function Read-DotEnv {

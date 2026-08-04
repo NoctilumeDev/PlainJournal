@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "targetRelease": "v1.0.1",
+  "targetRelease": "v1.0.2",
   "status": "release-candidate",
-  "verifiedOn": "2026-08-03",
+  "verifiedOn": "2026-08-04",
   "backend": {
     "surefireReports": 100,
     "tests": 436,
@@ -14,16 +14,20 @@
     "spotbugsReports": 12,
     "spotbugsPriority1": 0,
     "spotbugsPriority2": 247,
-    "spotbugsPriority3": 66
+    "spotbugsPriority3": 66,
+    "lineCoverage": 72.43,
+    "lineCoverageMinimum": 70
   },
   "frontend": {
-    "unitAndContractTests": 303,
+    "unitAndContractTests": 319,
     "developmentE2E": 60,
     "productionE2E": 3,
     "layerRules": 28,
     "deliveryRules": 3,
     "deploymentRules": 3,
-    "releaseMaterialRules": 3
+    "releaseMaterialRules": 3,
+    "lineCoverage": 70.06,
+    "lineCoverageMinimum": 70
   },
   "realEvidence": {
     "coreMiddleware": 7,

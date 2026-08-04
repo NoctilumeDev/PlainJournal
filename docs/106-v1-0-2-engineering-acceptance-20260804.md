@@ -1,0 +1,89 @@
+# v1.0.2 工程验收与冻结报告
+
+日期：2026-08-04
+
+## 1. 范围
+
+本轮不增加业务域，不进行前端视觉重构。目标是补齐覆盖率、GitHub 治理、发布门禁和
+公开证据，并在真实中间件、三实例和多角色浏览器链路上完成最终验收。
+
+## 2. 可重复代码门禁
+
+| 范围 | 结果 |
+| --- | --- |
+| 后端 | 100 份 Surefire 报告，436 tests，0 failure/error/skipped |
+| 后端覆盖率 | 聚合 72.43%，每个可执行模块不低于 65% |
+| PMD / SpotBugs | PMD 0；SpotBugs 12 份报告，P1=0、P2=247、P3=66 |
+| 前端 | 319 个单元/契约测试，聚合行覆盖率 70.06% |
+| 浏览器自动化 | 60 个开发态 E2E，3 个生产构建 E2E |
+| 静态门禁 | 28 条分层、3 条交付、3 条部署、3 条发布材料规则 |
+
+## 3. 本轮发现并修复的真实缺陷
+
+### 3.1 结算安全重试竞态
+
+下单结果未知时，内层请求先将 `submitting` 设为 `false`，Vue 会提前恢复“使用原请求
+安全重试”按钮；外层活动 Promise 尚未清除时点击，会被并发合并逻辑返回旧 Promise，
+用户看见按钮可用但没有发出第二次同键请求。
+
+修复后，loading 状态与外层 Promise 生命周期一致。V5 专项和全量 60 个开发态 E2E
+均确认第二次请求真实发出，且两次 `Idempotency-Key` 完全相同。
+
+### 3.2 JDK 版本探测受环境提示干扰
+
+三实例脚本原先读取 `java -version` 第一行。设置 `JAVA_TOOL_OPTIONS` 后，JDK 会先输出
+`Picked up JAVA_TOOL_OPTIONS`，导致脚本误判不是 JDK 17。
+
+修复后从完整输出中查找实际 `version "..."` 行。PowerShell AST 和带
+`JAVA_TOOL_OPTIONS` 的完整三实例运行均通过。
+
+## 4. 真实基础设施
+
+Core Smoke 使用本机真实 MySQL、Redis、Nacos、RocketMQ 和 MinIO，并启动 Gateway、
+Identity、Catalog、Inventory、Trade、Payment、Fulfillment、Marketing。
+
+为控制 16 GiB Windows 单机内存，本轮严格串行执行，并将验收 JVM 限制为
+`-Xms64m -Xmx256m`。身份、RBAC、商品、库存竞争、营销锁价、幂等下单、支付、履约、
+退货退款、Outbox、对账、限流和最终清理全部通过。
+
+## 5. 三实例与浏览器
+
+Trade Outbox 在真实 MySQL/RocketMQ 上分别运行 1、2、3 个实例，每轮注入 1000 条
+双版本聚合事件：
+
+| 实例 | 收敛时间 | 吞吐 |
+| --- | --- | --- |
+| 1 | 4606.874 ms | 217.07 events/s |
+| 2 | 3769.872 ms | 265.26 events/s |
+| 3 | 3364.126 ms | 297.25 events/s |
+
+全部事件进入 `PUBLISHED`，`PENDING/PUBLISHING` 最终为 0，重复、顺序冲突和死锁为 0；
+模拟死 owner 的过期租约在 2133.717 ms 后被三实例恢复。
+
+真实浏览器链路使用顾客端和客服管理端两个 Chrome Context，通过 Gateway、Identity、
+Chat、MySQL、Redis、Nacos 与 RocketMQ 验证：
+
+- 会话创建和消息发送响应丢失后按原客户端键恢复；
+- 客服认领前无法读取私聊正文；
+- 顾客和客服 WebSocket 均连接成功，回复无需刷新即可到达；
+- 刷新后从 MySQL 权威历史恢复；
+- CDP 记录 24 个授权 Chat 请求和 7 次 WebSocket `101`；
+- `pageerror`、Console、非预期 HTTP 和网络失败均为 0。
+
+## 6. 发布治理
+
+- 后端与前端版本统一到 `1.0.2-SNAPSHOT` / `1.0.2`；
+- Dependabot 忽略常规 Major，Minor/Patch 按生态分组；
+- Issue Form 收集版本、验证档位、环境、最小复现和脱敏确认；
+- 所有第三方 Actions 固定完整 Commit SHA；
+- Release 标签必须属于 `main`，重新执行 CI，并要求同 Commit 的 Security 成功；
+- Pages 提供前后端 HTML 覆盖率报告；
+- `v1.0.2` 使用仓库内人工 Release Notes。
+
+## 7. 冻结结论
+
+后端和开源工程在 `v1.0.2` 后冻结：只修明确缺陷，不主动增加大型领域模块。当前主要
+维护风险仍是少数大型服务类和前端 store/view，但冻结前强行拆分会扩大回归面，因此
+记录为后续维护项，不在本轮改写稳定架构。
+
+下一计划版本 `v1.1.0` 只处理前端视觉重构。

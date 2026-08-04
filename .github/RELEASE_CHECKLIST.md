@@ -43,8 +43,17 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 
 ## 6. v1.0.1 工程加固
 
-- [ ] CI、Security、Pages 和 Release Workflow 在公开仓库通过。
+- [x] CI、Security、Pages 和 Release Workflow 在公开仓库通过。
 - [x] 后端/前端版本、验证摘要和文档入口保持一致。
 - [x] Maven Wrapper、跨平台 UI Demo/E2E 和后端架构门禁通过。
-- [ ] Release 附带自定义 ZIP、SHA-256、manifest 和 SPDX SBOM。
+- [x] Release 附带自定义 ZIP、SHA-256、manifest 和 SPDX SBOM。
 - [x] 从冻结提交完成最终本地回归、浏览器/F12 和资源清理。
+
+## 7. v1.0.2 验收收口
+
+- [x] 后端聚合行覆盖率不低于 70%，每个业务模块不低于 65%。
+- [x] 前端四包聚合行覆盖率不低于 70%，管理端关键路由和组件测试通过。
+- [x] Dependabot 忽略常规 Major 升级并将 Minor/Patch 按生态分组。
+- [ ] Actions 固定完整 Commit SHA，Release 重新执行 CI 并核验同一提交的 Security。
+- [ ] 标签提交属于 `main`，发布材料、人工 Release Notes 和验证摘要一致。
+- [x] 完成真实基础设施、三实例、多角色浏览器链路、F12 和最终资源清理。

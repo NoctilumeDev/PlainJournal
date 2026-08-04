@@ -7,6 +7,44 @@
 
 - 正式版本发布后的明确缺陷修复将记录在这里。
 
+## [1.0.2] - 2026-08-04
+
+> 不增加业务域、不重做视觉的工程验收与治理收口版本。
+
+### Added
+
+- 后端 JaCoCo 覆盖率门禁：每个可执行模块行覆盖率不低于 65%，聚合不低于 70%；
+- 前端 Foundation、UI、Admin、Storefront 四包 V8 覆盖率报告与 70% 聚合门禁；
+- GitHub Pages 前后端公开覆盖率入口、结构化 Issue Form 和人工 Release Notes；
+- Action 完整 Commit SHA 固定门禁，以及标签发布前的 CI、Security 和 `main`
+  祖先校验。
+
+### Changed
+
+- 后端 Reactor 统一为 `1.0.2-SNAPSHOT`，前端 workspace 包统一为 `1.0.2`；
+- Dependabot 忽略常规 Major 升级，将 Maven、npm 和 Actions 的 Minor/Patch
+  按生态分组；
+- 当前验证基线更新为后端 436 tests、前端 319 个单元/契约测试，并公开记录前后端
+  聚合行覆盖率。
+
+### Fixed
+
+- 修复结算页在下单结果未知后过早恢复“安全重试”按钮，导致外层请求 Promise 尚未
+  释放时点击被并发合并逻辑吞掉的问题；
+- 修复三实例 Outbox 验证在设置 `JAVA_TOOL_OPTIONS` 后误把提示行当作 Java
+  版本号的问题；
+- 修复覆盖率 Artifact 缺失可能掩盖前置失败，以及 Release 对具体 Security Check
+  名称的脆弱依赖。
+
+### Verified
+
+- 后端 100 份 Surefire 报告、436 tests、聚合行覆盖率 72.43%，PMD 0 违规，
+  SpotBugs P1=0；
+- 前端 319 个单元/契约测试、聚合行覆盖率 70.06%、60 个开发态 E2E 和
+  3 个生产构建 E2E；
+- 真实七中间件 Core Smoke、Trade 1/2/3 实例各 1000 条 Outbox 事件，以及顾客/客服
+  双浏览器 WebSocket 链路通过；F12/CDP 的页面、控制台、HTTP 和网络错误均为 0。
+
 ## [1.0.1] - 2026-08-03
 
 > 不扩展业务域的开源工程加固版本。

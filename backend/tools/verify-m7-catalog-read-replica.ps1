@@ -19,7 +19,7 @@ $composeFile = Join-Path $composeDirectory 'compose.yml'
 $composeEnvFile = Join-Path $composeDirectory '.env'
 $networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
 $catalogJar = Join-Path $backendRoot `
-    'services\catalog-service\target\catalog-service-1.0.1-SNAPSHOT.jar'
+    'services\catalog-service\target\catalog-service-1.0.2-SNAPSHOT.jar'
 $timestamp = [DateTimeOffset]::UtcNow.ToString('yyyyMMdd-HHmmss')
 $runDirectory = Join-Path $backendRoot ".run\m7-catalog-read-replica-$timestamp"
 $evidencePath = Join-Path $runDirectory 'verification.json'

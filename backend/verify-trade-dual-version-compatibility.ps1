@@ -211,6 +211,33 @@ function Get-TradeScalar {
     return $rows[0].ToString().Trim()
 }
 
+function Resolve-TradeJar {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BackendRoot
+    )
+
+    $targetDirectory = Join-Path $BackendRoot 'services\trade-service\target'
+    $jars = @(
+        Get-ChildItem -LiteralPath $targetDirectory -Filter 'trade-service-*.jar' `
+            -File -ErrorAction Stop |
+            Where-Object {
+                $_.Name -notlike 'original-*' -and
+                $_.Name -notlike '*-sources.jar' -and
+                $_.Name -notlike '*-javadoc.jar'
+            }
+    )
+    if ($jars.Count -ne 1) {
+        $names = if ($jars.Count -eq 0) {
+            '<none>'
+        } else {
+            ($jars.Name -join ', ')
+        }
+        throw "Expected one Trade service JAR in $targetDirectory, found: $names"
+    }
+    return $jars[0].FullName
+}
+
 function Start-TradeContainer {
     param(
         [Parameter(Mandatory)][string]$Name,
@@ -592,7 +619,7 @@ try {
         }
 
         docker build `
-            --file (Join-Path $PSScriptRoot 'services\trade-service\Dockerfile') `
+            --file (Join-Path $stableBackend 'services\trade-service\Dockerfile') `
             --tag $stableImage `
             $stableBackend
         if ($LASTEXITCODE -ne 0) {
@@ -623,9 +650,9 @@ try {
     $stableJar = if ($SkipBuild) {
         ''
     } else {
-        Join-Path $stableBackend 'services\trade-service\target\trade-service-1.0.1-SNAPSHOT.jar'
+        Resolve-TradeJar -BackendRoot $stableBackend
     }
-    $candidateJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service-1.0.1-SNAPSHOT.jar'
+    $candidateJar = Resolve-TradeJar -BackendRoot $PSScriptRoot
     if ($stableJar) {
         $stableJarHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $stableJar).Hash.ToLowerInvariant()
     }

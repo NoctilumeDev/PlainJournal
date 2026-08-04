@@ -9,7 +9,24 @@ updates:
       time: "09:00"
       timezone: Asia/Shanghai
     open-pull-requests-limit: 5
-    labels: [dependencies, backend]
+    labels: [dependencies]
+    groups:
+      spring-platform:
+        patterns:
+          - "org.springframework.boot:*"
+          - "org.springframework.cloud:*"
+          - "com.alibaba.cloud:*"
+        update-types: [minor, patch]
+      backend-minor-patch:
+        patterns: ["*"]
+        exclude-patterns:
+          - "org.springframework.boot:*"
+          - "org.springframework.cloud:*"
+          - "com.alibaba.cloud:*"
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /frontend
@@ -19,7 +36,17 @@ updates:
       time: "09:15"
       timezone: Asia/Shanghai
     open-pull-requests-limit: 5
-    labels: [dependencies, frontend]
+    labels: [dependencies]
+    groups:
+      frontend-production:
+        dependency-type: production
+        update-types: [minor, patch]
+      frontend-development:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
@@ -29,4 +56,11 @@ updates:
       time: "09:30"
       timezone: Asia/Shanghai
     open-pull-requests-limit: 5
-    labels: [dependencies, automation]
+    labels: [dependencies]
+    groups:
+      actions-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

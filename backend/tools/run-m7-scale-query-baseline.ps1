@@ -213,10 +213,10 @@ function Start-BaselineService {
 
 function Stop-BaselineServices {
     $expectedJarByPort = @{
-        18000 = 'ecommerce-gateway-1.0.1-SNAPSHOT.jar'
-        18101 = 'identity-service-1.0.1-SNAPSHOT.jar'
-        18102 = 'catalog-service-1.0.1-SNAPSHOT.jar'
-        18104 = 'trade-service-1.0.1-SNAPSHOT.jar'
+        18000 = 'ecommerce-gateway-1.0.2-SNAPSHOT.jar'
+        18101 = 'identity-service-1.0.2-SNAPSHOT.jar'
+        18102 = 'catalog-service-1.0.2-SNAPSHOT.jar'
+        18104 = 'trade-service-1.0.2-SNAPSHOT.jar'
     }
     foreach ($port in @($expectedJarByPort.Keys)) {
         $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
@@ -692,10 +692,10 @@ $script:runDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $script:runDirectory -Force | Out-Null
 $script:gcLogDirectory = [IO.Path]::GetRelativePath(
     $script:backendRoot, $script:runDirectory).Replace('\', '/')
-$gatewayJar = Join-Path $script:backendRoot 'ecommerce-gateway\target\ecommerce-gateway-1.0.1-SNAPSHOT.jar'
-$identityJar = Join-Path $script:backendRoot 'services\identity-service\target\identity-service-1.0.1-SNAPSHOT.jar'
-$catalogJar = Join-Path $script:backendRoot 'services\catalog-service\target\catalog-service-1.0.1-SNAPSHOT.jar'
-$tradeJar = Join-Path $script:backendRoot 'services\trade-service\target\trade-service-1.0.1-SNAPSHOT.jar'
+$gatewayJar = Join-Path $script:backendRoot 'ecommerce-gateway\target\ecommerce-gateway-1.0.2-SNAPSHOT.jar'
+$identityJar = Join-Path $script:backendRoot 'services\identity-service\target\identity-service-1.0.2-SNAPSHOT.jar'
+$catalogJar = Join-Path $script:backendRoot 'services\catalog-service\target\catalog-service-1.0.2-SNAPSHOT.jar'
+$tradeJar = Join-Path $script:backendRoot 'services\trade-service\target\trade-service-1.0.2-SNAPSHOT.jar'
 
 $requiredContainers = @(
     'plainjournal-mysql', 'plainjournal-redis', 'plainjournal-nacos',

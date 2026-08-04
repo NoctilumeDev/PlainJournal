@@ -735,10 +735,6 @@ export const useCheckoutStore = defineStore("checkout-draft", () => {
       submissionUnknown.value = false;
       submissionError.value = cause instanceof Error ? cause.message : "订单提交未完成。";
       return null;
-    } finally {
-      if (accessIsCurrent(access) && requestRevision === submissionRevision) {
-        submitting.value = false;
-      }
     }
   }
 
@@ -760,6 +756,7 @@ export const useCheckoutStore = defineStore("checkout-draft", () => {
           && activeSubmissionPromise === request
         ) {
           activeSubmissionPromise = null;
+          submitting.value = false;
         }
       });
     activeSubmissionPromise = request;

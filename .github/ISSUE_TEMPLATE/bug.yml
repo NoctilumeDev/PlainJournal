@@ -1,12 +1,31 @@
 name: 缺陷报告
 description: 报告可稳定复现的业务、接口、构建或运行问题
 title: "[Bug] "
-labels: [bug, needs-triage]
+labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
         请先确认问题不包含密码、Token、Cookie、真实订单或其他敏感信息。
+  - type: textarea
+    id: version
+    attributes:
+      label: 版本或 Commit
+      description: 填写 Release 标签、Commit SHA 或分支名称。
+      placeholder: v1.0.2 / 0123456789abcdef
+    validations:
+      required: true
+  - type: dropdown
+    id: verification_tier
+    attributes:
+      label: 使用的验证档位
+      options:
+        - UI Demo
+        - Core Smoke
+        - Full Lab
+        - 普通开发环境
+    validations:
+      required: true
   - type: textarea
     id: summary
     attributes:
@@ -50,3 +69,10 @@ body:
     attributes:
       label: 非敏感证据
       description: 可附脱敏日志、状态码、trace_id 或截图。
+  - type: checkboxes
+    id: sanitization
+    attributes:
+      label: 脱敏确认
+      options:
+        - label: 我已确认内容不包含密码、Token、Cookie、真实订单或个人信息。
+          required: true

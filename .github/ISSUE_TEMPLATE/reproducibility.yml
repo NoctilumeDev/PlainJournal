@@ -1,7 +1,7 @@
 name: 可复现性或文档问题
 description: 报告启动说明、验证脚本、文档链接或平台兼容问题
 title: "[Docs/Repro] "
-labels: [documentation, reproducibility]
+labels: [documentation]
 body:
   - type: textarea
     id: entry

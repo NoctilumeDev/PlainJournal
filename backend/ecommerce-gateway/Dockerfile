@@ -11,7 +11,7 @@ RUN addgroup -S -g 10001 plainjournal \
 WORKDIR /opt/plainjournal
 
 COPY --chown=plainjournal:plainjournal \
-    ecommerce-gateway/target/ecommerce-gateway-1.0.1-SNAPSHOT.jar \
+    ecommerce-gateway/target/ecommerce-gateway-1.0.2-SNAPSHOT.jar \
     app.jar
 COPY --chown=plainjournal:plainjournal \
     ecommerce-gateway/docker/entrypoint.sh \

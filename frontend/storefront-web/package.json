@@ -1,13 +1,14 @@
 {
   "name": "@plain-journal/storefront-web",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 18200",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "build": "vite build"
   },
   "dependencies": {

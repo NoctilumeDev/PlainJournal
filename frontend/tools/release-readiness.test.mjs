@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -12,8 +13,15 @@ const frontendRoot = path.resolve(
 
 test("keeps GitHub release candidate materials complete", async () => {
   const result = await inspectReleaseReadiness(frontendRoot);
+  const baseline = JSON.parse(
+    await fs.readFile(result.paths.verificationBaseline, "utf8"),
+  );
   assert.deepEqual(result.violations, []);
   assert.equal(result.screenshots.length, 3);
+  assert.equal(
+    path.basename(result.paths.releaseNotes),
+    `${baseline.targetRelease}.md`,
+  );
 });
 
 test("keeps the Apache-2.0 license explicit and complete", async () => {

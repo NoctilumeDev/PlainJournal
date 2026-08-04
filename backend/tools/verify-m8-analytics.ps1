@@ -737,8 +737,8 @@ WHERE user = '$($script:analyticsUser)';
     $jvms = @(Get-CimInstance Win32_Process |
         Where-Object {
             $_.Name -eq 'java.exe' -and (
-                $_.CommandLine -like '*analytics-service-1.0.1-SNAPSHOT.jar*' -or
-                $_.CommandLine -like '*ecommerce-gateway-1.0.1-SNAPSHOT.jar*')
+                $_.CommandLine -like '*analytics-service-1.0.2-SNAPSHOT.jar*' -or
+                $_.CommandLine -like '*ecommerce-gateway-1.0.2-SNAPSHOT.jar*')
         })
     $topicList = @(Get-RocketMqTopics)
     $consumerGroups = @($script:createdConsumerGroups | Where-Object {
@@ -808,9 +808,9 @@ try {
     New-RocketMqConsumerGroup -ConsumerGroup $script:consumerGroup
 
     $analyticsJar = Join-Path $script:backendRoot `
-        'services\analytics-service\target\analytics-service-1.0.1-SNAPSHOT.jar'
+        'services\analytics-service\target\analytics-service-1.0.2-SNAPSHOT.jar'
     $gatewayJar = Join-Path $script:backendRoot `
-        'ecommerce-gateway\target\ecommerce-gateway-1.0.1-SNAPSHOT.jar'
+        'ecommerce-gateway\target\ecommerce-gateway-1.0.2-SNAPSHOT.jar'
 
     Start-Application -Name 'analytics' -Jar $analyticsJar `
         -Port $script:analyticsPort `

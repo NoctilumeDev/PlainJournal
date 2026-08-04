@@ -10,6 +10,15 @@ function requireText(source, expected, label, violations) {
 export async function inspectReleaseReadiness(frontendRoot) {
   const violations = [];
   const repositoryRoot = path.resolve(frontendRoot, "..");
+  const verificationBaselinePath = path.join(
+    repositoryRoot,
+    ".github",
+    "verification-baseline.json",
+  );
+  const verificationBaseline = JSON.parse(
+    await fs.readFile(verificationBaselinePath, "utf8"),
+  );
+  const releaseVersion = verificationBaseline.targetRelease.replace(/^v/u, "");
   const paths = {
     readme: path.join(repositoryRoot, "README.md"),
     changelog: path.join(repositoryRoot, "CHANGELOG.md"),
@@ -19,6 +28,13 @@ export async function inspectReleaseReadiness(frontendRoot) {
       ".github",
       "RELEASE_CHECKLIST.md",
     ),
+    releaseNotes: path.join(
+      repositoryRoot,
+      ".github",
+      "release-notes",
+      `${verificationBaseline.targetRelease}.md`,
+    ),
+    verificationBaseline: verificationBaselinePath,
     license: path.join(repositoryRoot, "LICENSE"),
     storefrontHome: path.join(
       repositoryRoot,
@@ -43,11 +59,19 @@ export async function inspectReleaseReadiness(frontendRoot) {
     ),
   };
 
-  const [readme, changelog, security, releaseChecklist, license] = await Promise.all([
+  const [
+    readme,
+    changelog,
+    security,
+    releaseChecklist,
+    releaseNotes,
+    license,
+  ] = await Promise.all([
     fs.readFile(paths.readme, "utf8"),
     fs.readFile(paths.changelog, "utf8"),
     fs.readFile(paths.security, "utf8"),
     fs.readFile(paths.releaseChecklist, "utf8"),
+    fs.readFile(paths.releaseNotes, "utf8"),
     fs.readFile(paths.license, "utf8"),
   ]);
 
@@ -63,7 +87,7 @@ export async function inspectReleaseReadiness(frontendRoot) {
     requireText(readme, marker, "Root README release entry", violations);
   }
   for (const marker of [
-    "[1.0.0] - 2026-08-03",
+    `[${releaseVersion}] - ${verificationBaseline.verifiedOn}`,
     "Apache License 2.0",
     "tsconfig.base.json",
     "--no-build --pull never",
@@ -85,6 +109,13 @@ export async function inspectReleaseReadiness(frontendRoot) {
     "--no-build --pull never",
   ]) {
     requireText(releaseChecklist, marker, "Release checklist", violations);
+  }
+  for (const marker of [
+    `# PlainJournal ${verificationBaseline.targetRelease}`,
+    "不增加业务域",
+    "F12/CDP",
+  ]) {
+    requireText(releaseNotes, marker, "Release notes", violations);
   }
   for (const marker of [
     "Apache License",

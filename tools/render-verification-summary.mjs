@@ -25,9 +25,11 @@ export function renderVerificationSummary(baseline) {
 | 范围 | 结果 |
 | --- | --- |
 | 后端 Maven | ${backend.surefireReports} 份 Surefire 报告，${backend.tests} tests，${backend.failures} failures，${backend.errors} errors，${backend.skipped} skipped |
+| 后端行覆盖率 | ${backend.lineCoverage}%（门禁 ≥ ${backend.lineCoverageMinimum}%） |
 | PMD | ${backend.pmdReports} 份报告，${backend.pmdViolations} 违规 |
 | SpotBugs | ${backend.spotbugsReports} 份报告，P1=${backend.spotbugsPriority1}，P2=${backend.spotbugsPriority2}，P3=${backend.spotbugsPriority3}；分类边界见 [SpotBugs 台账](quality/spotbugs-triage.md) |
 | 前端单元/契约 | ${frontend.unitAndContractTests} / ${frontend.unitAndContractTests} |
+| 前端聚合行覆盖率 | ${frontend.lineCoverage}%（门禁 ≥ ${frontend.lineCoverageMinimum}%） |
 | 开发态 Playwright | ${frontend.developmentE2E} / ${frontend.developmentE2E} |
 | 生产构建 Playwright | ${frontend.productionE2E} / ${frontend.productionE2E} |
 | 前端静态门禁 | ${frontend.layerRules} 条分层规则，${frontend.deliveryRules} 条交付规则，${frontend.deploymentRules} 条部署规则，${frontend.releaseMaterialRules} 条发布材料规则 |

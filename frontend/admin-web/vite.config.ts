@@ -26,6 +26,20 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       environment: "jsdom",
+      coverage: {
+        provider: "v8",
+        reporter: ["text", "html", "lcov", "json-summary"],
+        reportsDirectory: "../coverage/admin",
+        include: ["src/**/*.{ts,vue}"],
+        exclude: ["src/**/*.d.ts", "src/**/*.test.ts", "src/main.ts"],
+        reportOnFailure: true,
+        thresholds: {
+          lines: 60,
+          branches: 45,
+          functions: 45,
+          statements: 60,
+        },
+      },
     },
   };
 });

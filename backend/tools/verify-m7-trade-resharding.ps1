@@ -24,7 +24,7 @@ $migrationDirectory = Join-Path $backendRoot `
     'services\trade-service\src\main\resources\db\migration'
 $reshardingTool = Join-Path $PSScriptRoot 'invoke-m7-trade-resharding.ps1'
 $tradeJar = Join-Path $backendRoot `
-    'services\trade-service\target\trade-service-1.0.1-SNAPSHOT.jar'
+    'services\trade-service\target\trade-service-1.0.2-SNAPSHOT.jar'
 $timestamp = [DateTimeOffset]::Now.ToString('yyyyMMdd-HHmmss')
 $runDirectory = Join-Path $backendRoot ".run\m7-trade-resharding-$timestamp"
 $evidencePath = Join-Path $runDirectory 'verification.json'

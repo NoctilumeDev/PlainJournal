@@ -329,14 +329,14 @@ function Stop-FoundationServices {
             continue
         }
 
-        $isFoundationService = $process.CommandLine -like '*ecommerce-gateway-1.0.1-SNAPSHOT.jar*' -or
-            $process.CommandLine -like '*identity-service-1.0.1-SNAPSHOT.jar*' -or
-            $process.CommandLine -like '*catalog-service-1.0.1-SNAPSHOT.jar*' -or
-            $process.CommandLine -like '*inventory-service-1.0.1-SNAPSHOT.jar*' -or
-            $process.CommandLine -like '*trade-service-1.0.1-SNAPSHOT.jar*' -or
-            $process.CommandLine -like '*payment-service-1.0.1-SNAPSHOT.jar*' -or
-            $process.CommandLine -like '*fulfillment-service-1.0.1-SNAPSHOT.jar*' -or
-            $process.CommandLine -like '*marketing-service-1.0.1-SNAPSHOT.jar*'
+        $isFoundationService = $process.CommandLine -like '*ecommerce-gateway-1.0.2-SNAPSHOT.jar*' -or
+            $process.CommandLine -like '*identity-service-1.0.2-SNAPSHOT.jar*' -or
+            $process.CommandLine -like '*catalog-service-1.0.2-SNAPSHOT.jar*' -or
+            $process.CommandLine -like '*inventory-service-1.0.2-SNAPSHOT.jar*' -or
+            $process.CommandLine -like '*trade-service-1.0.2-SNAPSHOT.jar*' -or
+            $process.CommandLine -like '*payment-service-1.0.2-SNAPSHOT.jar*' -or
+            $process.CommandLine -like '*fulfillment-service-1.0.2-SNAPSHOT.jar*' -or
+            $process.CommandLine -like '*marketing-service-1.0.2-SNAPSHOT.jar*'
         if ($isFoundationService) {
             Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
             Wait-Process -Id $processId -Timeout 5 -ErrorAction SilentlyContinue
@@ -688,14 +688,14 @@ New-Item -ItemType Directory -Path $runDirectory -Force | Out-Null
 $internalTrustZoneEvidencePath = Join-Path $runDirectory 'internal-trust-zones.json'
 $databaseTimeContractEvidencePath = Join-Path $runDirectory 'database-time-contract.json'
 
-$identityJar = Join-Path $PSScriptRoot 'services\identity-service\target\identity-service-1.0.1-SNAPSHOT.jar'
-$catalogJar = Join-Path $PSScriptRoot 'services\catalog-service\target\catalog-service-1.0.1-SNAPSHOT.jar'
-$inventoryJar = Join-Path $PSScriptRoot 'services\inventory-service\target\inventory-service-1.0.1-SNAPSHOT.jar'
-$tradeJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service-1.0.1-SNAPSHOT.jar'
-$paymentJar = Join-Path $PSScriptRoot 'services\payment-service\target\payment-service-1.0.1-SNAPSHOT.jar'
-$fulfillmentJar = Join-Path $PSScriptRoot 'services\fulfillment-service\target\fulfillment-service-1.0.1-SNAPSHOT.jar'
-$marketingJar = Join-Path $PSScriptRoot 'services\marketing-service\target\marketing-service-1.0.1-SNAPSHOT.jar'
-$gatewayJar = Join-Path $PSScriptRoot 'ecommerce-gateway\target\ecommerce-gateway-1.0.1-SNAPSHOT.jar'
+$identityJar = Join-Path $PSScriptRoot 'services\identity-service\target\identity-service-1.0.2-SNAPSHOT.jar'
+$catalogJar = Join-Path $PSScriptRoot 'services\catalog-service\target\catalog-service-1.0.2-SNAPSHOT.jar'
+$inventoryJar = Join-Path $PSScriptRoot 'services\inventory-service\target\inventory-service-1.0.2-SNAPSHOT.jar'
+$tradeJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service-1.0.2-SNAPSHOT.jar'
+$paymentJar = Join-Path $PSScriptRoot 'services\payment-service\target\payment-service-1.0.2-SNAPSHOT.jar'
+$fulfillmentJar = Join-Path $PSScriptRoot 'services\fulfillment-service\target\fulfillment-service-1.0.2-SNAPSHOT.jar'
+$marketingJar = Join-Path $PSScriptRoot 'services\marketing-service\target\marketing-service-1.0.2-SNAPSHOT.jar'
+$gatewayJar = Join-Path $PSScriptRoot 'ecommerce-gateway\target\ecommerce-gateway-1.0.2-SNAPSHOT.jar'
 $identityOut = Join-Path $runDirectory 'identity.out.log'
 $identityErr = Join-Path $runDirectory 'identity.err.log'
 $catalogOut = Join-Path $runDirectory 'catalog.out.log'

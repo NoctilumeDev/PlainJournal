@@ -8,7 +8,7 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const releaseTag = process.argv[2] ?? process.env.RELEASE_TAG;
 
 if (!releaseTag || !/^v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/u.test(releaseTag)) {
-  throw new Error("Usage: node tools/build-release-bundle.mjs v1.0.1");
+  throw new Error("Usage: node tools/build-release-bundle.mjs v1.0.0");
 }
 
 const verify = spawnSync(

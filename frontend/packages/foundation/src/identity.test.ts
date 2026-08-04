@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { ApiClient } from "./api";
+import type { ApiClient, BusinessId } from "./api";
 import { createIdentityApi } from "./identity";
 
 describe("createIdentityApi", () => {
@@ -35,5 +35,73 @@ describe("createIdentityApi", () => {
       method: "POST",
       body: JSON.stringify({ refreshToken: "refresh-1" }),
     });
+  });
+
+  it("maps every identity command to its owned endpoint", async () => {
+    const request = vi.fn().mockResolvedValue(undefined);
+    const api = createIdentityApi({ request } as ApiClient);
+    const addressId = "2079000000000000010" as BusinessId;
+    const address = {
+      recipientName: "Reader",
+      phone: "13800000000",
+      province: "浙江省",
+      provinceCode: "330000",
+      city: "杭州市",
+      cityCode: "330100",
+      district: "西湖区",
+      districtCode: "330106",
+      detailAddress: "青荷路 1 号",
+      postalCode: "310000",
+      setDefault: true,
+    };
+
+    await api.register({
+      email: "reader@example.com",
+      password: "Strong-password-1",
+      displayName: "Reader",
+    });
+    await api.login({
+      email: "reader@example.com",
+      password: "Strong-password-1",
+    });
+    await api.logout("refresh-1");
+    await api.addresses();
+    await api.createAddress(address);
+    await api.updateAddress(addressId, address);
+    await api.setDefaultAddress(addressId);
+    await api.deleteAddress(addressId);
+
+    expect(request.mock.calls).toEqual([
+      ["/api/v1/identity/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          email: "reader@example.com",
+          password: "Strong-password-1",
+          displayName: "Reader",
+        }),
+      }],
+      ["/api/v1/identity/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: "reader@example.com",
+          password: "Strong-password-1",
+        }),
+      }],
+      ["/api/v1/identity/auth/logout", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken: "refresh-1" }),
+      }],
+      ["/api/v1/identity/addresses"],
+      ["/api/v1/identity/addresses", {
+        method: "POST",
+        body: JSON.stringify(address),
+      }],
+      [`/api/v1/identity/addresses/${addressId}`, {
+        method: "PUT",
+        body: JSON.stringify(address),
+      }],
+      [`/api/v1/identity/addresses/${addressId}/default`, { method: "POST" }],
+      [`/api/v1/identity/addresses/${addressId}`, { method: "DELETE" }],
+    ]);
   });
 });
