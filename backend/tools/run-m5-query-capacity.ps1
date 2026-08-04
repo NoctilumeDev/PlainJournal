@@ -161,10 +161,10 @@ function Start-BaselineService {
 
 function Stop-BaselineServices {
     $expectedJarByPort = @{
-        18000 = 'ecommerce-gateway-1.0.2-SNAPSHOT.jar'
-        18101 = 'identity-service-1.0.2-SNAPSHOT.jar'
-        18102 = 'catalog-service-1.0.2-SNAPSHOT.jar'
-        18104 = 'trade-service-1.0.2-SNAPSHOT.jar'
+        18000 = 'ecommerce-gateway.jar'
+        18101 = 'identity-service.jar'
+        18102 = 'catalog-service.jar'
+        18104 = 'trade-service.jar'
     }
 
     foreach ($port in @($expectedJarByPort.Keys)) {
@@ -476,10 +476,10 @@ foreach ($port in $ports.Values) {
 
 & (Join-Path $script:toolsRoot 'prepare-m5-baseline-data.ps1') -Action Verify | Out-Null
 
-$gatewayJar = Join-Path $script:backendRoot 'ecommerce-gateway\target\ecommerce-gateway-1.0.2-SNAPSHOT.jar'
-$identityJar = Join-Path $script:backendRoot 'services\identity-service\target\identity-service-1.0.2-SNAPSHOT.jar'
-$catalogJar = Join-Path $script:backendRoot 'services\catalog-service\target\catalog-service-1.0.2-SNAPSHOT.jar'
-$tradeJar = Join-Path $script:backendRoot 'services\trade-service\target\trade-service-1.0.2-SNAPSHOT.jar'
+$gatewayJar = Join-Path $script:backendRoot 'ecommerce-gateway\target\ecommerce-gateway.jar'
+$identityJar = Join-Path $script:backendRoot 'services\identity-service\target\identity-service.jar'
+$catalogJar = Join-Path $script:backendRoot 'services\catalog-service\target\catalog-service.jar'
+$tradeJar = Join-Path $script:backendRoot 'services\trade-service\target\trade-service.jar'
 
 $summaries = [Collections.Generic.List[object]]::new()
 $primaryError = $null

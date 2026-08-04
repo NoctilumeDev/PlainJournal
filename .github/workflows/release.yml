@@ -31,10 +31,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="${GITHUB_REF_NAME}"
-          case "$tag" in
-            v[0-9]*.[0-9]*.[0-9]*) ;;
-            *) echo "Unsupported release tag: $tag" >&2; exit 1 ;;
-          esac
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Unsupported release tag: $tag" >&2
+            exit 1
+          fi
           git rev-parse --verify "refs/tags/$tag"
           git fetch origin main
           commit="$(git rev-list -n 1 "$tag")"
@@ -52,6 +52,7 @@ jobs:
             echo "A successful security.yml run is required for release commit $commit" >&2
             exit 1
           fi
+          node tools/check-release-version.mjs "$tag"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Build source bundle and checksum
         env:

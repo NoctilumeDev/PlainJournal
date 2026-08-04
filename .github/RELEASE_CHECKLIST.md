@@ -57,3 +57,11 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 - [x] Actions 固定完整 Commit SHA，Release 重新执行 CI 并核验同一提交的 Security。
 - [x] 标签提交属于 `main`，发布材料、人工 Release Notes 和验证摘要一致。
 - [x] 完成真实基础设施、三实例、多角色浏览器链路、F12 和最终资源清理。
+
+## 8. v1.0.3 缺陷补丁
+
+- [x] 后端和前端版本均为正式 `1.0.3`，发布标签内不存在 `-SNAPSHOT`。
+- [x] CI 检查真实 PR/push 变更集，Release 只接受严格稳定版标签。
+- [x] 评价同键并发回归稳定通过，真实 MySQL 评价专项完成。
+- [x] Dependency Graph、安全更新、私密漏洞报告和 Dependabot 标签已启用。
+- [ ] 完整 CI、Security、Release 附件与本机资源清理通过。

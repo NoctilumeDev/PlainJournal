@@ -18,7 +18,7 @@ $script:runDirectory = Join-Path $script:backendRoot ".run\$($script:runId)"
 $script:port = 18106
 $script:process = $null
 $script:jarPath = Join-Path $script:backendRoot `
-    'services\fulfillment-service\target\fulfillment-service-1.0.2-SNAPSHOT.jar'
+    'services\fulfillment-service\target\fulfillment-service.jar'
 $script:javaPath = if (-not [string]::IsNullOrWhiteSpace($env:JAVA_HOME) -and
     (Test-Path -LiteralPath (Join-Path $env:JAVA_HOME 'bin\java.exe'))) {
     Join-Path $env:JAVA_HOME 'bin\java.exe'
@@ -258,7 +258,7 @@ function Stop-Fulfillment {
                 -Filter "ProcessId=$($listener.OwningProcess)" `
                 -ErrorAction SilentlyContinue
             if ($null -ne $candidate -and
-                [string]$candidate.CommandLine -like '*fulfillment-service-1.0.2-SNAPSHOT.jar*') {
+                [string]$candidate.CommandLine -like '*fulfillment-service.jar*') {
                 Stop-Process -Id $listener.OwningProcess -Force
             }
         }

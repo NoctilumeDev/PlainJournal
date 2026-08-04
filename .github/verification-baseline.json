@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "targetRelease": "v1.0.2",
-  "status": "released",
+  "targetRelease": "v1.0.3",
+  "status": "release-candidate",
   "verifiedOn": "2026-08-04",
   "backend": {
     "surefireReports": 100,
@@ -19,14 +19,14 @@
     "lineCoverageMinimum": 70
   },
   "frontend": {
-    "unitAndContractTests": 319,
+    "unitAndContractTests": 322,
     "developmentE2E": 60,
     "productionE2E": 3,
     "layerRules": 28,
     "deliveryRules": 3,
     "deploymentRules": 3,
     "releaseMaterialRules": 3,
-    "lineCoverage": 70.06,
+    "lineCoverage": 70.11,
     "lineCoverageMinimum": 70
   },
   "realEvidence": {

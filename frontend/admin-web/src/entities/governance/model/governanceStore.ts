@@ -6,6 +6,7 @@ import {
   createApiClient,
   createGovernanceApi,
   createPaymentApi,
+  secureRandomUUID,
   type BusinessId,
   type GovernanceApi,
   type PaymentApi,
@@ -110,9 +111,7 @@ function createApis(accessToken: string) {
 }
 
 function newCommandId(prefix: string): string {
-  const suffix = globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `${prefix}:${suffix}`;
+  return `${prefix}:${secureRandomUUID()}`;
 }
 
 function newTrack<TAudit>(prefix: string): CompensationTrack<TAudit> {

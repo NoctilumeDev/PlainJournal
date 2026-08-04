@@ -542,9 +542,9 @@ if (-not $SkipPackage) {
 }
 
 $marketingJar = Join-Path $script:backendRoot `
-    'services\marketing-service\target\marketing-service-1.0.2-SNAPSHOT.jar'
+    'services\marketing-service\target\marketing-service.jar'
 $gatewayJar = Join-Path $script:backendRoot `
-    'ecommerce-gateway\target\ecommerce-gateway-1.0.2-SNAPSHOT.jar'
+    'ecommerce-gateway\target\ecommerce-gateway.jar'
 $primaryError = $null
 $summary = $null
 

@@ -101,12 +101,11 @@ Payment 授权补偿和四域只读对账；缺少列表或通用管理契约的
 History fallback、分级缓存、Gateway/WS 边界和版本标签回退。V7.4 又完成真实双
 Nginx 镜像构建、OCI 元数据、Header/404、同源 API、HEALTHCHECK、两个不可变标签
 回退与恢复，以及 README/CHANGELOG/SECURITY/Release checklist 和三张最终截图。
-2026-08-04 最新串行
-门禁通过 319 个前端单元/契约测试、60 个开发态 Playwright E2E、3 个生产构建 E2E、
-28 条分层规则、3 条交付审计规则、3 条生产部署规则、全部类型检查、两端生产构建和
-关键页面 axe 检查。真实 Chromium 网络取证证明当前选择 `image/avif`，且没有把 PNG
-fallback 作为图片下载；生产构建还验证两端深层刷新、同源 API、错误密码 401 和管理
-守卫恢复。
+2026-08-04 最新串行门禁已覆盖单元/契约、开发态与生产构建 Playwright、分层、
+交付、部署、类型检查、两端构建和关键页面 axe 检查；精确计数只维护在仓库生成的
+[`docs/verification-summary.md`](../docs/verification-summary.md)。真实 Chromium
+网络取证证明当前选择 `image/avif`，且没有把 PNG fallback 作为图片下载；生产构建还
+验证两端深层刷新、同源 API、错误密码 401 和管理守卫恢复。
 `frontend/e2e/mock-api.mjs` 只用于稳定浏览器验收，不替代真实 MySQL、Redis、Nacos、
 RocketMQ、MinIO、Gateway 和所有者服务证据。
 
@@ -116,7 +115,7 @@ RocketMQ、MinIO、Gateway 和所有者服务证据。
 [`docs/104-frontend-visual-v7-3-demo-static-deployment-20260803.md`](../docs/104-frontend-visual-v7-3-demo-static-deployment-20260803.md)。
 以及
 [`docs/105-frontend-visual-v7-4-release-candidate-20260803.md`](../docs/105-frontend-visual-v7-4-release-candidate-20260803.md)。
-当前前端进入 `v1.0.2` 验收候选，基础演示和 E2E 编排使用跨平台 Node 入口，并以
+当前前端已冻结为 `v1.0.3` 发布候选，基础演示和 E2E 编排使用跨平台 Node 入口，并以
 四包聚合行覆盖率 70% 作为公开门禁；复杂 Docker 和真实故障脚本继续使用
 PowerShell 7。仓库采用 Apache-2.0，后续只处理明确缺陷，不扩大当前自营业务边界；
 视觉系统重构留给后续 `v1.1.0`。

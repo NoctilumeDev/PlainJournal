@@ -25,14 +25,14 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-      - uses: github/codeql-action/init@0b88f91c1c313eec6a3c4ee6b8342cb564c2060c # v4
+      - uses: github/codeql-action/init@d1ba80a13dd99fba24a470575428917156a28b43 # v4
         with:
           languages: java-kotlin
           build-mode: manual
       - name: Compile backend
         working-directory: backend
         run: ./mvnw --batch-mode --no-transfer-progress -DskipTests package
-      - uses: github/codeql-action/analyze@0b88f91c1c313eec6a3c4ee6b8342cb564c2060c # v4
+      - uses: github/codeql-action/analyze@d1ba80a13dd99fba24a470575428917156a28b43 # v4
 
   codeql-javascript:
     name: CodeQL JavaScript and TypeScript
@@ -42,11 +42,11 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: github/codeql-action/init@0b88f91c1c313eec6a3c4ee6b8342cb564c2060c # v4
+      - uses: github/codeql-action/init@d1ba80a13dd99fba24a470575428917156a28b43 # v4
         with:
           languages: javascript-typescript
           build-mode: none
-      - uses: github/codeql-action/analyze@0b88f91c1c313eec6a3c4ee6b8342cb564c2060c # v4
+      - uses: github/codeql-action/analyze@d1ba80a13dd99fba24a470575428917156a28b43 # v4
 
   dependency-review:
     name: Dependency review
@@ -72,6 +72,6 @@ jobs:
         run: |
           corepack enable
           corepack prepare pnpm@11.9.0 --activate
-      - name: Audit production dependencies
+      - name: Audit complete dependency graph
         working-directory: frontend
-        run: pnpm audit --prod --audit-level high
+        run: pnpm audit --audit-level moderate

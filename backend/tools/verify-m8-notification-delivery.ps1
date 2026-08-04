@@ -682,11 +682,11 @@ try {
         }
     }
     $gatewayJar = Join-Path $script:backendRoot `
-        'ecommerce-gateway\target\ecommerce-gateway-1.0.2-SNAPSHOT.jar'
+        'ecommerce-gateway\target\ecommerce-gateway.jar'
     $paymentJar = Join-Path $script:backendRoot `
-        'services\payment-service\target\payment-service-1.0.2-SNAPSHOT.jar'
+        'services\payment-service\target\payment-service.jar'
     $notificationJar = Join-Path $script:backendRoot `
-        'services\notification-service\target\notification-service-1.0.2-SNAPSHOT.jar'
+        'services\notification-service\target\notification-service.jar'
 
     $commonEnvironment = @{
         NACOS_HOST = '127.0.0.1'

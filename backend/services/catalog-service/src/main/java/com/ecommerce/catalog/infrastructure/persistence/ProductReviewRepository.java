@@ -135,12 +135,13 @@ public class ProductReviewRepository implements ConsumerFailureRetryStore {
                 """, userId, idempotencyKey);
     }
 
-    public ReviewState findReviewByEligibility(long eligibilityId) {
+    public ReviewState findReviewByEligibilityForUpdate(long eligibilityId) {
         return singleReviewState("""
                 SELECT id, eligibility_id, user_id, product_id, sku_id, rating, status,
                        idempotency_key, request_hash, like_count
                 FROM product_review
                 WHERE eligibility_id = ?
+                FOR UPDATE
                 """, eligibilityId);
     }
 

@@ -10,4 +10,5 @@ export * from "./inventory";
 export * from "./marketing";
 export * from "./notification";
 export * from "./payment";
+export * from "./random";
 export * from "./trade";

@@ -5,6 +5,7 @@ import {
   ApiError,
   createApiClient,
   createTradeApi,
+  secureRandomUUID,
   type AfterSale,
   type BusinessId,
   type TradeApi,
@@ -106,9 +107,7 @@ function loadPending(ownerId: BusinessId): PendingAfterSaleApplication | null {
 }
 
 function applicationKey(): string {
-  const suffix = globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `after-sale:${suffix}`;
+  return `after-sale:${secureRandomUUID()}`;
 }
 
 function tradeApi(accessToken: string): TradeApi {

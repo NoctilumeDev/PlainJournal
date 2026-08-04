@@ -70,6 +70,63 @@ FLUSH PRIVILEGES;
     }
 }
 
+function Test-TcpPort {
+    param(
+        [Parameter(Mandatory)][string]$HostName,
+        [Parameter(Mandatory)][int]$Port
+    )
+
+    $client = [Net.Sockets.TcpClient]::new()
+    try {
+        $connect = $client.ConnectAsync($HostName, $Port)
+        return $connect.Wait(1000) -and $client.Connected
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
+function Wait-CoreMiddleware {
+    $deadline = (Get-Date).AddSeconds(120)
+    do {
+        $mysqlHealth = docker inspect --format '{{.State.Health.Status}}' `
+            plainjournal-mysql 2>$null
+        $redisHealth = docker inspect --format '{{.State.Health.Status}}' `
+            plainjournal-redis 2>$null
+        $nacosReady = $false
+        try {
+            $nacos = Invoke-RestMethod `
+                -Uri 'http://127.0.0.1:18080/v3/console/health/readiness' `
+                -TimeoutSec 3
+            $nacosReady = $nacos.code -eq 0 -and $nacos.data -eq 'ok'
+        }
+        catch {
+        }
+        $rocketMqReady = Test-TcpPort -HostName '127.0.0.1' -Port 18082
+        $minioReady = Test-TcpPort -HostName '127.0.0.1' -Port 19000
+
+        if (
+            $mysqlHealth -eq 'healthy' -and
+            $redisHealth -eq 'healthy' -and
+            $nacosReady -and
+            $rocketMqReady -and
+            $minioReady
+        ) {
+            return
+        }
+        Start-Sleep -Seconds 2
+    } while ((Get-Date) -lt $deadline)
+
+    throw (
+        'Core middleware readiness timed out: ' +
+        "mysql=$mysqlHealth redis=$redisHealth nacos=$nacosReady " +
+        "rocketmq=$rocketMqReady minio=$minioReady"
+    )
+}
+
 $identityDbName = Ensure-EnvValue -Name 'IDENTITY_DB_NAME' -Value 'ecom_identity'
 $identityDbUser = Ensure-EnvValue -Name 'IDENTITY_DB_USER' -Value 'ecom_identity_app'
 $identityDbPassword = Ensure-EnvValue -Name 'IDENTITY_DB_PASSWORD' -Value (New-HexSecret -ByteLength 24)
@@ -139,6 +196,8 @@ foreach ($container in $requiredContainers) {
         throw "Container is not running: $container"
     }
 }
+
+Wait-CoreMiddleware
 
 $mysqlRootPassword = Get-EnvValue -Name 'MYSQL_ROOT_PASSWORD'
 Initialize-ServiceDatabase -DatabaseName $identityDbName -DatabaseUser $identityDbUser `

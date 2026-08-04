@@ -675,11 +675,11 @@ $networkPreflight = 'D:\DevTools\Network\check-dev-network.ps1'
 $envPath = Join-Path $script:repositoryRoot 'deploy/docker/.env'
 $bootstrapPath = Join-Path $script:repositoryRoot 'deploy/docker/bootstrap-resources.ps1'
 $identityJar = Join-Path $script:backendRoot `
-    'services/identity-service/target/identity-service-1.0.2-SNAPSHOT.jar'
+    'services/identity-service/target/identity-service.jar'
 $chatJar = Join-Path $script:backendRoot `
-    'services/chat-service/target/chat-service-1.0.2-SNAPSHOT.jar'
+    'services/chat-service/target/chat-service.jar'
 $gatewayJar = Join-Path $script:backendRoot `
-    'ecommerce-gateway/target/ecommerce-gateway-1.0.2-SNAPSHOT.jar'
+    'ecommerce-gateway/target/ecommerce-gateway.jar'
 $browserScript = Join-Path $script:frontendRoot 'e2e/real-chat-workspace.mjs'
 $browserResultPath = Join-Path $script:runDirectory 'browser-result.json'
 $screenshotDirectory = Join-Path $script:runDirectory 'screenshots'
@@ -1084,9 +1084,9 @@ WHERE email IN ($customerEmailLiteral, $agentEmailLiteral);
                 $_.Name -eq 'java.exe' -and
                 $_.CommandLine -like '*PlainJournal*' -and
                 (
-                    $_.CommandLine -like '*identity-service-1.0.2-SNAPSHOT.jar*' -or
-                    $_.CommandLine -like '*chat-service-1.0.2-SNAPSHOT.jar*' -or
-                    $_.CommandLine -like '*ecommerce-gateway-1.0.2-SNAPSHOT.jar*'
+                    $_.CommandLine -like '*identity-service.jar*' -or
+                    $_.CommandLine -like '*chat-service.jar*' -or
+                    $_.CommandLine -like '*ecommerce-gateway.jar*'
                 )
             }).Count
     $nodeResidue = @(Get-CimInstance Win32_Process |

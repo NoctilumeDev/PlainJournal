@@ -46,6 +46,25 @@ refresh token 仍由 JavaScript 可读，这是当前“响应体返回 refresh 
 
 顾客端 `/account/addresses` 已接通完整地址管理：新增或修改只有在 Identity 返回成功后才显示确认；切换默认地址以后端返回事实重载列表；删除使用原位确认，失败或结果未知时不关闭确认并不宣称删除成功。进入编辑状态后焦点移动到表单标题，状态与错误分别使用语义化 `status`/`alert`。
 
+## 3.1 CSRF 边界
+
+Gateway 与 10 个业务服务均是无状态 OAuth2 Resource Server：浏览器只在
+`Authorization: Bearer` 请求头中显式携带 access token，服务端不创建 HTTP
+session，Gateway 也不保存 SecurityContext。因此当前接口不接受浏览器自动附带的
+Cookie 凭据，CSRF 防护不适用于这条 Bearer 协议，Spring Security 配置显式关闭
+CSRF。
+
+这个结论不是约定俗成的注释。仓库的
+`tools/stateless-bearer-security.test.mjs` 会校验所有关闭 CSRF 的安全配置同时：
+
+- 使用 OAuth2 Resource Server JWT 校验；
+- 明确声明 `STATELESS` session，或在 Gateway 使用 NoOp SecurityContext；
+- 没有启用表单登录、HTTP Basic 或 remember-me 等浏览器凭据流。
+
+未来一旦把 refresh token 或认证状态迁移到 `HttpOnly` Cookie，必须在同一个版本内
+重新启用匹配的 CSRF 防护，并同时审查 SameSite、CORS、跨域刷新和登出接口；不能沿用
+当前的关闭配置。
+
 ## 4. 角色基线
 
 当前预置角色为：

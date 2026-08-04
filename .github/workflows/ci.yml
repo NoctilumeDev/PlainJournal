@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24.14.0
@@ -28,6 +30,7 @@ jobs:
           node --test tools/*.test.mjs
           node tools/check-backend-boundaries.mjs
           node tools/check-markdown-links.mjs
+          node tools/check-release-version.mjs
           node tools/render-verification-summary.mjs --check
       - name: Parse Compose configurations
         env:
@@ -41,7 +44,21 @@ jobs:
           docker compose --file deploy/docker/compose.yml --env-file deploy/docker/.env.example --profile core config --quiet
           docker compose --file frontend/deploy/nginx/compose.yml config --quiet
       - name: Check patch whitespace
-        run: git diff --check
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            git diff --check "$PR_BASE_SHA...$GITHUB_SHA"
+          elif [[ "$GITHUB_EVENT_NAME" == "push" \
+              && "${{ github.ref_type }}" == "branch" \
+              && -n "$PUSH_BEFORE_SHA" \
+              && "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            git diff --check "$PUSH_BEFORE_SHA...$PUSH_SHA"
+          else
+            git show --check --format= "$GITHUB_SHA"
+          fi
 
   backend:
     name: Backend verify

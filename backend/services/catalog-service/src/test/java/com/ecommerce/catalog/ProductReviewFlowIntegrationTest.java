@@ -210,7 +210,7 @@ class ProductReviewFlowIntegrationTest {
                 "review-concurrent-001");
 
         List<ProductReviewView> results = runConcurrently(
-                8,
+                16,
                 () -> service.createReview(command));
         assertThat(results)
                 .extracting(ProductReviewView::id)

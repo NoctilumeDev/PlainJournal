@@ -13,7 +13,7 @@
 
     <groupId>com.ecommerce.platform</groupId>
     <artifactId>plainjournal-backend</artifactId>
-    <version>1.0.2-SNAPSHOT</version>
+    <version>1.0.3</version>
     <packaging>pom</packaging>
     <name>plainjournal-backend</name>
 
@@ -71,6 +71,7 @@
     </dependencyManagement>
 
     <build>
+        <finalName>${project.artifactId}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.jacoco</groupId>

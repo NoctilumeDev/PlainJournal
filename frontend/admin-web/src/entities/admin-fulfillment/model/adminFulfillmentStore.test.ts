@@ -173,7 +173,15 @@ describe("admin fulfillment entity", () => {
 
     expect(store.commandPhase).toBe("unknown");
     expect(store.pendingCommand?.commandKey).toBe(eventId);
-    expect(localStorage.getItem(STORAGE_KEY)).toContain(eventId);
+    const persisted = JSON.parse(
+      String(localStorage.getItem(STORAGE_KEY)),
+    ) as {
+      requiresAuthorityRead?: boolean;
+      payload: Record<string, unknown>;
+    };
+    expect(persisted.requiresAuthorityRead).toBe(true);
+    expect(persisted.payload).not.toHaveProperty("longitude");
+    expect(persisted.payload).not.toHaveProperty("latitude");
 
     await store.retryPending(ACCESS);
 
@@ -188,15 +196,41 @@ describe("admin fulfillment entity", () => {
     expect(store.traceForm(FULFILLMENT_NO).externalEventId).not.toBe(eventId);
   });
 
-  it("restores an unresolved trace command after the store is recreated", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () =>
-      failure(503, "SERVICE_UNAVAILABLE", "response lost")));
+  it("redacts persisted coordinates and resolves a restored trace through authority", async () => {
+    let eventId = "";
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      if (init?.method === "POST") {
+        return failure(503, "SERVICE_UNAVAILABLE", "response lost");
+      }
+      expect(new URL(String(input), "http://localhost").pathname).toBe(
+        `/api/v1/fulfillment/admin/orders/${FULFILLMENT_NO}`,
+      );
+      return success(fulfillmentFixture({
+        status: "IN_TRANSIT",
+        traces: [{
+          externalEventId: eventId,
+          nodeType: "TRANSIT",
+          description: "恢复本地履约命令",
+          locationName: "杭州分拨中心",
+          longitude: "120.1551",
+          latitude: "30.2741",
+          occurredAt: "2026-08-03T00:00:00Z",
+        }],
+      }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
     const first = useAdminFulfillmentStore();
     first.synchronizeAccess(ACCESS);
     const form = first.traceForm(FULFILLMENT_NO);
     form.description = "恢复本地履约命令";
-    const eventId = form.externalEventId;
+    form.locationName = "杭州分拨中心";
+    form.longitude = "120.1551";
+    form.latitude = "30.2741";
+    eventId = form.externalEventId;
     await first.addTrace(ACCESS, FULFILLMENT_NO);
 
     setActivePinia(createPinia());
@@ -208,7 +242,20 @@ describe("admin fulfillment entity", () => {
     expect(restored.traceForm(FULFILLMENT_NO)).toMatchObject({
       externalEventId: eventId,
       description: "恢复本地履约命令",
+      longitude: "",
+      latitude: "",
     });
+
+    await restored.retryPending(ACCESS);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(restored.commandMessage).toContain("不能安全原样重试");
+
+    await restored.readPendingAuthority(ACCESS);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(restored.commandPhase).toBe("accepted");
+    expect(restored.pendingCommand).toBeNull();
   });
 
   it("settles a lost trace only when the authority returns the exact event identity", async () => {

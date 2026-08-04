@@ -905,11 +905,11 @@ try {
         }
     }
     $gatewayJar = Join-Path $script:backendRoot `
-        'ecommerce-gateway\target\ecommerce-gateway-1.0.2-SNAPSHOT.jar'
+        'ecommerce-gateway\target\ecommerce-gateway.jar'
     $catalogJar = Join-Path $script:backendRoot `
-        'services\catalog-service\target\catalog-service-1.0.2-SNAPSHOT.jar'
+        'services\catalog-service\target\catalog-service.jar'
     $tradeJar = Join-Path $script:backendRoot `
-        'services\trade-service\target\trade-service-1.0.2-SNAPSHOT.jar'
+        'services\trade-service\target\trade-service.jar'
 
     $commonEnvironment = @{
         NACOS_HOST = '127.0.0.1'
@@ -1526,9 +1526,9 @@ finally {
             -ErrorAction SilentlyContinue |
         Where-Object {
             [string]$_.CommandLine -like "*$($script:runId)*" -or
-            [string]$_.CommandLine -like '*catalog-service-1.0.2-SNAPSHOT.jar*' -or
-            [string]$_.CommandLine -like '*trade-service-1.0.2-SNAPSHOT.jar*' -or
-            [string]$_.CommandLine -like '*ecommerce-gateway-1.0.2-SNAPSHOT.jar*'
+            [string]$_.CommandLine -like '*catalog-service.jar*' -or
+            [string]$_.CommandLine -like '*trade-service.jar*' -or
+            [string]$_.CommandLine -like '*ecommerce-gateway.jar*'
         })
     [ordered]@{
         cleanupErrors = @($cleanupErrors)

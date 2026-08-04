@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.ecommerce.platform</groupId>
         <artifactId>ecommerce-services</artifactId>
-        <version>1.0.2-SNAPSHOT</version>
+        <version>1.0.3</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 

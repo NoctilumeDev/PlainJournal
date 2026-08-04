@@ -8,6 +8,7 @@ import {
   createInventoryApi,
   createMarketingApi,
   createTradeApi,
+  secureRandomUUID,
   multiplyMoney,
   sumMoney,
   type Benefit,
@@ -145,9 +146,7 @@ function isActiveContext(context: CheckoutAccessContext): context is {
 }
 
 function newOrderKey(): string {
-  const suffix = globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `order:${suffix}`;
+  return `order:${secureRandomUUID()}`;
 }
 
 function normalizeMoney(value: string | number): string {

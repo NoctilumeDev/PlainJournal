@@ -7,6 +7,45 @@
 
 - 正式版本发布后的明确缺陷修复将记录在这里。
 
+## [1.0.3] - 2026-08-04
+
+> 修正正式版本语义、发布门禁和并发评价幂等边界，不增加业务域。
+
+### Changed
+
+- 后端 Reactor 与前端 workspace 统一为正式 `1.0.3`，后端可执行 JAR 改为不含版本号
+  的稳定文件名，真实链路脚本和 Dockerfile 不再与具体版本耦合；
+- CodeQL Action 更新到当前 Dependabot 提议的完整 Commit SHA；
+- README 不再手工复制测试数字，精确版本和验证结果只由验证摘要承载。
+
+### Fixed
+
+- 修复正式 Release 标签内后端仍使用 `-SNAPSHOT` 的版本语义漂移，并增加跨 Maven、
+  pnpm、CHANGELOG、Release Notes 和验证基线的一致性门禁；
+- 修复 CI 在干净 checkout 上执行空 `git diff --check`，现在按 PR、分支 push 和标签/
+  手动事件检查真实变更集；
+- 修复 Release shell glob 会接受带额外尾巴的非标准标签，正式标签只允许
+  `vMAJOR.MINOR.PATCH`；
+- 修复同一评价幂等键并发重试偶发被误判为 `REVIEW_ALREADY_SUBMITTED`：资格锁后按
+  资格执行评价当前读，同键返回原结果，不同键保持 409；
+- 修复前端命令与幂等键在 Web Crypto 不可用时降级使用 `Math.random()` 的可预测性问题；
+- 修复结果未知的物流轨迹将经纬度写入 `localStorage`：同会话仍可原样重试，刷新后本地
+  副本会删除坐标，只能按外部事件 ID 读取 Fulfillment 权威事实确认；
+- 升级存在安全公告的 `brace-expansion` 与 `undici` 传递依赖；仓库显式固定 npm
+  官方源并保留严格 peer 依赖校验，让 Security 工作流审计完整锁文件、阻断中危及以上
+  漏洞；
+- 修复 Docker 冷启动时 `bootstrap-resources.ps1` 在 Nacos readiness 之前尝试登录，
+  并把服务未就绪误报为管理员密码不一致的问题；
+- 修复前端 README 仍将已发布版本描述为验收候选的问题。
+
+### Governance
+
+- 启用 Dependency Graph、Dependabot Security Updates 和 Private Vulnerability
+  Reporting，并补充 Dependabot 使用的 `dependencies` 标签；
+- 关闭被冻结范围内不计划合并的普通平台升级 PR，Actions 安全更新直接进入本补丁。
+- 用仓库测试约束所有关闭 CSRF 的服务均为无状态 Bearer JWT Resource Server；文档明确
+  迁移到 HttpOnly Cookie 时必须同步重新设计 CSRF、SameSite 与 CORS。
+
 ## [1.0.2] - 2026-08-04
 
 > 不增加业务域、不重做视觉的工程验收与治理收口版本。

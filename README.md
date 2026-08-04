@@ -121,14 +121,8 @@ Windows `cmd.exe` 可使用 `mvnw.cmd`。真实中间件准备见
 
 ## 当前验证
 
-当前单一事实源是 [验证摘要](docs/verification-summary.md)：
-
-| 范围 | 最近完整基线 |
-| --- | --- |
-| 后端 | 100 份 Surefire 报告，436 tests，0 failure/error/skipped |
-| PMD / SpotBugs | PMD 0；SpotBugs P1=0，P2/P3 进入公开分类台账 |
-| 前端 | 319 单元/契约、60 开发态 E2E、3 生产构建 E2E |
-| 真实机制 | 7 个核心中间件、代表服务三实例、1000/100 容量与 F12/CDP |
+当前版本、测试、覆盖率和真实链路证据的单一事实源是
+[验证摘要](docs/verification-summary.md)，发布后的每次变更都必须同步更新并通过生成门禁。
 
 GitHub Actions 公开复跑后端、前端、架构、文档和安全门禁。真实 MySQL、Redis、
 Nacos、RocketMQ、MinIO、ClamAV、OpenSearch、故障与容量实验继续由专项脚本证明，

@@ -5,6 +5,7 @@ import {
   ApiError,
   createApiClient,
   createPaymentApi,
+  secureRandomUUID,
   type BusinessId,
   type Payment,
   type PaymentApi,
@@ -116,9 +117,7 @@ function loadPendingPayment(ownerId: BusinessId): PendingPaymentSubmission | nul
 }
 
 function newPaymentKey(): string {
-  const suffix = globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `payment:${suffix}`;
+  return `payment:${secureRandomUUID()}`;
 }
 
 function paymentApi(accessToken: string): PaymentApi {

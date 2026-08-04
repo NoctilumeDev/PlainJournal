@@ -1,7 +1,7 @@
 {
   "name": "@plain-journal/design-system",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "sideEffects": [
     "./src/*.css"
@@ -11,6 +11,7 @@
     "./base.css": "./src/base.css"
   },
   "scripts": {
-    "test": "node --test src/tokens.test.mjs"
+    "test": "node --test src/tokens.test.mjs",
+    "test:coverage": "node --test src/tokens.test.mjs"
   }
 }

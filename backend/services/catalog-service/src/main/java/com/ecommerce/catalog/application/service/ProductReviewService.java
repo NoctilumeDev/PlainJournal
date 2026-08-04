@@ -105,11 +105,15 @@ public class ProductReviewService {
         if (existing != null) {
             return sameReviewRequest(existing, requestHash, command.userId());
         }
-        if (!"ELIGIBLE".equals(eligibility.status())) {
-            throw new CatalogException(CatalogError.REVIEW_ALREADY_SUBMITTED);
-        }
-        ReviewState eligibilityReview = repository.findReviewByEligibility(eligibility.id());
+        ReviewState eligibilityReview = repository.findReviewByEligibilityForUpdate(
+                eligibility.id());
         if (eligibilityReview != null) {
+            if (!idempotencyKey.equals(eligibilityReview.idempotencyKey())) {
+                throw new CatalogException(CatalogError.REVIEW_ALREADY_SUBMITTED);
+            }
+            return sameReviewRequest(eligibilityReview, requestHash, command.userId());
+        }
+        if (!"ELIGIBLE".equals(eligibility.status())) {
             throw new CatalogException(CatalogError.REVIEW_ALREADY_SUBMITTED);
         }
 

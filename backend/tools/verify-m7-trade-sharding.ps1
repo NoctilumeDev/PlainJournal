@@ -53,13 +53,13 @@ $servicePorts = [ordered]@{
     marketing = 18107
 }
 $serviceJars = @{
-    identity = Join-Path $backendRoot 'services\identity-service\target\identity-service-1.0.2-SNAPSHOT.jar'
-    catalog = Join-Path $backendRoot 'services\catalog-service\target\catalog-service-1.0.2-SNAPSHOT.jar'
-    inventory = Join-Path $backendRoot 'services\inventory-service\target\inventory-service-1.0.2-SNAPSHOT.jar'
-    trade = Join-Path $backendRoot 'services\trade-service\target\trade-service-1.0.2-SNAPSHOT.jar'
-    payment = Join-Path $backendRoot 'services\payment-service\target\payment-service-1.0.2-SNAPSHOT.jar'
-    fulfillment = Join-Path $backendRoot 'services\fulfillment-service\target\fulfillment-service-1.0.2-SNAPSHOT.jar'
-    marketing = Join-Path $backendRoot 'services\marketing-service\target\marketing-service-1.0.2-SNAPSHOT.jar'
+    identity = Join-Path $backendRoot 'services\identity-service\target\identity-service.jar'
+    catalog = Join-Path $backendRoot 'services\catalog-service\target\catalog-service.jar'
+    inventory = Join-Path $backendRoot 'services\inventory-service\target\inventory-service.jar'
+    trade = Join-Path $backendRoot 'services\trade-service\target\trade-service.jar'
+    payment = Join-Path $backendRoot 'services\payment-service\target\payment-service.jar'
+    fulfillment = Join-Path $backendRoot 'services\fulfillment-service\target\fulfillment-service.jar'
+    marketing = Join-Path $backendRoot 'services\marketing-service\target\marketing-service.jar'
 }
 $settings = @{}
 $processes = [System.Collections.Generic.List[object]]::new()

@@ -5,6 +5,7 @@ import {
   ApiError,
   createApiClient,
   createCatalogApi,
+  secureRandomUUID,
   type BusinessId,
   type CatalogApi,
   type ProductReview,
@@ -133,9 +134,7 @@ function loadPendingReview(ownerId: BusinessId): PendingReviewSubmission | null 
 }
 
 function reviewCommandKey(): string {
-  const suffix = globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `review:${suffix}`;
+  return `review:${secureRandomUUID()}`;
 }
 
 function catalogApi(accessToken: string | null): CatalogApi {

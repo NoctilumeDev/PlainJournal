@@ -5,6 +5,7 @@ import {
   ApiError,
   createApiClient,
   createMarketingApi,
+  secureRandomUUID,
   type Benefit,
   type BenefitType,
   type BusinessId,
@@ -86,9 +87,7 @@ function createApi(accessToken: string): MarketingApi {
 }
 
 function newGrantKey(): string {
-  const suffix = globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `admin-benefit:${suffix}`;
+  return `admin-benefit:${secureRandomUUID()}`;
 }
 
 function defaultRuleForm() {

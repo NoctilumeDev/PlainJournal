@@ -5,6 +5,7 @@ import {
   ApiError,
   createApiClient,
   createInventoryApi,
+  secureRandomUUID,
   type AdjustStockInput,
   type BusinessId,
   type InventoryApi,
@@ -84,9 +85,7 @@ function createApi(accessToken: string): InventoryApi {
 }
 
 function newMovementNo(): string {
-  const suffix = globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `admin-stock:${suffix}`;
+  return `admin-stock:${secureRandomUUID()}`;
 }
 
 function normalizedInput(value: unknown): string {

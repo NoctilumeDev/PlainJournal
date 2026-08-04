@@ -125,6 +125,12 @@ HTTP 409 `REVIEW_ALREADY_SUBMITTED`。数据库最终只有一条评价，但相
 评价 ID；同键异载荷仍返回 `IDEMPOTENCY_CONFLICT`。集成测试额外固定了事务隔离级别
 契约，防止以后无意恢复默认隔离级别。
 
+`v1.0.3` 又补充了按资格读取评价的 `FOR UPDATE` 当前读。资格状态已变为
+`REVIEWED` 时，后继请求先锁定并读取既有评价：同一幂等键返回原结果，不同幂等键仍
+返回 `REVIEW_ALREADY_SUBMITTED`。这消除了 H2 并发回归中偶发看到新资格状态却未读到
+对应评价行、从而把同键重试误判为 409 的测试不稳定性；真实 MySQL 仍以
+`READ_COMMITTED`、资格行锁和两个唯一约束共同裁决。
+
 ## 6. 消费失败治理
 
 Catalog 的 `OrderCompletedConsumer` 区分两类失败：

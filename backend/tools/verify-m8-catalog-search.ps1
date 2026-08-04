@@ -58,7 +58,7 @@ else {
     (Get-Command java -ErrorAction Stop).Source
 }
 $script:jarPath = Join-Path $script:backendRoot `
-    'services\catalog-service\target\catalog-service-1.0.2-SNAPSHOT.jar'
+    'services\catalog-service\target\catalog-service.jar'
 
 [IO.Directory]::CreateDirectory($script:runDirectory) | Out-Null
 $script:tracePath = Join-Path $script:runDirectory 'script-trace.log'
@@ -1039,7 +1039,7 @@ WHERE Db = '$($script:database)'
     $residualJvms = @(Get-CimInstance Win32_Process `
             -Filter "Name='java.exe'" -ErrorAction SilentlyContinue |
         Where-Object {
-            [string]$_.CommandLine -like '*catalog-service-1.0.2-SNAPSHOT.jar*'
+            [string]$_.CommandLine -like '*catalog-service.jar*'
         })
     $residualIndices = @()
     if (Get-NetTCPConnection -State Listen -LocalPort $script:openSearchPort `

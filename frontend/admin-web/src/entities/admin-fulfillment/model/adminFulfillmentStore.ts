@@ -5,6 +5,7 @@ import {
   ApiError,
   createApiClient,
   createFulfillmentApi,
+  secureRandomUUID,
   type AddLogisticsTraceInput,
   type BusinessId,
   type Fulfillment,
@@ -53,6 +54,7 @@ interface PendingFulfillmentCommand {
   commandKey: string;
   payload: Record<string, unknown>;
   createdAt: string;
+  requiresAuthorityRead?: boolean;
 }
 
 interface ShipForm {
@@ -116,9 +118,7 @@ function createApi(accessToken: string): FulfillmentApi {
 }
 
 function newIdentity(prefix: string): string {
-  const suffix = globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `${prefix}:${suffix}`;
+  return `${prefix}:${secureRandomUUID()}`;
 }
 
 function storageKey(operatorId: BusinessId): string {
@@ -160,7 +160,10 @@ function parsePending(raw: string | null): PendingFulfillmentCommand | null {
     ) {
       return null;
     }
-    return value as PendingFulfillmentCommand;
+    const command = value as PendingFulfillmentCommand;
+    return command.kind === "trace"
+      ? persistentPending(command)
+      : command;
   } catch {
     return null;
   }
@@ -170,7 +173,28 @@ function loadPending(operatorId: BusinessId): PendingFulfillmentCommand | null {
   if (typeof localStorage === "undefined") {
     return null;
   }
-  return parsePending(localStorage.getItem(storageKey(operatorId)));
+  const key = storageKey(operatorId);
+  const command = parsePending(localStorage.getItem(key));
+  if (command?.kind === "trace") {
+    localStorage.setItem(key, JSON.stringify(command));
+  }
+  return command;
+}
+
+function persistentPending(
+  value: PendingFulfillmentCommand,
+): PendingFulfillmentCommand {
+  if (value.kind !== "trace") {
+    return value;
+  }
+  const payload = { ...value.payload };
+  delete payload.longitude;
+  delete payload.latitude;
+  return {
+    ...value,
+    payload,
+    requiresAuthorityRead: true,
+  };
 }
 
 function savePending(
@@ -181,7 +205,10 @@ function savePending(
     return;
   }
   if (value) {
-    localStorage.setItem(storageKey(operatorId), JSON.stringify(value));
+    localStorage.setItem(
+      storageKey(operatorId),
+      JSON.stringify(persistentPending(value)),
+    );
   } else {
     localStorage.removeItem(storageKey(operatorId));
   }
@@ -327,8 +354,12 @@ export const useAdminFulfillmentStore = defineStore(
           nodeType: stringPayload(payload, "nodeType") as TraceForm["nodeType"],
           description: stringPayload(payload, "description"),
           locationName: stringPayload(payload, "locationName"),
-          longitude: stringPayload(payload, "longitude"),
-          latitude: stringPayload(payload, "latitude"),
+          longitude: command.requiresAuthorityRead
+            ? ""
+            : stringPayload(payload, "longitude"),
+          latitude: command.requiresAuthorityRead
+            ? ""
+            : stringPayload(payload, "latitude"),
         };
       } else if (command.kind === "exception") {
         exceptionForms[referenceNo] = {
@@ -388,7 +419,9 @@ export const useAdminFulfillmentStore = defineStore(
         hydratePending(pendingCommand.value);
         commandPhase.value = pendingCommand.value ? "unknown" : "idle";
         commandMessage.value = pendingCommand.value
-          ? "发现一条尚未确认的履约命令。业务号、命令身份和原始载荷已恢复；请读取权威事实或原样重试。"
+          ? pendingCommand.value.requiresAuthorityRead
+            ? "发现一条尚未确认的物流轨迹。坐标未本地持久化，请先读取权威事实确认外部事件 ID，不能在刷新后直接重放。"
+            : "发现一条尚未确认的履约命令。业务号、命令身份和原始载荷已恢复；请读取权威事实或原样重试。"
           : null;
       } else if (pendingCommand.value) {
         commandPhase.value = "unknown";
@@ -839,6 +872,15 @@ export const useAdminFulfillmentStore = defineStore(
         }
         return Promise.resolve(null);
       }
+      if (
+        pendingCommand.value.kind === "trace"
+        && pendingCommand.value.requiresAuthorityRead
+      ) {
+        commandPhase.value = "unknown";
+        commandMessage.value =
+          "物流坐标未写入本地存储，刷新后不能安全原样重试；请读取 Fulfillment 权威事实确认外部事件 ID。";
+        return Promise.resolve(null);
+      }
       if (activeCommandPromise) {
         return activeCommandPromise;
       }
@@ -886,11 +928,16 @@ export const useAdminFulfillmentStore = defineStore(
           case "trace":
             return value.traces.some((trace) =>
               trace.externalEventId === command.commandKey
-              && trace.nodeType === stringPayload(payload, "nodeType")
-              && trace.description === stringPayload(payload, "description")
-              && (trace.locationName ?? "") === stringPayload(payload, "locationName")
-              && String(trace.longitude ?? "") === stringPayload(payload, "longitude")
-              && String(trace.latitude ?? "") === stringPayload(payload, "latitude"));
+              && (
+                command.requiresAuthorityRead
+                || (
+                  trace.nodeType === stringPayload(payload, "nodeType")
+                  && trace.description === stringPayload(payload, "description")
+                  && (trace.locationName ?? "") === stringPayload(payload, "locationName")
+                  && String(trace.longitude ?? "") === stringPayload(payload, "longitude")
+                  && String(trace.latitude ?? "") === stringPayload(payload, "latitude")
+                )
+              ));
           case "exception":
             return value.status === "EXCEPTION"
               && historyMatches(

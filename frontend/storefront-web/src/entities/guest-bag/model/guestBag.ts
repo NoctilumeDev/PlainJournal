@@ -1,7 +1,11 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
-import type { BusinessId, GuestBagMergeItem } from "@plain-journal/foundation";
+import {
+  secureRandomUUID,
+  type BusinessId,
+  type GuestBagMergeItem,
+} from "@plain-journal/foundation";
 
 export interface GuestBagItem {
   productId: BusinessId;
@@ -182,9 +186,7 @@ function loadPendingMerge(): PendingGuestBagMerge | null {
 }
 
 function newMergeKey(): string {
-  const suffix = globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `guest-merge:${suffix}`;
+  return `guest-merge:${secureRandomUUID()}`;
 }
 
 export const useBagStore = defineStore("guest-bag", () => {

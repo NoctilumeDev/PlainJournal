@@ -195,8 +195,8 @@ function Stop-Applications {
     }
     $script:processes = [ordered]@{}
     $expectedByPort = @{
-        $script:gatewayPort = 'ecommerce-gateway-1.0.2-SNAPSHOT.jar'
-        $script:chatPort = 'chat-service-1.0.2-SNAPSHOT.jar'
+        $script:gatewayPort = 'ecommerce-gateway.jar'
+        $script:chatPort = 'chat-service.jar'
     }
     foreach ($port in $expectedByPort.Keys) {
         foreach ($listener in @(Get-NetTCPConnection -State Listen -LocalPort $port `
@@ -305,8 +305,8 @@ else {
 $networkPreflight = 'D:\DevTools\Network\check-dev-network.ps1'
 $envPath = Join-Path $script:repositoryRoot 'deploy/docker/.env'
 $bootstrapPath = Join-Path $script:repositoryRoot 'deploy/docker/bootstrap-resources.ps1'
-$chatJar = Join-Path $script:backendRoot 'services/chat-service/target/chat-service-1.0.2-SNAPSHOT.jar'
-$gatewayJar = Join-Path $script:backendRoot 'ecommerce-gateway/target/ecommerce-gateway-1.0.2-SNAPSHOT.jar'
+$chatJar = Join-Path $script:backendRoot 'services/chat-service/target/chat-service.jar'
+$gatewayJar = Join-Path $script:backendRoot 'ecommerce-gateway/target/ecommerce-gateway.jar'
 $script:javaPath = (Get-Command java -ErrorAction Stop).Source
 
 try {

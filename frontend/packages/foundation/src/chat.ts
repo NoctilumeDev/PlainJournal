@@ -4,6 +4,7 @@ import {
   type ApiClient,
   type BusinessId,
 } from "./api";
+import { secureRandomUUID } from "./random";
 
 export interface ChatConversation {
   id: BusinessId;
@@ -1105,9 +1106,7 @@ export function createChatWorkspaceApi(
 }
 
 function operationKey(prefix: string): string {
-  const random = globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `chat:${prefix}:${random}`;
+  return `chat:${prefix}:${secureRandomUUID()}`;
 }
 
 function safeStorage(): Storage | undefined {

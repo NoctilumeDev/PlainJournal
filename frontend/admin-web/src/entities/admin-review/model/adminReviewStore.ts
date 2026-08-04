@@ -5,6 +5,7 @@ import {
   ApiError,
   createApiClient,
   createCatalogApi,
+  secureRandomUUID,
   type BusinessId,
   type CatalogApi,
   type PageResponse,
@@ -100,9 +101,7 @@ function createApi(accessToken: string): CatalogApi {
 }
 
 function newCommandId(prefix: string): string {
-  const suffix = globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `${prefix}:${suffix}`;
+  return `${prefix}:${secureRandomUUID()}`;
 }
 
 function storageKey(operatorId: BusinessId): string {
