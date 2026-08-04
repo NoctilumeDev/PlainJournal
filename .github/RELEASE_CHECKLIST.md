@@ -54,6 +54,6 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 - [x] 后端聚合行覆盖率不低于 70%，每个业务模块不低于 65%。
 - [x] 前端四包聚合行覆盖率不低于 70%，管理端关键路由和组件测试通过。
 - [x] Dependabot 忽略常规 Major 升级并将 Minor/Patch 按生态分组。
-- [ ] Actions 固定完整 Commit SHA，Release 重新执行 CI 并核验同一提交的 Security。
-- [ ] 标签提交属于 `main`，发布材料、人工 Release Notes 和验证摘要一致。
+- [x] Actions 固定完整 Commit SHA，Release 重新执行 CI 并核验同一提交的 Security。
+- [x] 标签提交属于 `main`，发布材料、人工 Release Notes 和验证摘要一致。
 - [x] 完成真实基础设施、三实例、多角色浏览器链路、F12 和最终资源清理。
