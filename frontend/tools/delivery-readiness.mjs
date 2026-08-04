@@ -105,6 +105,13 @@ function findDuplicates(values) {
 export async function inspectDeliveryReadiness(frontendRoot) {
   const violations = [];
   const warnings = [];
+  const repositoryRoot = path.resolve(frontendRoot, "..");
+  const verificationBaseline = JSON.parse(
+    await fs.readFile(
+      path.join(repositoryRoot, ".github", "verification-baseline.json"),
+      "utf8",
+    ),
+  );
   const routerFiles = {
     storefront: path.join(frontendRoot, "storefront-web", "src", "app", "router.ts"),
     admin: path.join(frontendRoot, "admin-web", "src", "router.ts"),
@@ -179,11 +186,12 @@ export async function inspectDeliveryReadiness(frontendRoot) {
   }
   if (
     !readme.includes("V1–V7.4 已全部完成")
-    || !readme.includes("v1.0.0")
+    || !readme.includes(verificationBaseline.targetRelease)
     || !readme.includes("Apache-2.0")
   ) {
     violations.push(
-      "frontend/README.md does not state V7.4 completion and the Apache-2.0 v1.0.0 release boundary",
+      "frontend/README.md does not state V7.4 completion and the "
+        + `Apache-2.0 ${verificationBaseline.targetRelease} release boundary`,
     );
   }
 
