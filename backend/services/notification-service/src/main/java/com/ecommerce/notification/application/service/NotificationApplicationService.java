@@ -16,6 +16,7 @@ import com.ecommerce.platform.common.api.KeysetCursor;
 import com.ecommerce.platform.common.idempotency.PayloadFingerprint;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -128,21 +129,19 @@ public class NotificationApplicationService {
         repository.markRead(notificationId, userId, repository.currentTime());
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public DeliveryRetryView retryEmailDelivery(
             long operatorId,
             long deliveryId,
             String commandId,
             String reason) {
-        DeliveryRetryAudit existing = repository.findRetryAudit(commandId);
-        if (existing != null) {
-            return replayRetry(existing, operatorId, deliveryId, reason);
-        }
+        // The delivery row owns retry serialization. Audit replay is checked only after
+        // a waiting transaction has acquired that lock and can see the winner's commit.
         DeliveryState delivery = repository.findDeliveryForUpdate(deliveryId);
         if (delivery == null) {
             throw new NotificationException(NotificationError.DELIVERY_NOT_FOUND);
         }
-        existing = repository.findRetryAudit(commandId);
+        DeliveryRetryAudit existing = repository.findRetryAudit(commandId);
         if (existing != null) {
             return replayRetry(existing, operatorId, deliveryId, reason);
         }
