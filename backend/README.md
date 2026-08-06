@@ -134,20 +134,9 @@ MySQL 降级、三次有限重试、`NEEDS_ATTENTION`、幂等审计恢复、蓝
 `MISSING/STALE/ORPHAN` 对账修复和下架隔离。M8.12 使用真实 MySQL、Nacos、
 RocketMQ、Gateway 和单个 Analytics JVM 验证重复事件收敛、Broker 保留与恢复、
 旧事件收入覆盖边界、三类投影偏差、幂等审计重建、专用 Prometheus 身份和最终
-零残留。各入口脚本都在结束时清理各自业务行、
-失败/审计台账、对象/Redis Key、按需容器、索引、schema、授权、端口和进程。证据分别见
-`../docs/56-m8-chat-reliable-persistence.md`、
-`../docs/57-m8-chat-realtime-routing.md`、
-`../docs/58-m8-chat-attachment-storage-and-authorization.md`、
-`../docs/59-m8-chat-browser-websocket-ticket.md` 与
-`../docs/60-m8-chat-consumer-failure-governance.md`、
-`../docs/61-m8-chat-frontend-workspace.md`、
-`../docs/62-m8-chat-malware-scan-and-quarantine.md` 与
-`../docs/63-m8-notification-reliable-delivery.md`、以及
-`../docs/64-m8-fulfillment-geo.md`、
-`../docs/65-m8-product-reviews.md`、
-`../docs/66-m8-catalog-search.md` 和
-`../docs/67-m8-operational-analytics.md`。
+零残留。各入口脚本都在结束时清理各自业务行、失败/审计台账、对象/Redis Key、按需
+容器、索引、schema、授权、端口和进程。跨能力终局证据统一见
+[`M0-M8 三层工程验收`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
 ## M7 scale-data and query tools
 
@@ -170,7 +159,8 @@ RocketMQ、Gateway 和单个 Analytics JVM 验证重复事件收敛、Broker 保
 ./tools/prepare-m7-scale-data.ps1 -Action Remove -Scale Small
 ```
 
-正式结果和当前边界见 `../docs/49-m7-scale-data-and-cursor-pagination.md`。
+正式结果和当前边界见
+[`M0-M8 三层工程验收`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
 Catalog 真实读副本使用独立互斥 Profile，验证暂停复制、读己之写、恢复追平、
 副本停机和主库回退：
@@ -182,8 +172,8 @@ Catalog 真实读副本使用独立互斥 Profile，验证暂停复制、读己�
 脚本会执行机器级网络预检，只启动一个 512 MiB MySQL 副本和一个 Catalog
 JVM，专项关闭 Catalog 缓存，并在结束时移除容器、临时复制账号、探针和
 应用进程。当前主库 GTID 关闭，因此本机证据使用一致快照加 binlog 文件/位置，
-不把它描述为生产自动故障转移。完整结果见
-`../docs/51-m7-catalog-read-replica.md`。
+不把它描述为生产自动故障转移。完整结果收敛在
+[`M0-M8 三层工程验收`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
 Trade 两分片同样使用独立互斥 Profile。脚本创建两个临时 Trade schema，
 逐片执行 Flyway，按 `user_id % 2` 验证奇偶用户聚合，并跑通支付、履约、
@@ -196,7 +186,7 @@ Trade 两分片同样使用独立互斥 Profile。脚本创建两个临时 Trade
 
 脚本采用两阶段启动，最多同时运行五个业务 JVM。它证明当前两片机制可行，
 不代表历史归档、在线迁移和主动扩容已经完成。完整证据见
-`../docs/52-m7-trade-sharding.md`。
+[`M0-M8 三层工程验收`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
 历史归档工具不启动业务 JVM。它在两个真实 MySQL 上分别创建随机源/归档 schema，
 执行 Trade V1–V14，验证提交后中断续跑、显式高水位刷新、重复执行、11 表指纹、
@@ -222,7 +212,7 @@ Trade 两分片同样使用独立互斥 Profile。脚本创建两个临时 Trade
 
 `Promote` 只写切读门禁，不删除源事实；需要撤销时执行 `Rollback`。当前归档工具
 本身不等价于 `user_id % 2 -> user_id % 4` 的主动重分片。完整证据见
-`../docs/53-m7-trade-history-archive-migration.md`。
+[`M0-M8 三层工程验收`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
 主动重分片使用同一个按需第二 MySQL Profile，但在两个物理 MySQL 上创建四个随机
 目标 schema。验证器覆盖 NULL 消费所有者门禁、提交后中断、在线变化、最终写栅栏、
@@ -235,7 +225,7 @@ Trade 两分片同样使用独立互斥 Profile。脚本创建两个临时 Trade
 应用 Profile `application-m7-trade-resharding.yml` 只接受连续命名的四片配置。
 初始复制期间源可以继续写，但最终追平需要短维护写栅栏；没有反向复制，目标产生
 新写后不能直接回滚。完整证据见
-`../docs/54-m7-trade-active-resharding.md`。
+[`M0-M8 三层工程验收`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
 ## M6 flash-sale verification
 
@@ -251,7 +241,9 @@ Trade 两分片同样使用独立互斥 Profile。脚本创建两个临时 Trade
 ./tools/verify-m6-flash-sale-queue.ps1 -EnableMqFaultInjection
 ```
 
-两个脚本都使用独立运行命名空间并在 `finally` 中清理本次 MySQL、Redis、Topic、消费组和应用进程。最终证据分别见 `docs/46-m6-flash-sale-admission-baseline.md` 与 `docs/47-m6-flash-sale-queue-and-graduation.md`。
+两个脚本都使用独立运行命名空间并在 `finally` 中清理本次 MySQL、Redis、Topic、
+消费组和应用进程。最终证据见
+[`M0-M8 三层工程验收`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
 ## M5 capacity tools
 
@@ -276,8 +268,8 @@ The runner records throughput, error rate, status distribution, P50/P95/P99,
 response-contract failures, and per-scenario details. A short empty-Catalog run
 is only a tool smoke test; formal M5 conclusions require fixed data, JVM and
 container resources, repeated load levels, Prometheus/GC/connection/lock/MQ
-evidence, and business correctness assertions. See
-`docs/41-m5-capacity-methodology-and-first-baseline.md`.
+evidence, and business correctness assertions. The current method is defined in
+[`reference-baseline-and-pro-boundary.md`](../docs/reference-baseline-and-pro-boundary.md).
 
 Prepare or verify the deterministic M5 data set, then run the fixed-resource
 Catalog/Trade query curve:
@@ -302,7 +294,8 @@ deterministic data only after all M5 comparisons that depend on it:
 ```
 
 The first formal comparison and the Trade order-list pagination/N+1 fix are
-documented in `docs/42-m5-query-capacity-and-order-pagination.md`.
+included in the
+[`M0-M8 three-layer acceptance`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md).
 
 ## M4 authoritative checkout verification
 
@@ -331,7 +324,8 @@ This option only delays cleanup and does not change the verified business path.
 The disposable browser password and request key are written to a short-lived
 fixture file under `.run`; stdout only reports the fixture path and non-secret
 identity summary, and `finally` removes the file.
-See `docs/36-m4-authoritative-checkout-and-order-recovery.md`.
+See the
+[`M0-M8 three-layer acceptance`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md).
 
 ## M4 payment and fulfillment recovery verification
 
@@ -356,8 +350,8 @@ and Trade convergence. The Fulfillment script drops a real HTTP 200
 confirm-receipt response, then proves `SIGNED` query recovery, append-only
 history/logistics, cross-account isolation, and Trade `COMPLETED`. Both scripts
 write ignored evidence under `backend/.run` and clean only their own fixtures.
-See `docs/38-m4-payment-and-unknown-result-recovery.md` and
-`docs/39-m4-fulfillment-and-logistics-timeline.md`.
+See the
+[`M0-M8 three-layer acceptance`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md).
 
 ## Identity API
 
@@ -423,7 +417,8 @@ Inventory also runs an owner-domain, read-only reconciliation scan across balanc
 active reservations, immutable movements, return records, and Outbox facts. Issues
 are persisted as `OPEN`/`RESOLVED`; only `ADMIN` can query them under
 `/api/v1/inventory/admin/reconciliation/issues`. The scan reports inconsistencies
-but never changes stock. See `docs/21-inventory-reconciliation.md`.
+but never changes stock. See
+[`21-inventory-reconciliation.md`](../docs/21-inventory-reconciliation.md).
 
 ## Trade API
 
@@ -595,13 +590,14 @@ Payment also runs an owner-domain reconciliation scan for payment/refund status,
 channel transactions, success Outbox facts, and original-payment consistency.
 Findings are persisted as `OPEN`/`RESOLVED`, exposed read-only to `ADMIN`, and
 reported through a bounded Prometheus gauge. The scan never repairs financial
-facts automatically. See `docs/20-payment-reconciliation.md`.
+facts automatically. See
+[`20-payment-reconciliation.md`](../docs/20-payment-reconciliation.md).
 
 The same bounded issue metric covers Inventory, Trade, and Fulfillment
 reconciliation. Prometheus alerts by the `service` label, so financial, stock,
 order/after-sale, and fulfillment/return inconsistencies retain their domain
 owner without a central component reading or updating multiple schemas. See
-`docs/25-trade-fulfillment-reconciliation.md`.
+[`25-trade-fulfillment-reconciliation.md`](../docs/25-trade-fulfillment-reconciliation.md).
 
 ## Synchronous call resilience
 
@@ -616,7 +612,8 @@ row. An unavailable Marketing fact leaves the order in recoverable
 `PENDING_STOCK` and prevents inventory reservation. Native Resilience4j metrics
 plus a bounded `ecommerce.http.client.resilience.rejections` counter drive the
 dashboard and alerts. This is not a claim that every synchronous call has been
-governed. See `docs/22-synchronous-call-resilience.md`.
+governed. See
+[`22-synchronous-call-resilience.md`](../docs/22-synchronous-call-resilience.md).
 
 Trade order recovery runs on a dedicated, single-threaded
 `tradeOrderRecoveryScheduler`; the existing default single-thread scheduler
@@ -625,7 +622,7 @@ concurrency. Actuator exposes native executor active/queued/pool metrics plus
 bounded task execution, duration, running, and completion-age metrics. The live
 Marketing outage test proves a second recovery attempt in about 6.33 seconds
 while all long-poll consumers remain enabled. See
-`docs/23-trade-scheduling-isolation.md`.
+[`23-trade-scheduling-isolation.md`](../docs/23-trade-scheduling-isolation.md).
 
 ## Trade Outbox multi-instance verification
 
@@ -648,7 +645,8 @@ and InnoDB deadlock logs, and expired-owner recovery. Evidence is written to
 `.run/trade-outbox-multi-instance.json`. The latest 2026-07-20 result was 212.491,
 218.639, and 195.832 events/s respectively, so two instances are the current
 single-machine performance default; three instances remain the correctness and
-failure-test scale. See `docs/27-m3-trade-outbox-multi-instance.md`.
+failure-test scale. See the
+[`v1.0.2 engineering acceptance`](../docs/evidence/v1.0.2-engineering-acceptance-20260804.md).
 
 ## Trade container multi-instance verification
 
@@ -676,8 +674,8 @@ budgets, and stops one instance gracefully. The formal result converged in
 and zero order violations. Evidence is written to
 `.run/trade-container-multi-instance.json`. For a smaller connectivity smoke such
 as 100 events, add `-AllowPartialPublisherParticipation`; a small batch may be
-claimed before every publisher receives work. See
-`docs/28-m3-trade-container-multi-instance.md`.
+claimed before every publisher receives work. See the
+[`v1.0.2 engineering acceptance`](../docs/evidence/v1.0.2-engineering-acceptance-20260804.md).
 
 ## Trade consumer multi-instance and process-termination verification
 
@@ -729,8 +727,8 @@ failure cannot enter Nacos. The formal run completed 1439 continuous Gateway
 requests with zero HTTP or business failures and zero unexpected releases.
 The disposable release network gives each version a unique service-discovery
 IP and is removed with the experiment. Evidence is written to
-`.run/gateway-rolling-upgrade.json`. See
-`docs/29-m3-consumer-fault-and-release-governance.md`.
+`.run/gateway-rolling-upgrade.json`; the final cross-stage conclusion is in the
+[`M0-M8 three-layer acceptance`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md).
 
 ## Real foundation smoke test
 
@@ -751,7 +749,8 @@ persist the payment and refund callback W3C carriers through the Payment Outbox,
 propagate them through RocketMQ, and query Tempo for two traces containing both
 `payment-service` and `trade-service` plus the matching producer/consumer spans. Combine it with
 `-EnableObservability` for the complete M2 observability proof. Export remains
-disabled by default. See `docs/24-distributed-tracing.md`.
+disabled by default. See
+[`24-distributed-tracing.md`](../docs/24-distributed-tracing.md).
 
 Add `-EnableSynchronousResilienceFaultInjection` to stop Trade after a real
 payable order exists, open the Payment circuit with bounded failures, verify a
@@ -769,13 +768,13 @@ scenarios, plus 100-way same-order-key, same-payment-callback, and
 same-refund-callback replay. The command writes ignored evidence to
 `.run/capacity-baseline.json`, polls MySQL to the final state, and validates stock
 against the number of reservations that are still active when the asynchronous
-chain converges. The 2026-07-18 baseline and its Outbox tail-latency finding are
-documented in `docs/26-m2-graduation-and-capacity-admission.md`.
+chain converges. The baseline and its Outbox tail-latency finding are included in
+the [`M0-M8 three-layer acceptance`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md).
 
-The smoke script first calls `D:\DevTools\Network\check-dev-network.ps1` and
-never starts missing containers automatically. It does not stop Redis by
-default. Run `./run-foundation-smoke.ps1 -EnableRedisFaultInjection` only when
-an intentional Redis outage test is desired; `-SkipNetworkPreflight` is for an
+The smoke script first runs its repository-local network preflight and never
+starts missing containers automatically. It does not stop Redis by default.
+Run `./run-foundation-smoke.ps1 -EnableRedisFaultInjection` only when an
+intentional Redis outage test is desired; `-SkipNetworkPreflight` is for an
 equivalent manual network check, not a normal shortcut.
 
 The script loads ignored local credentials from `deploy/docker/.env`, packages

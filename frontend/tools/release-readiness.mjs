@@ -7,6 +7,28 @@ function requireText(source, expected, label, violations) {
   }
 }
 
+function readReleaseDate(changelog, releaseVersion, violations) {
+  const escapedVersion = releaseVersion.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const heading = new RegExp(
+    `^## \\[${escapedVersion}\\] - (\\d{4}-\\d{2}-\\d{2})$`,
+    "mu",
+  );
+  const match = changelog.match(heading);
+  if (!match) {
+    violations.push(
+      `CHANGELOG release heading is missing for version ${releaseVersion}`,
+    );
+    return null;
+  }
+  const releaseDate = match[1];
+  const parsed = new Date(`${releaseDate}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== releaseDate) {
+    violations.push(`CHANGELOG release date is invalid: ${releaseDate}`);
+    return null;
+  }
+  return releaseDate;
+}
+
 export async function inspectReleaseReadiness(frontendRoot) {
   const violations = [];
   const repositoryRoot = path.resolve(frontendRoot, "..");
@@ -87,13 +109,13 @@ export async function inspectReleaseReadiness(frontendRoot) {
     requireText(readme, marker, "Root README release entry", violations);
   }
   for (const marker of [
-    `[${releaseVersion}] - ${verificationBaseline.verifiedOn}`,
     "Apache License 2.0",
     "tsconfig.base.json",
     "--no-build --pull never",
   ]) {
-    requireText(changelog, marker, "CHANGELOG release candidate", violations);
+    requireText(changelog, marker, "CHANGELOG release entry", violations);
   }
+  const releaseDate = readReleaseDate(changelog, releaseVersion, violations);
   for (const marker of [
     "GitHub Private Vulnerability Reporting",
     "不要在公开 Issue",
@@ -149,6 +171,7 @@ export async function inspectReleaseReadiness(frontendRoot) {
     violations,
     licensePresent: true,
     licenseId: "Apache-2.0",
+    releaseDate,
     screenshots,
     paths,
   };

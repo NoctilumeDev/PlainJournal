@@ -2,7 +2,7 @@
 
 ## 1. 当前闭环
 
-`identity-service` 已形成第一条完整业务切片：
+`identity-service` 持有账号、地址、令牌、角色和登录风控事实：
 
 ```text
 注册 -> BCrypt 密码落库 -> 默认 CUSTOMER 角色
@@ -94,15 +94,17 @@ Spring Security 将 JWT 的 `roles` 声明映射为 `ROLE_*` authority。新增�
 执行命令：
 
 ```powershell
-cd C:\Users\lenovo\Desktop\PlainJournal\backend
-mvn clean verify
+cd backend
+./mvnw.cmd clean verify
 ./run-foundation-smoke.ps1
 ```
 
-## 6. 明确边界与下一步
+## 6. 当前安全边界
 
 - Access Token 是短期自包含令牌，注销不会立即使已签发令牌失效，最长保留 15 分钟。需要即时冻结时，再增加 Redis 账号版本或黑名单校验，并保留数据库降级策略。
-- 当前 HS256 适合首个服务切片。业务服务增多后改用非对称密钥或标准授权服务器，使业务服务只持有公钥，不能签发令牌。
+- 当前 HS256 是本地参考环境的明确边界。公网或多团队部署应改用非对称密钥或标准
+  授权服务器，使业务服务只持有验证公钥，不能签发令牌。
 - Redis 登录失败计数、邮箱临时锁定和网关限流已经实现，具体策略见《Redis 流量防护与降级》。
-- 员工账号不能开放注册，后续由有权限的管理员创建并审计角色变更。
+- 员工账号禁止公开自助注册。当前演示账号通过受控迁移和环境引导创建；管理员自助
+  开户不是当前仓库能力，真实部署必须使用独立的受控开通和角色审计流程。
 - 下单不会持有 identity 数据库事务。trade 通过受保护内部 API 获取一次地址并固化快照，不跨 schema 查询或建立外键。

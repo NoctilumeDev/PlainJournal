@@ -54,8 +54,8 @@ Key 包含环境命名空间，且不写入邮箱和 IP 明文。所有计数与
 ## 6. 验证
 
 ```powershell
-cd C:\Users\lenovo\Desktop\PlainJournal\backend
-mvn clean verify
+cd backend
+./mvnw.cmd clean verify
 ./run-foundation-smoke.ps1
 ```
 
@@ -67,4 +67,5 @@ M6 活动准入使用不同的失败策略：Gateway Redis 故障仍可使用有
 ./tools/verify-m6-flash-sale-admission.ps1 -EnableRedisFaultInjection
 ```
 
-正式结果见 [M6 第一批：秒杀活动准入基线](46-m6-flash-sale-admission-baseline.md)。
+最终运行结论见
+[M0-M8 三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。

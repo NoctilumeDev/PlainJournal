@@ -66,7 +66,8 @@
 
 ## 3. 标识与业务编号
 
-- 数据库主键使用全局唯一 `BIGINT`，首期可采用 MyBatis-Plus `ASSIGN_ID`。
+- 数据库主键使用全局唯一 `BIGINT`；普通领域可采用 MyBatis-Plus `ASSIGN_ID`，
+  Trade 代表链路使用已验证的分布式 ID 节点租约方案。
 - 订单号、支付单号、退款单号、预占号和运单号是独立业务编号，并建立唯一索引。
 - 第三方回调同时保存平台业务编号与渠道编号，渠道编号必须唯一。
 - 事件 ID、请求幂等键和客户端消息 ID 使用 UUID/ULID 字符串，不与展示编号混用。
@@ -119,7 +120,7 @@ OpenSearch 由 Catalog 管理，但不属于最终事实数据库：
 | `product-media` | catalog | 对外展示通过签名 URL 或受控 CDN |
 | `user-avatars` | identity | 上传者和后台审核可写 |
 | `chat-attachments` | chat | 私有 Bucket；新对象进入 `quarantine/chat/{environment}/...`，扫描通过后才能绑定；下载前重新校验会话成员和对象完整性 |
-| `review-media` | catalog | 规划项，当前 M8.10 尚未创建；实现后必须按内容权限读取 |
+| `review-media` | catalog | 当前未实现且不在冻结范围；若 Pro 或后续独立版本引入，必须按内容权限读取 |
 | `logistics-proofs` | fulfillment | 顾客仅可查看自己的订单证明 |
 | `after-sale-evidence` | trade/售后子域 | 顾客与有权限员工可访问 |
 

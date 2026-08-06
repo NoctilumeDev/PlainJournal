@@ -11,7 +11,7 @@ const frontendRoot = path.resolve(
   "..",
 );
 
-test("keeps GitHub release candidate materials complete", async () => {
+test("keeps GitHub release materials complete", async () => {
   const result = await inspectReleaseReadiness(frontendRoot);
   const baseline = JSON.parse(
     await fs.readFile(result.paths.verificationBaseline, "utf8"),
@@ -22,6 +22,7 @@ test("keeps GitHub release candidate materials complete", async () => {
     path.basename(result.paths.releaseNotes),
     `${baseline.targetRelease}.md`,
   );
+  assert.match(result.releaseDate, /^\d{4}-\d{2}-\d{2}$/u);
 });
 
 test("keeps the Apache-2.0 license explicit and complete", async () => {

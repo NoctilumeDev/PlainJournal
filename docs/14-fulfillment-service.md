@@ -1,6 +1,9 @@
 # 履约与物流服务
 
-`fulfillment-service` 端口为 `18106`，数据独占 `ecom_fulfillment` schema。当前切片实现支付后自动建履约单、仓库拣货/打包/发货、追加式物流轨迹、MySQL 最新位置与空间附近查询、可重建 Redis GEO 投影、签收、异常登记，以及整单退货的寄回、收货和验收。多包裹、真实承运商回调验签、实时 GPS、外部地图与签收证明仍留在后续切片。
+`fulfillment-service` 端口为 `18106`，数据独占 `ecom_fulfillment` schema。当前实现
+支付后自动建履约单、仓库拣货/打包/发货、追加式物流轨迹、MySQL 最新位置与空间附近
+查询、可重建 Redis GEO 投影、签收、异常登记，以及整单退货的寄回、收货和验收。
+多包裹、真实承运商回调验签、实时 GPS、外部地图与签收证明不在当前仓库范围。
 
 ## 1. 数据边界
 
@@ -74,6 +77,11 @@ CREATED -> PICKING -> PACKED -> SHIPPED -> IN_TRANSIT -> DELIVERING -> SIGNED
 - 重复售后批准不会创建第二张退货单；重复寄回、收货或验收命令不会追加重复副作用。
 - 无效版本和持续失败的售后消息会进入 `consumer_failure`，不永久阻塞消费组。
 - 所有者域对账覆盖履约历史、状态时间戳、生命周期事件、签收轨迹，以及退货历史、时间戳、商品行金额和生命周期事件；问题只进入本地 `OPEN/RESOLVED` 台账和指标，不自动修复履约事实。详见 [Trade 与 Fulfillment 所有者域对账](25-trade-fulfillment-reconciliation.md)。
-- M4 顾客端已接通履约时间线和确认收货。真实故障代理在 Fulfillment 上游返回 HTTP 200 后断开响应，页面查询恢复 `SIGNED`，Trade 经 `ShipmentSigned` 最终收敛为 `COMPLETED`；跨账户查询返回 404。详见 [M4 履约与物流时间线](39-m4-fulfillment-and-logistics-timeline.md)。
+- M4 顾客端已接通履约时间线和确认收货。真实故障代理在 Fulfillment 上游返回
+  HTTP 200 后断开响应，页面查询恢复 `SIGNED`，Trade 经 `ShipmentSigned` 最终收敛
+  为 `COMPLETED`；跨账户查询返回 404。
 - `OrderPaid` 地址事件使用独立内部载荷。消费者同时接受正整数 JSON number 和历史十进制字符串 ID；解析坏载荷进入 `NEEDS_ATTENTION` 并 ACK，业务异常有限重试。
-- M8.9 真实 MySQL/Redis 验证覆盖 V8/V9 Flyway、`POINT SRID 4326`、空间索引、南京/上海/乱序苏州轨迹、MySQL 附近查询、Redis 删除和暂停时回退、读修复、管理员重建、顾客跨账户 404 及最终业务夹具/Redis Key/18106/JVM 零残留。详见 [M8 第九批：Fulfillment 物流 GEO 与可重建 Redis 投影](64-m8-fulfillment-geo.md)。
+- M8.9 真实 MySQL/Redis 验证覆盖 V8/V9 Flyway、`POINT SRID 4326`、空间索引、
+  南京/上海/乱序苏州轨迹、MySQL 附近查询、Redis 删除和暂停时回退、读修复、管理员
+  重建、顾客跨账户 404 及最终业务夹具/Redis Key/18106/JVM 零残留。最终结论见
+  [M0-M8 三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。

@@ -29,6 +29,7 @@ jobs:
         run: |
           node --test tools/*.test.mjs
           node tools/check-backend-boundaries.mjs
+          node tools/check-documentation-structure.mjs
           node tools/check-markdown-links.mjs
           node tools/check-release-version.mjs
           node tools/render-verification-summary.mjs --check

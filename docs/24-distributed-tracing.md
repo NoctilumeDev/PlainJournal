@@ -1,8 +1,8 @@
 # Payment 到 Trade 分布式追踪代表链路
 
-## 1. 本批边界
+## 1. 当前边界
 
-本批完成两条能跨事务和消息异步边界保存因果关系的代表链路：
+当前实现两条能跨事务和消息异步边界保存因果关系的代表链路：
 
 ```text
 Payment 支付回调 HTTP server span
@@ -18,7 +18,8 @@ Payment 退款回调 HTTP server span
   -> Trade CONSUMER span（完成售后和 ACK 同处该 span）
 ```
 
-这证明支付与退款两个关键 HTTP、数据库持久化异步边界和 RocketMQ 可以归入各自同一条 trace，不代表八个应用所有 HTTP、消息和补偿任务已经完成追踪。
+这证明支付与退款两个关键 HTTP、数据库持久化异步边界和 RocketMQ 可以归入各自
+同一条 trace，不代表所有服务的 HTTP、消息和补偿任务都已经完成端到端追踪。
 
 ## 2. 单一主线
 
@@ -43,7 +44,8 @@ trace 只用于定位，不参与支付、订单或消息状态裁决。Tempo �
 
 Payment 与 Trade 的自定义 `RestClient` 仍保留连接/读取超时，但通过 Spring Boot 的 `RestClientBuilderConfigurer` 构建，使 Micrometer observation、负载均衡和现有 Resilience4j 包装可以同时工作。业务代码不手工拼接 HTTP trace header。
 
-本批真实证据聚焦 Payment 回调到 Trade 消费；其余同步客户端只完成基础自动观测接入，尚未逐条宣告端到端完成。
+真实证据聚焦 Payment 回调到 Trade 消费；其余同步客户端只完成基础自动观测接入，
+没有逐条宣告端到端完成。
 
 ## 5. 属性与安全边界
 
@@ -59,24 +61,29 @@ Payment 与 Trade 的自定义 `RestClient` 仍保留连接/读取超时，但�
 - Trade 业务异常时不 ACK，错误继续向原消费循环传播。
 - 带已知 W3C 父上下文的退款回调把 `RefundSucceeded` carrier 持久化，Trade 恢复同 trace 并在完成售后的 CONSUMER span 内 ACK。
 
-2026-07-18 全量 `mvn clean verify` 共 130 个测试，0 失败、0 错误、0 跳过。
+当前自动化测试数量和覆盖率统一见[验证摘要](verification-summary.md)。
 
 真实验证命令：
 
 ```powershell
-cd C:\Users\lenovo\Desktop\PlainJournal\backend
+cd backend
 .\run-foundation-smoke.ps1 -EnableDistributedTracing -EnableObservability
 ```
 
-脚本先遵守本机网络预检，再按需启动 Tempo 和观测栈，执行完整八服务正向/逆向闭环，分别从 Payment 的支付与退款 Outbox 读取本次 `traceId`，通过 Tempo `/api/traces/{traceId}` 验证：
+脚本先遵守本机网络预检，再按需启动 Tempo 和观测栈，执行基础交易正向/逆向闭环，
+分别从 Payment 的支付与退款 Outbox 读取本次 `traceId`，通过 Tempo
+`/api/traces/{traceId}` 验证：
 
 - trace 同时包含 `payment-service` 和 `trade-service`；
 - 包含 `rocketmq publish PaymentSucceeded`；
 - 包含 `rocketmq consume PaymentSucceeded`。
 - 退款 trace 包含 `rocketmq publish RefundSucceeded` 与 `rocketmq consume RefundSucceeded`。
 
-验证通过后脚本只停止本次启动的 Java 进程和观测容器，保留原先六个核心中间件与 D 盘数据。
+验证通过后脚本只停止本次启动的 Java 进程和观测容器，保留原先运行的核心中间件与
+仓库外数据卷。
 
-## 7. 后续最小切片
+## 7. 当前扩展规则
 
-继续按风险和恢复价值补齐，而不是一次性给全部方法加 span：M3 优先覆盖任务抢占/租约、关键履约事件和 Gateway→代表同步调用的完整入口 trace。每条新链路都必须包含自动传播测试、故障语义检查和真实 Tempo 查询证据。
+继续按风险和恢复价值补齐，而不是一次性给全部方法加 span。每条新增高风险链路都
+必须包含自动传播测试、故障语义检查和真实 Tempo 查询证据；追踪失败不得改变业务
+事务、Outbox 或消息 ACK 语义。

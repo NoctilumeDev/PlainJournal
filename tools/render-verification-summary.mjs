@@ -9,8 +9,8 @@ export function renderVerificationSummary(baseline) {
   return `# 当前验证摘要
 
 > 本文件由 \`.github/verification-baseline.json\` 通过
-> \`node tools/render-verification-summary.mjs\` 生成。历史阶段报告保留当时数字，
-> 当前入口只引用本摘要。
+> \`node tools/render-verification-summary.mjs\` 生成。逐批过程由 Git 历史追溯，
+> 当前入口只引用本摘要和精选终局验收快照。
 
 ## 发布坐标
 

@@ -61,11 +61,14 @@ Grafana 与 Payment 共用所有者域问题面板；任一服务未关闭问题
 - Outbox 仍为 `PENDING` 时由既有发布器重试，不直接写 `PUBLISHED`。
 - 需要恢复时必须先定位原命令、消费或迁移问题，通过领域拥有的幂等入口处理。
 - 事实恢复后由下一轮扫描关闭问题；`RESOLVED` 历史保留用于审计。
-- 未来中央工作台只能聚合只读结果并调用领域 API，不拥有 `ecom_inventory` 写权限。
+- 当前中央治理工作区只聚合只读结果并调用领域 API，不拥有 `ecom_inventory` 写权限。
 
 ## 6. 验证证据
 
 - 2 个专用集成测试覆盖健康零误报、余额错位、缺失退货事件、重复扫描、只读不修库存、权限、指标和恢复关闭。
-- Inventory 模块 17 个测试通过；最近一次全量 `mvn clean verify` 共 130 个测试，0 失败、0 错误、0 跳过。
-- 八服务真实中间件冒烟在 MySQL/Flyway V4 中临时把已发布 `ReturnStocked` 改为故障类型，真实定时任务产生 `RETURN_EVENT_MISSING` 和非零指标；恢复事件类型后问题自动进入 `RESOLVED`。
-- 同一轮真实验证当时通过 Prometheus 9 条规则、四个实时采集目标、Alertmanager 路由和 Grafana 看板，并在结束后清理测试记录、观测容器与八个 Java 进程；后续同步韧性与调度隔离批次已扩为四组 12 条。
+- 真实中间件冒烟在 MySQL/Flyway 中临时把已发布 `ReturnStocked` 改为故障类型，
+  真实定时任务产生 `RETURN_EVENT_MISSING` 和非零指标；恢复事件类型后问题自动进入
+  `RESOLVED`。
+- 同一轮验证确认 Prometheus、Alertmanager 和 Grafana 可观察问题生命周期，并在
+  结束后清理测试记录、观测容器与本轮 Java 进程。
+- 当前全仓测试与覆盖率数字见[验证摘要](verification-summary.md)。

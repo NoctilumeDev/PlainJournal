@@ -75,8 +75,14 @@ POST /api/v1/payment/admin/refunds/{refundNo}/retry-dispatch
 
 Payment 在同一本地事务中锁定退款、校验状态、重置派发并向 `refund_dispatch_retry_audit` 追加接受/拒绝审计。同一命令键重复提交不会再次产生副作用，不同内容复用同一键会返回冲突。审计查询和完整边界见 [领域授权补偿与审计](19-compensation-governance.md)。
 
-## 6. 已验证与未完成
+## 6. 已验证与当前边界
 
 自动测试已经覆盖：整单价格分摊快照、重复申请、审核权限、退货事件幂等、库存回补、退款金额校验、失败后成功、晚到失败、渠道传输超时重试、毒丸隔离、历史订单行号升级和售后申请期限。
 
-真实中间件冒烟必须遵循 [本地开发网络基线](07-local-development-network.md)，先运行网络诊断；脚本默认不停止 Redis，只有显式传入 `-EnableRedisFaultInjection` 才执行 Redis 故障注入。退款补偿验证会在真实 MySQL 退款事实上注入可恢复状态，经 Gateway 执行管理员命令，等待定时派发并核对审计。部分退款、退款失败对账、财务账本和跨领域只读补偿工作台属于后续里程碑。
+真实中间件冒烟必须遵循 [本地开发网络基线](07-local-development-network.md)，先运行
+网络诊断；脚本默认不停止 Redis，只有显式传入 `-EnableRedisFaultInjection` 才执行
+Redis 故障注入。退款补偿验证会在真实 MySQL 退款事实上注入可恢复状态，经 Gateway
+执行管理员命令，等待定时派发并核对审计。
+
+退款失败治理、Payment/Inventory/Trade/Fulfillment 四域只读对账和管理端治理工作区
+已经完成。部分退款、真实渠道清结算、平台账本和多商户逆向分账不在当前仓库范围。

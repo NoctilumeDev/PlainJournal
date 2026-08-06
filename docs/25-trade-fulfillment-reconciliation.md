@@ -50,7 +50,7 @@ GET /api/v1/fulfillment/admin/reconciliation/issues?status=OPEN&limit=50
 
 自动测试分别覆盖正常无问题、缺失事实打开问题、重复扫描不重复建档、恢复后关闭问题，以及非管理员越权拒绝。
 
-真实八服务冒烟在完整正向/逆向交易完成后：
+真实基础交易冒烟在完整正向/逆向交易完成后：
 
 1. 删除本轮 Trade 的 `OrderCompleted` Outbox 事实，等待 `ORDER_STATE_EVENT_MISSING` 进入 `OPEN` 并核对 gauge；恢复原事实后等待同一问题转为 `RESOLVED`。
 2. 删除本轮 Fulfillment 的 `ShipmentSigned` Outbox 事实，等待 `FULFILLMENT_STATE_EVENT_MISSING` 进入 `OPEN` 并核对 gauge；恢复原事实后等待同一问题转为 `RESOLVED`。

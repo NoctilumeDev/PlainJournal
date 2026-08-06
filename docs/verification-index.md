@@ -55,7 +55,9 @@ cd backend
 - `backend/tools/verify-m8-analytics.ps1`
 
 Full Lab 必须按文档 Profile 串行运行，测试前确认本机端口、内存、Docker Profile 和
-网络代理状态。它不是 GitHub Actions 的常驻任务。
+网络代理状态。它不是 GitHub Actions 的常驻任务。单变量、组合批次、随机顺序、
+资源停止线和并发数字的统一解释见
+[参考基线与 Pro 边界](reference-baseline-and-pro-boundary.md)。
 
 ## 公共 CI
 
@@ -67,6 +69,7 @@ GitHub Actions 公开运行：
 - CodeQL、Dependency Review、pnpm audit、Dependabot；
 - 标签 Release 的 ZIP、SHA-256、清单和 SPDX SBOM。
 
-当前数字见 [验证摘要](verification-summary.md)。真实专项证据的历史报告集中在
-`docs/26` 至 `docs/69`，前端与发布证据集中在 `docs/70` 至 `docs/105`。
-
+当前数字见[验证摘要](verification-summary.md)，终局真实证据见
+[验收证据](evidence/README.md)，当前项目边界由
+[参考基线与 Pro 边界](reference-baseline-and-pro-boundary.md)统一说明。逐批实验记录
+通过 Git 历史追溯，不再作为主分支文档目录。

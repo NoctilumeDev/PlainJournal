@@ -11,9 +11,11 @@ PlainJournal 是一个单经营主体、自营 B2C 分布式电商项目。它�
 JDK 17 和 Vue 3，围绕数据所有权、交易一致性、结果未知恢复、多实例竞争和故障治理
 建立可运行实现，而不是用服务数量代替工程证据。
 
-当前仓库冻结为 `v1.0.x`：保留完整业务闭环，只修复明确缺陷和工程边界；多商户、
-平台分账、Go 异构服务和新的大型业务模块不再加入。前端后续可在 `v1.1.0` 单独进行
-视觉重构，但不能改变所有者事实和交易状态机。
+当前仓库是 16GB Windows 单机约束下已经闭环的 M0-M8 参考基线，不是等待平台化补齐
+的 Basic 版。`v1.0.x` 只修复明确缺陷和工程边界；前端后续可单独进行视觉重构，但
+不能改变所有者事实和交易状态机。多商户、平台账本、结算和 Java/Go 异构协作进入
+独立仓库 [PlainJournalPro](https://github.com/NoctilumeDev/PlainJournalPro)，完整
+边界见[参考基线与 Pro 边界](docs/reference-baseline-and-pro-boundary.md)。
 
 ## 成品预览
 
@@ -135,7 +137,7 @@ PlainJournal/
 ├── backend/              # 11 个 Spring Boot 应用与真实专项脚本
 ├── frontend/             # Vue 3 顾客端、管理端、共享包和 Playwright
 ├── deploy/docker/        # 核心与按需中间件 Profile
-├── docs/                 # 架构、历史、验证和阶段证据
+├── docs/                 # 当前规范、验证入口与精选验收证据
 ├── online-preview/       # GitHub Pages 公开预览源文件
 ├── tools/                # 仓库、架构、文档和发布门禁
 └── .github/              # Actions、治理模板和验证基线
@@ -146,6 +148,7 @@ PlainJournal/
 - [文档导航](docs/README.md)
 - [当前验证摘要](docs/verification-summary.md)
 - [项目历史与 Git 说明](docs/project-history.md)
+- [参考基线与 PlainJournalPro 边界](docs/reference-baseline-and-pro-boundary.md)
 - [验证索引](docs/verification-index.md)
 - [技术版本矩阵](docs/06-version-matrix.md)
 - [SpotBugs 基线与分类策略](docs/quality/spotbugs-triage.md)
@@ -153,8 +156,8 @@ PlainJournal/
 - [后端专项说明](backend/README.md)
 - [变更记录](CHANGELOG.md)
 
-历史阶段报告保留当时数字和结论；当前版本、测试数和发布状态只从验证基线生成，不再
-人工同步到十几个文档。
+逐批阶段报告由 Git 历史保存；当前版本、测试数和发布状态只从验证基线生成，不再
+人工同步到多个文档。
 
 ## 安全与贡献
 

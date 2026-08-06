@@ -1,8 +1,8 @@
 # 当前验证摘要
 
 > 本文件由 `.github/verification-baseline.json` 通过
-> `node tools/render-verification-summary.mjs` 生成。历史阶段报告保留当时数字，
-> 当前入口只引用本摘要。
+> `node tools/render-verification-summary.mjs` 生成。逐批过程由 Git 历史追溯，
+> 当前入口只引用本摘要和精选终局验收快照。
 
 ## 发布坐标
 
@@ -10,7 +10,7 @@
 | --- | --- |
 | 目标版本 | `v1.0.3` |
 | 状态 | `release-candidate` |
-| 最近完整验证日期 | 2026-08-04 |
+| 最近完整验证日期 | 2026-08-06 |
 
 ## 可重复代码门禁
 

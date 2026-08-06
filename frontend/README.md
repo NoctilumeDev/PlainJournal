@@ -109,12 +109,9 @@ Nginx 镜像构建、OCI 元数据、Header/404、同源 API、HEALTHCHECK、两
 `frontend/e2e/mock-api.mjs` 只用于稳定浏览器验收，不替代真实 MySQL、Redis、Nacos、
 RocketMQ、MinIO、Gateway 和所有者服务证据。
 
-完整视觉计划与分阶段证据见
-[`docs/81-frontend-visual-reconstruction-master-plan-20260801.md`](../docs/81-frontend-visual-reconstruction-master-plan-20260801.md)
-至
-[`docs/104-frontend-visual-v7-3-demo-static-deployment-20260803.md`](../docs/104-frontend-visual-v7-3-demo-static-deployment-20260803.md)。
-以及
-[`docs/105-frontend-visual-v7-4-release-candidate-20260803.md`](../docs/105-frontend-visual-v7-4-release-candidate-20260803.md)。
+当前前端交付边界、真实浏览器链路和工程冻结证据见
+[`v1.0.2` 工程验收快照](../docs/evidence/v1.0.2-engineering-acceptance-20260804.md)；
+逐批视觉迁移记录由 Git 历史追溯，不再随主分支持续携带。
 当前前端已冻结为 `v1.0.3` 发布候选，基础演示和 E2E 编排使用跨平台 Node 入口，并以
 四包聚合行覆盖率 70% 作为公开门禁；复杂 Docker 和真实故障脚本继续使用
 PowerShell 7。仓库采用 Apache-2.0，后续只处理明确缺陷，不扩大当前自营业务边界；

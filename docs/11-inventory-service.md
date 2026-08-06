@@ -1,6 +1,8 @@
 # 库存服务
 
-`inventory-service` 是项目的第一个高并发正确性业务切片，端口为 `18103`，数据独占 `ecom_inventory` schema。它管理仓库、现货、预占、确认、释放、过期、退货回补、库存流水和 Outbox，不管理商品价格、订单状态或退款金额。
+`inventory-service` 是库存最终事实所有者，端口为 `18103`，数据独占
+`ecom_inventory` Schema。它管理仓库、现货、预占、确认、释放、过期、退货回补、
+库存流水和 Outbox，不管理商品价格、订单状态或退款金额。
 
 ## 1. 数据模型
 
@@ -100,4 +102,9 @@ Inventory 每 10 秒在自己的 schema 内核对余额与有效预占、调整/
 - 对账健康扫描无误报；余额错位和缺失 `ReturnStocked` 能幂等发现、只读展示并在事实恢复后关闭。
 - M6 真实排队实验中，100 个常规准入和 MQ 停机期间额外接受的 1 个请求恢复后全部通过 MySQL 最终裁决；最终 `on_hand=101,reserved=101`，没有超卖、重复预占或遗留处理中记录。
 
-真实中间件冒烟使用 MySQL、Nacos、Redis、RocketMQ、MinIO 与网关，验证 20 件库存面对 100 个并发请求时恰好 20 个 `RESERVED`、80 个 `REJECTED`，并验证确认、释放、幂等重试与 Outbox 最终发布。最新复验还在 MySQL/Flyway V4 中临时隐藏已发布的 `ReturnStocked` 事实，确认定时任务产生 `RETURN_EVENT_MISSING`、指标变为非零，并在恢复事实后自动关闭问题。秒杀最终裁决证据见 [M6 秒杀排队、最终裁决与毕业报告](47-m6-flash-sale-queue-and-graduation.md)。
+真实中间件冒烟使用 MySQL、Nacos、Redis、RocketMQ、MinIO 与网关，验证 20 件库存面对
+100 个并发请求时恰好 20 个 `RESERVED`、80 个 `REJECTED`，并验证确认、释放、
+幂等重试与 Outbox 最终发布。最新复验还在 MySQL/Flyway V4 中临时隐藏已发布的
+`ReturnStocked` 事实，确认定时任务产生 `RETURN_EVENT_MISSING`、指标变为非零，并在
+恢复事实后自动关闭问题。最终裁决证据见
+[M0-M8 三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。

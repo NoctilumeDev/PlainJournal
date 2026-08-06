@@ -1,6 +1,10 @@
 # 支付服务
 
-`payment-service` 端口为 `18105`，数据独占 `ecom_payment` schema。当前切片实现支付单与整单退款单、模拟渠道、HMAC 回调校验、渠道流水、回调审计、持久化退款请求投递、有限重试和 Outbox；真实支付 SDK 与财务对账仍在后续切片。
+`payment-service` 端口为 `18105`，数据独占 `ecom_payment` schema。当前实现支付单
+与整单退款单、模拟渠道、HMAC 回调校验、渠道流水、回调审计、持久化退款请求投递、
+有限重试、Outbox 和支付/退款所有者域对账。真实支付 SDK、外部清结算与平台账本不在
+当前仓库范围；多商户资金模型进入
+[PlainJournalPro](https://github.com/NoctilumeDev/PlainJournalPro)。
 
 ## 1. 数据边界
 
@@ -104,6 +108,12 @@ sequenceDiagram
 - `ADMIN` 可通过只读 `businessprocesses` 运维端点定位 `PROCESSING`、`FAILED` 和退款投递 `NEEDS_ATTENTION` 的数量、最老年龄、退款号、投递阶段与最后错误；响应不包含客户身份。
 - 退款派发人工重试具备管理员权限、稳定命令键、请求冲突检测、同退款并发串行化、接受/拒绝审计和只读审计查询。
 - 本地定时对账检查成功状态、渠道流水、Outbox 和退款原支付引用；异常只写问题台账并告警，恢复后标记 `RESOLVED`，不自动改写资金事实。详见 [Payment 支付与退款对账](20-payment-reconciliation.md)。
-- Payment→Trade 查询已通过真实 TCP 503/超时/4xx/舱壁自动测试，以及八服务真实停服故障注入：熔断开启后快速拒绝、Payment MySQL 零脏写，Trade 重启后经两次半开探测关闭并保持支付幂等。
-- M4 顾客端使用稳定 `payment:{uuid}` 创建或读取原支付单。真实故障代理已证明 Payment 上游返回 HTTP 200 后响应丢失时，页面按原键恢复唯一 `PROCESSING` 支付单；同键重试不创建第二笔，跨账户查询/创建返回 404，签名回调后 Payment `SUCCESS`、Trade `PAID`。详见 [M4 Payment 与结果未知恢复](38-m4-payment-and-unknown-result-recovery.md)。
+- Payment→Trade 查询已通过真实 TCP 503/超时/4xx/舱壁自动测试，以及基础交易拓扑
+  的真实停服故障注入：熔断开启后快速拒绝、Payment MySQL 零脏写，Trade 重启后经
+  两次半开探测关闭并保持支付幂等。
+- M4 顾客端使用稳定 `payment:{uuid}` 创建或读取原支付单。真实故障代理已证明
+  Payment 上游返回 HTTP 200 后响应丢失时，页面按原键恢复唯一 `PROCESSING`
+  支付单；同键重试不创建第二笔，跨账户查询/创建返回 404，签名回调后 Payment
+  `SUCCESS`、Trade `PAID`。最终结论见
+  [M0-M8 三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。
 - 浏览器可见退款 `userId` 已局部序列化为 JSON string；内部 Outbox 继续使用独立 Map 和数值事件语义。

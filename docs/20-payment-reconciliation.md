@@ -2,13 +2,15 @@
 
 ## 1. 目标与边界
 
-本批实现 Payment 所有者域内的支付/退款事实对账。任务只比较 `ecom_payment` 内由 Payment 拥有的状态、渠道流水、Outbox 和原支付引用，发现不一致时写入 `reconciliation_record`；它不跨 schema 查询 Trade、Inventory 或 Fulfillment，也不自动修改资金状态、补造流水或重发成功事件。
+Payment 对账只比较 `ecom_payment` 内由 Payment 拥有的状态、渠道流水、Outbox 和
+原支付引用，发现不一致时写入 `reconciliation_record`；它不跨 Schema 查询 Trade、
+Inventory 或 Fulfillment，也不自动修改资金状态、补造流水或重发成功事件。
 
 对账是异常发现与恢复确认机制，不替代创建支付、退款回调、本地事务、唯一约束和 Outbox。
 
 ## 2. 对账规则
 
-首批规则类型是固定枚举语义，不把订单号、退款号或错误正文放进指标标签：
+规则类型使用固定枚举语义，不把订单号、退款号或错误正文放进指标标签：
 
 | Domain | Issue type | 检查 |
 | --- | --- | --- |
@@ -69,11 +71,13 @@ Grafana 运维看板显示未关闭总数；持续 30 秒大于零触发 `PlainJ
 - 若渠道结果未知，继续等待或查询渠道，不能凭对账结果写 `SUCCESS`。
 - 若需要重试退款派发，只能调用 [领域授权补偿命令](19-compensation-governance.md)，并满足其状态、幂等与审计约束。
 
-跨服务对账将在后续通过各领域只读契约组合，不给中央工作台任何跨库更新权限。
+跨服务视角已经由管理端通过各领域只读契约组合；中央工作台没有跨库更新权限。
 
-## 6. 当前验证证据
+## 6. 验证证据
 
 - 2 个专用集成测试覆盖健康零误报、事件缺失、退款金额/流水不一致、重复扫描、恢复关闭、权限和指标。
-- 最近一次全量 `mvn clean verify` 共 130 个测试，0 失败、0 错误、0 跳过。
-- 该批交付时官方 `promtool 3.12.0` 验证三个规则组共 9 条规则有效；完整 Prometheus、Alertmanager、Grafana 真实栈及四个实时采集目标已通过。后续同步韧性与调度隔离批次已扩为四组 12 条，见观测文档。
-- 八服务真实中间件冒烟已验证 MySQL/Flyway V7、Gateway 鉴权、真实定时任务、`OPEN` 指标和事实恢复后的 `RESOLVED`；脚本随后删除测试对账记录并关闭八个 Java 应用。
+- 真实中间件冒烟已验证 MySQL/Flyway、Gateway 鉴权、真实定时任务、`OPEN` 指标和
+  事实恢复后的 `RESOLVED`，并清理测试记录和本轮 Java 进程。
+- Prometheus、Alertmanager、Grafana 和规则配置已在专项观测脚本中验证，当前配置见
+  [观测文档](18-observability-and-alerting.md)。
+- 当前全仓测试与覆盖率数字见[验证摘要](verification-summary.md)。

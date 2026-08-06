@@ -67,7 +67,7 @@ SpotBugs 的数量是 bug instance 数，不是用户可见 Issue 数。框架�
 - 新增或数量上升的 Priority 2 必须先分类；
 - 已知基线不能被 README 隐藏，当前数字由验证摘要统一展示；
 - SpotBugs 不绑定普通 `mvn verify`，避免每次快速回归承担全量分析成本；
-- 发布候选和重要后端改动需重新生成 12 份报告，并保存 Actions 或 Release 证据。
+- 正式发布和重要后端改动需重新生成 12 份报告，并保存 Actions 或 Release 证据。
 
 重现命令：
 

@@ -115,15 +115,15 @@ Playwright 自动化 E2E 已纳入 `pnpm check`，当前覆盖顾客主题/权�
 当前数字统一见 [验证摘要](verification-summary.md)，分层运行入口见
 [验证索引](verification-index.md)。本节以下只冻结技术兼容性，不承担测试计数。
 
-历史 M0–M7 链路证据记录在 `docs/26` 至 `docs/55`；M8.1–M8.12 的 Chat、
-Notification、Fulfillment GEO、商品评价、商品搜索和运营统计证据记录在 `docs/56`
-至 `docs/67`。H2 自动化回归和浏览器 Mock 夹具不能替代真实基础设施证据。
+M0-M8 的最终代码、自动化与真实基础设施矩阵收敛在
+[三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。逐批报告由 Git
+历史追溯；H2 自动化回归和浏览器 Mock 夹具不能替代真实基础设施证据。
 
 任意一项失败时，Spring Boot、Spring Cloud 和 Spring Cloud Alibaba 必须按发布列车整体调整，禁止只强行覆盖其中一个依赖版本。
 
 ## 6. 暂不引入
 
-- Seata/TCC：首期使用本地事务、Outbox、幂等和补偿。
+- Seata/TCC：当前使用本地事务、Outbox、幂等和补偿。
 - Elasticsearch：当前不与 OpenSearch 双重引入；M8.11 已选择单一 OpenSearch
   投影验证搜索机制。
 - OpenTelemetry Collector、Zipkin、SkyWalking：当前 Tempo 单后端已满足本机代表链路，不为组件清单增加第二条管线。

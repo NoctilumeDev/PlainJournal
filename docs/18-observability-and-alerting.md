@@ -1,8 +1,9 @@
 # 指标采集、看板与告警
 
-## 1. 本批目标
+## 1. 目标与边界
 
-本批把 M2 已存在于应用内的 Outbox、消费失败和业务处理中指标接入真实指标后端，并加入首条跨服务追踪代表链路，形成“安全采集、统一查询、状态看板、分级告警、按 trace 定位”的最小闭环。
+当前观测方案把 Outbox、消费失败和业务处理中指标接入真实指标后端，并保留跨服务追踪
+代表链路，形成“安全采集、统一查询、状态看板、分级告警、按 trace 定位”的最小闭环。
 
 它不建设一个常驻的大型观测平台，也不把观测组件变成交易服务的启动依赖。Prometheus、Alertmanager、Grafana 和 Tempo 位于独立 `observability` Compose profile，默认不启动；四个组件同时运行的内存上限约为 1.5 GiB。关闭它们不会改变订单、库存、支付、退款或消息状态。
 
@@ -31,7 +32,8 @@ Payment / Trade
 ```
 
 - Prometheus 每 10 秒抓取五个交易核心服务，保存 7 天本地时序数据。
-- Alertmanager 负责分组、去重、静默和本地状态展示。首批不配置邮件、短信或聊天软件接收方，避免开发环境误发外部通知。
+- Alertmanager 负责分组、去重、静默和本地状态展示。默认开发配置不接入邮件、短信
+  或聊天软件接收方，避免误发外部通知。
 - Tempo 接收 Payment 与 Trade 显式开启的 OTLP/HTTP trace，使用本地 WAL/blocks 并保留 24 小时。
 - Grafana 自动配置 Prometheus、Tempo 两个数据源和 `PlainJournal Operations` 看板。
 - 应用仍由各自 MySQL schema 保存最终业务事实；指标后端不是审计账本，也不参与补偿决策。
@@ -67,7 +69,7 @@ Payment / Trade
 - Trade 订单恢复距上次完成时间，以及专用调度器的活跃线程、队列和池大小。
 - M6 秒杀处理中数量、最老年龄、完成速率、预计排空时间和 `NEEDS_ATTENTION` 数量。
 
-首批告警按业务语义区分：
+当前告警按业务语义区分：
 
 | 告警 | 条件摘要 | 等级 |
 | --- | --- | --- |
@@ -94,7 +96,7 @@ Payment / Trade
 先按网络文档确认 Clash、Docker 和七个核心中间件容器健康，再初始化凭据：
 
 ```powershell
-cd C:\Users\lenovo\Desktop\PlainJournal\deploy\docker
+cd deploy/docker
 .\bootstrap-resources.ps1
 docker compose --env-file .env --profile observability up -d
 ```
@@ -115,7 +117,10 @@ Grafana 用户名为 `plainjournal-admin`，密码在被忽略的 `.env` 中。�
 .\verify-observability.ps1
 ```
 
-脚本验证匿名拒绝、专用采集凭据、Prometheus 与 Alertmanager 配置、五个真实目标、四组告警规则、Alertmanager 连接、Tempo 就绪，以及 Grafana 的 Prometheus/Tempo 数据源和看板预配置。默认只清理本次新启动的观测容器，不删除 D 盘时序与 trace 数据；使用 `-KeepRunning` 可保留它们。
+脚本验证匿名拒绝、专用采集凭据、Prometheus 与 Alertmanager 配置、五个真实目标、
+四组告警规则、Alertmanager 连接、Tempo 就绪，以及 Grafana 的 Prometheus/Tempo
+数据源和看板预配置。默认只清理本次新启动的观测容器，不删除仓库外的时序与 trace
+卷数据；使用 `-KeepRunning` 可保留它们。
 
 脚本显式使用自身目录中的 Compose 文件、项目目录和 `.env`，因此可从仓库其他目录调用，不依赖当前工作目录。2026-07-22 的最终复验使用官方 `grafana/grafana:13.1.0` 与 `grafana/tempo:2.10.5` 镜像；Prometheus 配置、4 个规则组共 16 条规则、五个实时目标、Alertmanager 路由、Tempo 就绪、Grafana 双数据源和看板全部通过，本机无需为此修改全局镜像源。
 
@@ -128,21 +133,21 @@ M8.9 的 Fulfillment 注册低基数计数器
 `ecommerce.fulfillment.geo.cache.operations`，标签只包含 `operation` 和 `outcome`，
 用于区分缓存命中、MySQL 回退、提交后写入、读修复与重建结果；订单号、履约号、
 用户 ID 和坐标均不进入标签。Fulfillment 本来就是固定五个采集目标之一，但当前
-`PlainJournal Operations` 看板和 16 条规则尚未增加 GEO 专属面板或告警，所以本批只
-确认应用指标契约，不把它描述为固定观测栈已经完成 GEO 可视化扩容。详见
-[M8 第九批：Fulfillment 物流 GEO 与可重建 Redis 投影](64-m8-fulfillment-geo.md)。
+`PlainJournal Operations` 看板和 16 条规则尚未增加 GEO 专属面板或告警，所以这里只
+确认应用指标契约，不把它描述为固定观测栈已经完成 GEO 可视化扩容。
 
 M8.12 的 Analytics 注册低基数事件接受/重复、对账问题和重建结果指标，并复用专用
 `X-Metrics-Token` 采集身份。真实脚本已验证匿名拒绝、专用身份 200，以及事件、
 重建和对账三组指标存在。订单号、用户 ID、事件 ID、商品 ID 和错误正文均不进入
 标签。当前固定 Prometheus 配置仍只抓取五个交易核心服务，尚未把 Analytics 加入
-常驻目标、Grafana 面板或告警规则，因此本批只声明应用指标契约和专项采集通过。
-详见 [M8 第十二批：运营统计事件读模型、对账与审计重建](67-m8-operational-analytics.md)。
+常驻目标、Grafana 面板或告警规则，因此这里只声明应用指标契约和专项采集通过。
+最终三层结论见
+[M0-M8 三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
-完整八服务冒烟可附加观测验证：
+基础交易冒烟可附加观测验证：
 
 ```powershell
-cd C:\Users\lenovo\Desktop\PlainJournal\backend
+cd backend
 .\run-foundation-smoke.ps1 -EnableObservability
 ```
 
@@ -159,6 +164,8 @@ cd C:\Users\lenovo\Desktop\PlainJournal\backend
 - 不把 `/actuator/prometheus` 暴露到 Gateway 公网路由。
 - 不在指标标签中加入订单号、用户 ID、消息 ID 或错误正文等高基数/敏感值。
 - 不用 Grafana 或 Alertmanager 直接修改业务库、重放消息或推进状态机。
-- 不在本批引入 Loki、SkyWalking、ELK 或 OpenTelemetry Collector；追踪只保留 Micrometer Tracing、一个 OpenTelemetry bridge 和一个 Tempo 主后端。
-- 不把 Payment→Trade 代表链路描述成八服务全链路完成；其余 HTTP、消息和补偿边界必须逐批补证据。
+- 当前不引入 Loki、SkyWalking、ELK 或 OpenTelemetry Collector；追踪只保留
+  Micrometer Tracing、一个 OpenTelemetry bridge 和一个 Tempo 主后端。
+- 不把 Payment→Trade 代表链路描述成所有服务路径都已追踪；新增高风险 HTTP、消息和
+  补偿边界仍需独立证据。
 - 不把本地空接收器描述成已经完成外部值班通知；生产通知渠道必须另行配置和验证。

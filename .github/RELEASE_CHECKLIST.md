@@ -64,4 +64,7 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 - [x] CI 检查真实 PR/push 变更集，Release 只接受严格稳定版标签。
 - [x] 评价同键并发回归稳定通过，真实 MySQL 评价专项完成。
 - [x] Dependency Graph、安全更新、私密漏洞报告和 Dependabot 标签已启用。
+- [x] 当前规范与精选验收证据分区，逐批日志由 Git 历史保存，文档结构、索引、路径和
+  可漂移数字进入 CI 门禁。
+- [x] PlainJournal M0-M8 参考基线与独立 PlainJournalPro 的 M9+ 边界已写入文档。
 - [ ] 完整 CI、Security、Release 附件与本机资源清理通过。

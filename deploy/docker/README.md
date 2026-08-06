@@ -1,6 +1,10 @@
 # Local Middleware Environment
 
-This directory contains development-only middleware configuration. Business data is not stored in the repository. All bind-mounted data is written under `D:/Middleware/PlainJournal`.
+This directory contains development-only middleware configuration. Business
+data is not stored in the repository. The example environment writes
+bind-mounted data under the ignored `deploy/docker/.data/` directory; a local
+`.env` may override `MIDDLEWARE_DATA_ROOT` with another absolute or relative
+location.
 
 ## Core services
 
@@ -161,7 +165,8 @@ created by the script is removed. Run-scoped indices, schema grants, ports and
 Catalog JVMs must be absent at completion while all seven core containers remain
 running. The final metrics check uses the dedicated `X-Metrics-Token` scrape
 identity rather than an administrator login token. The completed mechanism and
-evidence are recorded in `../../docs/66-m8-catalog-search.md`.
+evidence are summarized in the
+[`M0-M8 three-layer acceptance`](../../docs/evidence/m0-m8-three-layer-acceptance-20260728.md).
 
 M8.12 operational Analytics uses the seven core middleware containers plus one
 temporary Analytics JVM and Gateway; it does not add another persistent
@@ -179,7 +184,8 @@ missing/stale/orphan reconciliation, idempotent audited rebuilds, role
 authorization, and dedicated metrics-token scraping. Cleanup removes the
 temporary schema, user, topics, consumer group, ports, and JVMs, restores the
 Proxy, and verifies all seven core containers remain running. Evidence is
-recorded in `../../docs/67-m8-operational-analytics.md`.
+summarized in the
+[`M0-M8 three-layer acceptance`](../../docs/evidence/m0-m8-three-layer-acceptance-20260728.md).
 
 M8.8 reliable Notification delivery uses the seven core middleware containers
 plus three temporary JVMs and a minimal local SMTP capture process; it does not

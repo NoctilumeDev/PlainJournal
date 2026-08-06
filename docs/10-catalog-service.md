@@ -2,7 +2,7 @@
 
 ## 1. 实现边界
 
-`catalog-service` 是第二条完整业务纵切，拥有独立的 `ecom_catalog` schema，负责：
+`catalog-service` 拥有独立的 `ecom_catalog` schema，负责：
 
 - 分类与品牌；
 - SPU 商品信息；
@@ -147,8 +147,8 @@ catalog -> MySQL: 保存 product_media
 
 以后若建设完整商品经营后台，必须先补充管理端列表/详情读模型、Foundation 管理 API、
 写命令的幂等或结果未知恢复契约，再另立业务切片验证；不能在视觉迁移中直接复用公开
-投影冒充完整管理事实。前端实现与三层证据见
-[V6.4.3 Catalog 管理观察窗](97-frontend-visual-v6-4-3-catalog-20260803.md)。
+投影冒充完整管理事实。前端实现由 E2E 与
+[当前验证摘要](verification-summary.md)约束。
 
 ### 6.1 当前管理前端的评价治理边界
 
@@ -165,8 +165,8 @@ catalog -> MySQL: 保存 product_media
   把驳回举报解释为重新发布已隐藏评价；
 - operator/token 切换会使旧请求响应失效，pending 命令按 operatorId 隔离。
 
-前端实现、故障链和三层证据见
-[V6.4.3 Review 评价治理工作区](99-frontend-visual-v6-4-3-review-20260803.md)。
+前端实现和故障链由 E2E 与
+[当前验证摘要](verification-summary.md)约束。
 
 ## 7. 公开读副本边界
 
@@ -182,8 +182,8 @@ X-Catalog-Read-Consistency: primary
 
 普通公开读仍走副本。复制延迟导致的未命中不会自动回退；只有连接类故障才会
 在原只读事务结束后向主库重放一次。真实副本 Profile 默认不常驻，并与观测栈、
-分片和规模数据实验互斥。完整机制、指标、故障和资源证据见
-[M7 第三批：Catalog 真实 MySQL 读副本](51-m7-catalog-read-replica.md)。
+分片和规模数据实验互斥。最终机制、故障和资源结论见
+[M0-M8 三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
 公开评价列表和评分汇总也属于显式副本资格；评价资格、提交、点赞、举报、回复和
 审核全部固定主库。副本延迟只能造成短暂展示滞后，不能改变评价资格或审核事实。
@@ -191,8 +191,8 @@ X-Catalog-Read-Consistency: primary
 ## 8. 验证方式
 
 ```powershell
-cd C:\Users\lenovo\Desktop\PlainJournal\backend
-mvn clean verify
+cd backend
+./mvnw.cmd clean verify
 ../deploy/docker/bootstrap-resources.ps1
 ./run-foundation-smoke.ps1
 ```
@@ -203,7 +203,11 @@ Outbox 状态、恢复审计、重建、对账、降级元数据、10,000 结果
 OpenSearch 版本扫描另有 1,001 条文档拆为 1,000 + 1 两页并携带 `search_after` 的
 HTTP 适配器测试。
 
-M7 第一批在 10,000 SPU / 20,000 SKU 的 Small 数据上验证 offset 与 keyset 各 100 条结果完全一致。V3 删除旧冗余索引后，首屏、深 offset 和 keyset 均使用 `(status, category_id, created_at, id)` 覆盖索引且没有排序节点。关键词使用 `%keyword%` 时不宣称当前 B-Tree 具备同等收益。完整证据见 [M7 第一批：规模数据、查询基线与游标分页](49-m7-scale-data-and-cursor-pagination.md)。
+M7 第一批在 10,000 SPU / 20,000 SKU 的 Small 数据上验证 offset 与 keyset 各
+100 条结果完全一致。V3 删除旧冗余索引后，首屏、深 offset 和 keyset 均使用
+`(status, category_id, created_at, id)` 覆盖索引且没有排序节点。关键词使用
+`%keyword%` 时不宣称当前 B-Tree 具备同等收益。最终证据见
+[M0-M8 三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
 M7 第三批通过两个独立 H2 数据源覆盖路由边界，并使用真实 MySQL 8.4 主从
 验证复制暂停、主库提示、444 ms 追平、副本停机回退和 11.907 秒恢复。
@@ -211,23 +215,20 @@ M7 第三批通过两个独立 H2 数据源覆盖路由边界，并使用真实 
 M8.10 在真实 MySQL 8.4、Nacos、RocketMQ、Gateway、Trade 和 Catalog 上验证
 `ShipmentSigned -> OrderCompleted -> review_eligibility`、8 路相同提交收敛为一个
 评价 ID、跨账户 404、点赞重放、平台回复、举报审核、评分扣减，以及 RocketMQ Proxy
-停机时 Outbox 保持 `PENDING`、恢复后收敛。专项文档和证据见
-[M8 第十批：商品评价、并发幂等与审核治理](65-m8-product-reviews.md)。
+停机时 Outbox 保持 `PENDING`、恢复后收敛。最终证据见
+[M0-M8 三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
 M8.11 在真实 MySQL 8.4、按需 OpenSearch 3.7.0 和独立 Catalog JVM 上验证两商品
 增量投影、OpenSearch 停机时 MySQL 更新继续提交、公开查询明确
 `MYSQL_FALLBACK/degraded=true`、三次有限重试后进入 `NEEDS_ATTENTION`、管理员
 幂等审计恢复、蓝绿重建、missing/stale/orphan 注入与修复，以及下架商品索引删除
-和公开隔离。M8.11 交付时的全量门禁中 Catalog 为 31 tests，全 Reactor 合计
-318 tests；
-临时 schema、授权、索引、OpenSearch 容器、18102/19200 端口和 JVM 残留均为 0。
-专项文档和证据见
-[M8 第十一批：商品搜索、可重建索引与事实对账](66-m8-catalog-search.md)。
+和公开隔离；临时 schema、授权、索引、OpenSearch 容器、18102/19200 端口和 JVM
+残留均为 0。
+最终证据见
+[M0-M8 三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
-其中 31/318 是 M8.11 交付时的阶段快照，43/399 是 2026-07-25 的 M8 收口
-快照。2026-07-28 进入 M9 前复审后的当前最终基线为 Catalog 44 tests、全 Reactor
-435 tests；完整三层证据以
-[进入 M9 前审查](69-m0-m8-pre-m9-three-layer-audit-20260728.md)为准。
+阶段测试数字保留在对应归档报告；当前 Catalog 与全仓门禁统一见
+[验证摘要](verification-summary.md)，不在领域文档重复维护。
 
-评价图片/视频尚未实现，不能把现有商品媒体上传链路复用成未经内容授权和审核的
-评价媒体链路。
+评价图片/视频不在当前仓库范围，不能把现有商品媒体上传链路复用成未经内容授权和
+审核的评价媒体链路。

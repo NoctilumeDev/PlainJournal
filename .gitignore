@@ -6,6 +6,7 @@
 deploy/docker/.env
 deploy/docker/*.log
 deploy/docker/.runtime-secrets/
+deploy/docker/.data/
 
 # Application build outputs (reserved for later development)
 **/target/

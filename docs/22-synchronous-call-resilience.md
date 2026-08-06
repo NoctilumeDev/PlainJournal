@@ -77,14 +77,15 @@ Prometheus 的 `plainjournal-synchronous-resilience` 规则组对两个实例统
 
 Marketing TCP 用例还验证第一次连接在返回前断开、第二次返回同一锁号，证明客户端使用同一业务命令重试。Marketing 自身的集成测试和数据库唯一约束负责证明真实领域幂等，而不是由 TCP 桩伪造数据库语义。Payment 集成测试断言 Trade 不可用时 `payment_order` 为零；两个应用上下文测试确认原生指标和自定义拒绝计数器实际注册。
 
-2026-07-18 最近一次全量 `mvn clean verify` 共 130 个测试，0 失败、0 错误、0 跳过。
+当前自动化测试数量和覆盖率统一见[验证摘要](verification-summary.md)；本节只维护两个
+同步边界的故障语义和完成条件。
 
 ## 6. 真实中间件与故障证据
 
 Payment→Trade 验证命令：
 
 ```powershell
-cd C:\Users\lenovo\Desktop\PlainJournal\backend
+cd backend
 .\run-foundation-smoke.ps1 -EnableSynchronousResilienceFaultInjection
 ```
 
@@ -93,17 +94,26 @@ cd C:\Users\lenovo\Desktop\PlainJournal\backend
 Trade→Marketing 验证命令：
 
 ```powershell
-cd C:\Users\lenovo\Desktop\PlainJournal\backend
+cd backend
 .\run-foundation-smoke.ps1 -EnableTradeMarketingResilienceFaultInjection
 ```
 
-脚本在真实 MySQL、Redis、Nacos、RocketMQ、MinIO 和八个 Java 应用上停止 Marketing。首笔订单的同步失败和一次独立调度恢复失败，加上三笔故障订单形成最少 5 个逻辑失败并打开熔断，第 5 笔订单被本地快速拒绝；5 笔订单均保持 `PENDING_STOCK`，Trade 保存恢复事实，Marketing 没有锁，Inventory 没有预占。Marketing 恢复并越过 OPEN 窗口后，订单恢复任务使 5 笔订单全部进入 `PENDING_PAYMENT`，Marketing MySQL 严格存在 5 个不同锁号；取消全部订单后库存恢复为 `onHand=6/reserved=0/available=6`。同轮完整正向交易、履约、整单退款、补偿和 Payment/Inventory 对账全部通过，脚本最后清理临时数据和 Java 进程。
+脚本在真实 MySQL、Redis、Nacos、RocketMQ、MinIO 和所需核心服务上停止 Marketing。
+首笔订单的同步失败和一次独立调度恢复失败，加上三笔故障订单形成最少 5 个逻辑失败
+并打开熔断，第 5 笔订单被本地快速拒绝；5 笔订单均保持 `PENDING_STOCK`，Trade 保存
+恢复事实，Marketing 没有锁，Inventory 没有预占。Marketing 恢复并越过 OPEN 窗口
+后，订单恢复任务使 5 笔订单全部进入 `PENDING_PAYMENT`，Marketing MySQL 严格存在
+5 个不同锁号；取消全部订单后库存恢复为 `onHand=6/reserved=0/available=6`。同轮
+完整正向交易、履约、整单退款、补偿和 Payment/Inventory 对账全部通过，脚本最后
+清理临时数据和 Java 进程。
 
 同日观测栈验证确认 Prometheus、Alertmanager 和 Grafana 的四个实时采集目标健康，四个规则组共 12 条规则有效，包含两个同步韧性实例和 Trade 调度指标的新看板已加载。
 
-## 7. 调度隔离与下一步
+## 7. 当前扩展边界
 
 - 首轮真实故障发现 Trade 订单恢复与多个 RocketMQ 长轮询共享默认单线程，5 秒扫描可能推迟到约 25 秒。后续批次已将订单恢复隔离到独立、上限为 1 的调度器，并增加执行、完成年龄和 executor 饱和指标；相同停服场景实测 6.33 秒发生第二次调用，低于 12 秒硬上限。详见 [Trade 订单恢复调度隔离](23-trade-scheduling-isolation.md)。
 - 继续按风险治理其余同步边界，只对只读或具有稳定幂等键、唯一约束和结果查询的命令开放有限重试。
-- 分布式追踪在独立 M2 批次使用 Micrometer Tracing/OpenTelemetry 传播标准并选择一个主后端，不与本批混装多套 SDK。
-- M3 再验证三实例下的熔断样本、舱壁资源隔离、实例退出和滚动恢复。
+- 分布式追踪已使用 Micrometer Tracing、单一 OpenTelemetry bridge 和 Tempo，代表
+  链路见[分布式追踪](24-distributed-tracing.md)。
+- 三实例抢占、消费者竞争、实例退出和滚动恢复已经完成；后续新增同步边界仍须按同一
+  风险准入规则独立验证。

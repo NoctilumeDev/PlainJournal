@@ -76,4 +76,5 @@ AVAILABLE --下单锁价--> LOCKED --OrderPaid--> REDEEMED
 - Redis 准入不可用时发布或请求准入返回 `503`，不做本地成功；公开活动查询不依赖 Redis。Redis 接受后，Marketing 在本地事务内持久化 `QUEUED` 事实与 Outbox，准入令牌仍不是订单或库存成功，后续由 Trade 和 Inventory/MySQL 裁决。
 - Trade 通过同一独立 Topic 返回 `FlashSaleOrderSucceeded/Failed`；Marketing 使用 `consumed_event` 幂等更新 `ORDER_CREATED/FAILED`。MQ 停机期间 Outbox 保留，恢复后 101 条准入全部收敛为 `ORDER_CREATED`，未发布、`QUEUED`、`FAILED` 和 `RESULT_UNKNOWN` 均为 0。
 
-完整边界与证据见 [M6 第一批：秒杀活动准入基线](46-m6-flash-sale-admission-baseline.md)和 [M6 秒杀排队、最终裁决与毕业报告](47-m6-flash-sale-queue-and-graduation.md)。
+完整边界与最终证据见
+[M0-M8 三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。

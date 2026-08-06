@@ -1,8 +1,11 @@
 # 领域授权补偿与审计
 
-## 1. 本批目标
+## 1. 目标与边界
 
-M2 第五批把“日志里看到失败后手工改库”收敛为领域所有者提供的受控命令。首个代表切片选择 Payment 的退款渠道派发：它已经具有稳定 `refundNo`、MySQL 状态机、有限自动重试和明确的 `NEEDS_ATTENTION`，适合证明授权、幂等、并发串行化、审计和恢复，而不需要中央服务跨库写数据。
+当前补偿模型把“日志里看到失败后手工改库”收敛为领域所有者提供的受控命令。代表
+实现选择 Payment 的退款渠道派发：它具有稳定 `refundNo`、MySQL 状态机、有限自动
+重试和明确的 `NEEDS_ATTENTION`，可以证明授权、幂等、并发串行化、审计和恢复，
+不需要中央服务跨库写数据。
 
 这不是任意 RocketMQ 消息重放器，也不是一个可以把退款直接改成成功的超级管理员接口。渠道成功仍只能由验签后的独立退款回调确认。
 
@@ -75,10 +78,18 @@ GET /api/v1/payment/admin/refunds/{refundNo}/retry-dispatch/audits?limit=50
 - 全链路冒烟在真实 MySQL 中注入“自动派发耗尽”故障，经 Gateway 调用领域命令，等待真实定时任务重新派发，并核对接受/拒绝审计。
 - 重试后仍保持 `PROCESSING`；只有独立签名回调才能产生 `RefundSucceeded`。
 
-当前证据：退款集成测试覆盖并发命令一条接受、一条拒绝；退款调度整类连续复跑消除了 `TIMESTAMP(3)` 与纳秒时钟边界导致的偶发未到期判断。最近一次全量 `mvn clean verify` 共 130 个测试，0 失败、0 错误、0 跳过。八服务真实中间件冒烟已在 MySQL/Flyway V7、Gateway、管理员 JWT 和真实定时派发任务上验证上述故障注入与收敛过程，并在结束后清理测试审计记录。
+验证覆盖退款并发命令一条接受、一条拒绝，以及 `TIMESTAMP(3)` 与纳秒时钟边界导致的
+偶发未到期判断。真实中间件冒烟已在 MySQL、Gateway、管理员 JWT 和真实定时派发
+任务上验证故障注入与收敛，并在结束后清理测试审计记录。当前全仓数字统一见
+[验证摘要](verification-summary.md)。
 
 ## 6. 后续边界
 
-Payment 的[支付与退款只读对账](20-payment-reconciliation.md)、Inventory 的[库存与退货回补只读对账](21-inventory-reconciliation.md)，以及 [Trade/Fulfillment 所有者域对账](25-trade-fulfillment-reconciliation.md)均已实现。后续只按真实恢复需求增加最小授权动作；只有确实存在稳定业务键、幂等副作用和明确恢复状态的操作才允许人工重试。补偿工作台未来只聚合各领域只读视图并调用领域 API，不拥有跨 schema 更新权限。
+Payment 的[支付与退款只读对账](20-payment-reconciliation.md)、Inventory 的
+[库存与退货回补只读对账](21-inventory-reconciliation.md)，以及
+[Trade/Fulfillment 所有者域对账](25-trade-fulfillment-reconciliation.md)均已实现。
+后续只按真实恢复需求增加最小授权动作；只有确实存在稳定业务键、幂等副作用和明确
+恢复状态的操作才允许人工重试。现有治理工作区只聚合各领域只读视图并调用领域 API，
+不拥有跨 Schema 更新权限。
 
 不提供“任意消息正文重放”“任意状态修改”“跳过验签确认资金成功”或“中央服务直接修复多库”的能力。
