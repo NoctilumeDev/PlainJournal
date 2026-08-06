@@ -75,4 +75,4 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 - [x] 通知邮件人工恢复以投递行锁和 `READ_COMMITTED` 保证同命令并发回放可见性。
 - [x] 本地后端 14 模块、436 个测试、覆盖率和仓库文档门禁通过。
 - [x] PR 与 `main` 的 CI、Security 和 CodeQL 通过，公开代码扫描告警为 0。
-- [ ] `v1.0.4` 标签、Release Notes、ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
+- [x] `v1.0.4` 标签、Release Notes、ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
