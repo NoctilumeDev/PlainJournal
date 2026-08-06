@@ -180,8 +180,7 @@ describe("admin fulfillment entity", () => {
       payload: Record<string, unknown>;
     };
     expect(persisted.requiresAuthorityRead).toBe(true);
-    expect(persisted.payload).not.toHaveProperty("longitude");
-    expect(persisted.payload).not.toHaveProperty("latitude");
+    expect(persisted.payload).toEqual({ externalEventId: eventId });
 
     await store.retryPending(ACCESS);
 
@@ -241,7 +240,8 @@ describe("admin fulfillment entity", () => {
     expect(restored.pendingCommand?.commandKey).toBe(eventId);
     expect(restored.traceForm(FULFILLMENT_NO)).toMatchObject({
       externalEventId: eventId,
-      description: "恢复本地履约命令",
+      description: "",
+      locationName: "",
       longitude: "",
       latitude: "",
     });
