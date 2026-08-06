@@ -67,4 +67,4 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 - [x] 当前规范与精选验收证据分区，逐批日志由 Git 历史保存，文档结构、索引、路径和
   可漂移数字进入 CI 门禁。
 - [x] PlainJournal M0-M8 参考基线与独立 PlainJournalPro 的 M9+ 边界已写入文档。
-- [ ] 完整 CI、Security、Release 附件与本机资源清理通过。
+- [x] 完整 CI、Security、Release 附件与本机资源清理通过。
