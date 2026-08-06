@@ -848,9 +848,9 @@ try {
     Write-Host 'Stage 1/9: validating network, middleware, ports, and local configuration.'
     Write-VerificationTrace 'stage 1 begin'
     if (-not $SkipNetworkPreflight) {
-        & 'D:\DevTools\Network\check-dev-network.ps1'
+        & (Join-Path $PSScriptRoot 'check-verification-host.ps1')
         if ($LASTEXITCODE -ne 0) {
-            throw 'Local network preflight failed.'
+            throw 'Host preflight failed.'
         }
     }
     foreach ($port in @(

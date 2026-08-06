@@ -4,6 +4,7 @@ import com.ecommerce.chat.application.exception.ChatError;
 import com.ecommerce.chat.application.exception.ChatException;
 import com.ecommerce.chat.application.model.ChatModels.WebSocketTicketIdentity;
 import com.ecommerce.chat.application.model.ChatModels.WebSocketTicketView;
+import com.ecommerce.chat.application.port.ChatWebSocketTicketIssuer;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -27,7 +28,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 @Component
-public class ChatWebSocketTicketService {
+public class ChatWebSocketTicketService implements ChatWebSocketTicketIssuer {
 
     private static final Logger log = LoggerFactory.getLogger(ChatWebSocketTicketService.class);
     static final String QUERY_PARAMETER = "ticket";
@@ -65,6 +66,7 @@ public class ChatWebSocketTicketService {
         this.clock = clock;
     }
 
+    @Override
     public WebSocketTicketView issue(Long userId, List<String> authorities) {
         ensureEnabled();
         List<String> roles = normalizedRoles(authorities);

@@ -25,6 +25,17 @@ before(async () => {
         response.end(JSON.stringify({ code: 'CREATED' }));
         return;
       }
+      if (request.url.startsWith('/capture-')) {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({
+          code: 'OK',
+          data: {
+            identifier: request.url.slice('/capture-'.length),
+            status: 'ACCEPTED',
+          },
+        }));
+        return;
+      }
       response.writeHead(200, { 'Content-Type': 'application/json' });
       response.end(JSON.stringify({ code: 'OK' }));
     });
@@ -215,5 +226,69 @@ test('rotates complete request variants with independent headers and bodies', as
         body: '{"quantity":2}',
       },
     ],
+  );
+});
+
+test('captures selected business fields and preserves seeded variant coverage', async () => {
+  const configuration = {
+    schemaVersion: 1,
+    name: 'runner-captured-records',
+    requests: 8,
+    concurrency: 8,
+    maxErrorRate: 0,
+    includeRecords: true,
+    randomizeOrder: true,
+    seed: 20260806,
+    scenarios: [
+      {
+        name: 'captured',
+        expectedStatuses: [200],
+        expectedJsonCode: 'OK',
+        captureJsonPaths: ['data.identifier', 'data.status'],
+        variants: Array.from({ length: 8 }, (_, index) => ({
+          label: `request-${index}`,
+          url: `${baseUrl}/capture-${index}`,
+        })),
+      },
+    ],
+  };
+
+  const first = await runBenchmark(configuration);
+  const second = await runBenchmark(configuration);
+
+  assert.equal(first.passed, true);
+  assert.equal(first.records.length, 8);
+  assert.deepEqual(
+    first.records.map((record) => record.variant),
+    second.records.map((record) => record.variant),
+  );
+  assert.deepEqual(
+    first.records.map((record) => record.variant).sort(),
+    Array.from({ length: 8 }, (_, index) => `request-${index}`),
+  );
+  assert.ok(first.records.every((record) => record.captured['data.status'] === 'ACCEPTED'));
+  assert.deepEqual(
+    first.records.map((record) => record.captured['data.identifier']).sort(),
+    Array.from({ length: 8 }, (_, index) => String(index)),
+  );
+});
+
+test('rejects randomization without an explicit unambiguous 32-bit seed', () => {
+  const baseConfiguration = {
+    schemaVersion: 1,
+    name: 'runner-seed-validation',
+    requests: 1,
+    concurrency: 1,
+    randomizeOrder: true,
+    scenarios: [{ name: 'seeded', url: `${baseUrl}/ok` }],
+  };
+
+  assert.rejects(
+    () => runBenchmark(baseConfiguration),
+    /randomizeOrder requires an explicit seed/u,
+  );
+  assert.rejects(
+    () => runBenchmark({ ...baseConfiguration, seed: 0x1_0000_0000 }),
+    /seed must be an integer between 0 and 4294967295/u,
   );
 });

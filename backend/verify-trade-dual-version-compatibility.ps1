@@ -13,7 +13,7 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $composeDirectory = Join-Path $repositoryRoot 'deploy\docker'
 $composeFile = Join-Path $composeDirectory 'compose.yml'
 $envFile = Join-Path $composeDirectory '.env'
-$networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+$networkCheck = Join-Path $PSScriptRoot 'tools\check-verification-host.ps1'
 $runDirectory = Join-Path $PSScriptRoot '.run'
 $runToken = (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmssfff')
 $workspace = Join-Path $runDirectory "m3-dual-version-$runToken"
@@ -514,7 +514,7 @@ if (-not (Test-Path -LiteralPath $runDirectory)) {
 if (-not $SkipNetworkPreflight) {
     & $networkCheck
     if ($LASTEXITCODE -ne 0) {
-        throw 'Local development network preflight failed.'
+        throw 'Host preflight failed.'
     }
 }
 docker info *> $null

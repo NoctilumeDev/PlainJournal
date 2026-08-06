@@ -20,7 +20,7 @@ $envFile = Join-Path $composeDirectory '.env'
 $tradeJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service.jar'
 $runDirectory = Join-Path $PSScriptRoot '.run'
 $evidencePath = Join-Path $runDirectory 'trade-consumer-multi-instance.json'
-$networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+$networkCheck = Join-Path $PSScriptRoot 'tools\check-verification-host.ps1'
 $runToken = (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmssfff')
 $topic = "plainjournal-m3-payment-consumer-$runToken"
 $flashSaleTopic = "plainjournal-m3-flash-sale-outbox-$runToken"
@@ -944,7 +944,7 @@ if (-not (Test-Path -LiteralPath $runDirectory)) {
 if (-not $SkipNetworkPreflight) {
     & $networkCheck
     if ($LASTEXITCODE -ne 0) {
-        throw 'Local development network preflight failed.'
+        throw 'Host preflight failed.'
     }
 }
 

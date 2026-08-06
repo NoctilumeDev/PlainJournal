@@ -26,10 +26,8 @@ $script:redisStoppedByScript = $false
 $nodeCandidate = Get-Command node -ErrorAction SilentlyContinue
 $script:nodeExecutable = if ($nodeCandidate) {
     $nodeCandidate.Source
-} elseif (Test-Path -LiteralPath 'D:\Node.js\current\node.exe') {
-    'D:\Node.js\current\node.exe'
 } else {
-    throw 'Node.js was not found on PATH or at D:\Node.js\current\node.exe.'
+    throw 'Node.js was not found on PATH.'
 }
 
 if (-not $OutputDirectory) {

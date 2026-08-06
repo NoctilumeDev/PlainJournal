@@ -610,7 +610,7 @@ else {
 }
 [IO.Directory]::CreateDirectory($script:runDirectory) | Out-Null
 
-$networkPreflight = 'D:\DevTools\Network\check-dev-network.ps1'
+$networkPreflight = Join-Path $PSScriptRoot 'check-verification-host.ps1'
 $envPath = Join-Path $script:repositoryRoot 'deploy/docker/.env'
 $bootstrapPath = Join-Path $script:repositoryRoot 'deploy/docker/bootstrap-resources.ps1'
 $chatJar = Join-Path $script:backendRoot `
@@ -624,11 +624,11 @@ try {
     if (-not $SkipNetworkPreflight) {
         Write-Host 'Stage 1/7: validating the local development network and middleware.'
         if (-not (Test-Path -LiteralPath $networkPreflight)) {
-            throw "Network preflight script not found: $networkPreflight"
+            throw "Host preflight script not found: $networkPreflight"
         }
         & $networkPreflight
         if ($LASTEXITCODE -ne 0) {
-            throw 'Network preflight failed.'
+            throw 'Host preflight failed.'
         }
     }
 

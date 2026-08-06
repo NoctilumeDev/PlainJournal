@@ -21,6 +21,24 @@ location.
 | MinIO API | `plainjournal-minio` | `http://127.0.0.1:19000` |
 | MinIO console | `plainjournal-minio` | `http://127.0.0.1:19001` |
 
+Before a real verification batch, run the repository-owned host preflight:
+
+```powershell
+../../backend/tools/check-verification-host.ps1
+```
+
+It checks host memory, Windows dynamic TCP/UDP port headroom, recent 4231/4266
+events, and Docker readiness. A scenario may pass its own required container
+list; the preflight itself does not assume every experiment needs all seven core
+containers and does not inspect or modify proxy, adapter, route, or firewall
+configuration.
+
+Run `../../backend/tools/verify-middleware-isolation.ps1` when each core
+middleware should be started, probed, measured, and removed serially before a
+business profile. RocketMQ NameServer, Broker, and Proxy are treated as one
+indivisible stage. This baseline proves middleware readiness and cleanup, not
+business concurrency or cross-service consistency.
+
 Optional `observability` profile:
 
 | Service | Container | Host endpoint |
@@ -64,7 +82,7 @@ cd ../../backend
 ./tools/verify-m7-catalog-read-replica.ps1
 ```
 
-The script performs the network preflight, creates a consistent Catalog snapshot,
+The script performs the host preflight, creates a consistent Catalog snapshot,
 pauses and resumes replication, stops and restarts the replica, verifies primary
 fallback metrics, and removes the experimental container afterward.
 

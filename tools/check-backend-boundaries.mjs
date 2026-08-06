@@ -73,9 +73,16 @@ function collectDependencyArtifacts(source) {
   return artifacts;
 }
 
+function collectSchemaDomains(source) {
+  return [...source.matchAll(
+    /\becom_(analytics|catalog|chat|fulfillment|identity|inventory|marketing|notification|payment|trade)\b/gu,
+  )].map((match) => match[1]);
+}
+
 export async function inspectBackendBoundaries(repositoryRoot) {
   const backendRoot = path.join(repositoryRoot, "backend");
   const violations = [];
+  let checkedServiceResources = 0;
 
   for (const domain of SERVICE_DOMAINS) {
     const serviceRoot = path.join(
@@ -90,10 +97,55 @@ export async function inspectBackendBoundaries(repositoryRoot) {
 
     for (const javaFile of javaFiles) {
       const source = await fs.readFile(javaFile, "utf8");
+      const serviceRelative = relative(repositoryRoot, javaFile);
       for (const importedDomain of collectDomainImports(source)) {
         if (importedDomain !== domain) {
           violations.push(
             `${relative(repositoryRoot, javaFile)} imports sibling service package com.ecommerce.${importedDomain}`,
+          );
+        }
+      }
+
+      if (
+        serviceRelative.includes("/interfaces/")
+        && new RegExp(`^import\\s+com\\.ecommerce\\.${domain}\\.infrastructure\\.`, "mu")
+          .test(source)
+      ) {
+        violations.push(
+          `${serviceRelative} imports the service infrastructure layer from an interface adapter`,
+        );
+      }
+
+      if (
+        serviceRelative.includes("/application/port/")
+        && new RegExp(`^import\\s+com\\.ecommerce\\.${domain}\\.infrastructure\\.`, "mu")
+          .test(source)
+      ) {
+        violations.push(
+          `${serviceRelative} imports the service infrastructure layer from an application port`,
+        );
+      }
+
+      if (
+        serviceRelative.includes("/domain/")
+        && /import\s+(?:org\.springframework|jakarta\.persistence|org\.apache\.ibatis|com\.baomidou)\./u
+          .test(source)
+      ) {
+        violations.push(
+          `${serviceRelative} imports framework or persistence concerns into the domain layer`,
+        );
+      }
+
+      if (javaFile.endsWith("Controller.java") && /@Transactional\b/u.test(source)) {
+        violations.push(
+          `${serviceRelative} declares a transaction in a controller`,
+        );
+      }
+
+      for (const schemaDomain of new Set(collectSchemaDomains(source))) {
+        if (schemaDomain !== domain) {
+          violations.push(
+            `${serviceRelative} references schema owned by ${schemaDomain}-service`,
           );
         }
       }
@@ -105,6 +157,30 @@ export async function inspectBackendBoundaries(repositoryRoot) {
         violations.push(
           `${relative(repositoryRoot, javaFile)} imports a persistence mapper from a controller`,
         );
+      }
+    }
+
+    const resourceRoot = path.join(
+      backendRoot,
+      "services",
+      `${domain}-service`,
+      "src",
+      "main",
+      "resources",
+    );
+    const resourceFiles = await listFiles(
+      resourceRoot,
+      (file) => /\.(?:sql|xml|ya?ml|properties)$/u.test(file),
+    );
+    checkedServiceResources += resourceFiles.length;
+    for (const resourceFile of resourceFiles) {
+      const source = await fs.readFile(resourceFile, "utf8");
+      for (const schemaDomain of new Set(collectSchemaDomains(source))) {
+        if (schemaDomain !== domain) {
+          violations.push(
+            `${relative(repositoryRoot, resourceFile)} references schema owned by ${schemaDomain}-service`,
+          );
+        }
       }
     }
 
@@ -180,6 +256,7 @@ export async function inspectBackendBoundaries(repositoryRoot) {
     violations,
     checkedServices: SERVICE_DOMAINS.size,
     checkedCommonFiles: commonFiles.length,
+    checkedServiceResources,
   };
 }
 
@@ -197,7 +274,8 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
   } else {
     console.log(
       `Backend architecture boundaries passed: ${result.checkedServices} services and `
-      + `${result.checkedCommonFiles} platform-common sources checked.`,
+      + `${result.checkedCommonFiles} platform-common sources and `
+      + `${result.checkedServiceResources} service resources checked.`,
     );
   }
 }

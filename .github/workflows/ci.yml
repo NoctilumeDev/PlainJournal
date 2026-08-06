@@ -27,7 +27,7 @@ jobs:
           node-version: 24.14.0
       - name: Verify generated documents and architecture
         run: |
-          node --test tools/*.test.mjs
+          node tools/run-repository-tests.mjs
           node tools/check-backend-boundaries.mjs
           node tools/check-documentation-structure.mjs
           node tools/check-markdown-links.mjs

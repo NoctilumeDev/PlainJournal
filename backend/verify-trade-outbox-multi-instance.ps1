@@ -18,7 +18,7 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $envFile = Join-Path $repositoryRoot 'deploy\docker\.env'
 $tradeJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service.jar'
 $runDirectory = Join-Path $PSScriptRoot '.run'
-$networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+$networkCheck = Join-Path $PSScriptRoot 'tools\check-verification-host.ps1'
 $topic = 'plainjournal-m3-outbox-probe-v1'
 $aggregatePrefix = 'M3OutboxProbe:'
 $ports = @(18211, 18212, 18213)
@@ -450,7 +450,7 @@ if (-not $SkipNetworkPreflight) {
     }
     & $networkCheck
     if ($LASTEXITCODE -ne 0) {
-        throw 'Local development network preflight failed.'
+        throw 'Host preflight failed.'
     }
 }
 

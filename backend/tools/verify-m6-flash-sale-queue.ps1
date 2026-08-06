@@ -896,10 +896,8 @@ Assert-RequiredEnvironment
 $nodeCandidate = Get-Command node -ErrorAction SilentlyContinue
 $script:nodePath = if ($nodeCandidate) {
     $nodeCandidate.Source
-} elseif (Test-Path -LiteralPath 'D:\Node.js\current\node.exe') {
-    'D:\Node.js\current\node.exe'
 } else {
-    throw 'Node.js was not found on PATH or at D:\Node.js\current\node.exe.'
+    throw 'Node.js was not found on PATH.'
 }
 $javaHomeCandidate = if ($env:JAVA_HOME) {
     Join-Path $env:JAVA_HOME 'bin\java.exe'
@@ -924,7 +922,7 @@ $cleanupFailure = $null
 $summary = $null
 try {
     $networkLog = Join-Path $script:runDirectory 'network-preflight.log'
-    $networkOutput = @(& 'D:\DevTools\Network\check-dev-network.ps1' *>&1)
+    $networkOutput = @(& (Join-Path $PSScriptRoot 'check-verification-host.ps1') *>&1)
     $networkExitCode = $LASTEXITCODE
     $networkOutput | Out-String -Width 240 |
         Set-Content -LiteralPath $networkLog -Encoding utf8
@@ -936,7 +934,7 @@ try {
     $missing = @($requiredContainers | Where-Object { $runningContainers -notcontains $_ })
     if ($missing.Count -gt 0) { throw "Required containers are not running: $($missing -join ', ')" }
     if ($networkExitCode -ne 0) {
-        throw "Local network preflight failed with exit code $networkExitCode. See $networkLog."
+        throw "Host preflight failed with exit code $networkExitCode. See $networkLog."
     }
     foreach ($port in @(18000,18101,18102,18103,18104,18105,18107)) {
         Assert-PortAvailable $port

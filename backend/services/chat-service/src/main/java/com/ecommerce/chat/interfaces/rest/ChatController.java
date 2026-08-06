@@ -13,10 +13,10 @@ import com.ecommerce.chat.application.model.ChatModels.ReadView;
 import com.ecommerce.chat.application.model.ChatModels.RetryAttachmentScanCommand;
 import com.ecommerce.chat.application.model.ChatModels.SendMessageCommand;
 import com.ecommerce.chat.application.model.ChatModels.WebSocketTicketView;
+import com.ecommerce.chat.application.port.ChatWebSocketTicketIssuer;
 import com.ecommerce.chat.application.service.ChatApplicationService;
 import com.ecommerce.chat.application.service.ChatAttachmentService;
 import com.ecommerce.chat.application.service.ChatAttachmentScanService;
-import com.ecommerce.chat.infrastructure.realtime.ChatWebSocketTicketService;
 import com.ecommerce.platform.common.api.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -52,17 +52,17 @@ public class ChatController {
     private final ChatApplicationService chatService;
     private final ChatAttachmentService attachmentService;
     private final ChatAttachmentScanService attachmentScanService;
-    private final ChatWebSocketTicketService webSocketTicketService;
+    private final ChatWebSocketTicketIssuer webSocketTicketIssuer;
 
     public ChatController(
             ChatApplicationService chatService,
             ChatAttachmentService attachmentService,
             ChatAttachmentScanService attachmentScanService,
-            ChatWebSocketTicketService webSocketTicketService) {
+            ChatWebSocketTicketIssuer webSocketTicketIssuer) {
         this.chatService = chatService;
         this.attachmentService = attachmentService;
         this.attachmentScanService = attachmentScanService;
-        this.webSocketTicketService = webSocketTicketService;
+        this.webSocketTicketIssuer = webSocketTicketIssuer;
     }
 
     @PostMapping("/conversations")
@@ -94,7 +94,7 @@ public class ChatController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .header(HttpHeaders.PRAGMA, "no-cache")
-                .body(ApiResponse.success(webSocketTicketService.issue(
+                .body(ApiResponse.success(webSocketTicketIssuer.issue(
                         actor.userId(),
                         authorities)));
     }

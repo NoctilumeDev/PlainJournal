@@ -152,3 +152,85 @@ test("rejects persistence and domain packages in platform-common", async () => {
   const result = await inspectBackendBoundaries(root);
   assert.equal(result.violations.length, 2);
 });
+
+test("rejects interface-to-infrastructure, controller transactions, and cross-owner schemas", async () => {
+  const root = await createRepository();
+  const interfaceRoot = path.join(
+    root,
+    "backend",
+    "services",
+    "trade-service",
+    "src",
+    "main",
+    "java",
+    "com",
+    "ecommerce",
+    "trade",
+    "interfaces",
+    "rest",
+  );
+  await fs.mkdir(interfaceRoot, { recursive: true });
+  await fs.writeFile(
+    path.join(interfaceRoot, "TradeProbeController.java"),
+    [
+      "package com.ecommerce.trade.interfaces.rest;",
+      "import com.ecommerce.trade.infrastructure.persistence.mapper.OrderMapper;",
+      "@Transactional class TradeProbeController {}",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  const resourceRoot = path.join(
+    root,
+    "backend",
+    "services",
+    "trade-service",
+    "src",
+    "main",
+    "resources",
+  );
+  await fs.mkdir(resourceRoot, { recursive: true });
+  await fs.writeFile(
+    path.join(resourceRoot, "application.yml"),
+    "foreign-schema: ecom_payment\n",
+    "utf8",
+  );
+
+  const result = await inspectBackendBoundaries(root);
+  assert.equal(result.violations.length, 4);
+  assert.ok(result.violations.some((violation) => violation.includes("interface adapter")));
+  assert.ok(result.violations.some((violation) => violation.includes("transaction in a controller")));
+  assert.ok(result.violations.some((violation) => violation.includes("payment-service")));
+});
+
+test("rejects infrastructure dependencies in application ports", async () => {
+  const root = await createRepository();
+  const portRoot = path.join(
+    root,
+    "backend",
+    "services",
+    "trade-service",
+    "src",
+    "main",
+    "java",
+    "com",
+    "ecommerce",
+    "trade",
+    "application",
+    "port",
+  );
+  await fs.mkdir(portRoot, { recursive: true });
+  await fs.writeFile(
+    path.join(portRoot, "BrokenPort.java"),
+    [
+      "package com.ecommerce.trade.application.port;",
+      "import com.ecommerce.trade.infrastructure.id.DistributedIdWorkerLeaseManager;",
+      "interface BrokenPort {}",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+
+  const result = await inspectBackendBoundaries(root);
+  assert.ok(result.violations.some((violation) => violation.includes("application port")));
+});

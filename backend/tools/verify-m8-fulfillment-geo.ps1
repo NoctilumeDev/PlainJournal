@@ -282,7 +282,10 @@ Require-Environment -Names @(
     'METRICS_SCRAPE_TOKEN')
 
 if (-not $SkipNetworkPreflight) {
-    & 'D:\DevTools\Network\check-dev-network.ps1'
+    & (Join-Path $PSScriptRoot 'check-verification-host.ps1')
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Host preflight failed.'
+    }
 }
 foreach ($container in @('plainjournal-mysql', 'plainjournal-redis')) {
     if ((docker inspect --format '{{.State.Running}}' $container 2>$null) -ne 'true') {

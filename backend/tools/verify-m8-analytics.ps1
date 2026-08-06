@@ -95,16 +95,16 @@ function Require-Environment {
 
 function Invoke-NetworkPreflight {
     if ($SkipNetworkPreflight) {
-        Write-VerificationTrace 'network preflight skipped by explicit switch'
+        Write-VerificationTrace 'host preflight skipped by explicit compatibility switch'
         return
     }
-    $networkScript = 'D:\DevTools\Network\check-dev-network.ps1'
+    $networkScript = Join-Path $PSScriptRoot 'check-verification-host.ps1'
     if (-not (Test-Path -LiteralPath $networkScript)) {
-        throw "Missing required network preflight: $networkScript"
+        throw "Missing required host preflight: $networkScript"
     }
     & $networkScript
     if ($LASTEXITCODE -ne 0) {
-        throw 'Development network preflight failed.'
+        throw 'Host preflight failed.'
     }
 }
 

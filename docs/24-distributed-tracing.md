@@ -70,7 +70,7 @@ cd backend
 .\run-foundation-smoke.ps1 -EnableDistributedTracing -EnableObservability
 ```
 
-脚本先遵守本机网络预检，再按需启动 Tempo 和观测栈，执行基础交易正向/逆向闭环，
+脚本先遵守本机宿主机预检，再按需启动 Tempo 和观测栈，执行基础交易正向/逆向闭环，
 分别从 Payment 的支付与退款 Outbox 读取本次 `traceId`，通过 Tempo
 `/api/traces/{traceId}` 验证：
 

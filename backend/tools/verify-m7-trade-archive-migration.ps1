@@ -16,7 +16,7 @@ $repositoryRoot = Split-Path -Parent $backendRoot
 $composeDirectory = Join-Path $repositoryRoot 'deploy\docker'
 $composeFile = Join-Path $composeDirectory 'compose.yml'
 $environmentFile = Join-Path $composeDirectory '.env'
-$networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+$networkCheck = Join-Path $PSScriptRoot 'check-verification-host.ps1'
 $archiveTool = Join-Path $PSScriptRoot 'invoke-m7-trade-archive-migration.ps1'
 $migrationDirectory = Join-Path $backendRoot `
     'services\trade-service\src\main\resources\db\migration'
@@ -509,12 +509,12 @@ try {
 
     if (-not $SkipNetworkPreflight) {
         if (-not (Test-Path -LiteralPath $networkCheck -PathType Leaf)) {
-            throw "Network preflight script does not exist: $networkCheck"
+            throw "Host preflight script does not exist: $networkCheck"
         }
         Invoke-TimedStage -Name 'network-preflight' -Body {
             & $networkCheck
             if ($LASTEXITCODE -ne 0) {
-                throw 'Machine network preflight failed.'
+                throw 'Host preflight failed.'
             }
         }
     }

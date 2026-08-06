@@ -18,7 +18,7 @@ $composeDirectory = Join-Path $repositoryRoot 'deploy\docker'
 $composeFile = Join-Path $composeDirectory 'compose.yml'
 $composeEnvFile = Join-Path $composeDirectory '.env'
 $bootstrapScript = Join-Path $composeDirectory 'bootstrap-resources.ps1'
-$networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+$networkCheck = Join-Path $PSScriptRoot 'check-verification-host.ps1'
 $timestamp = [DateTimeOffset]::UtcNow.ToString('yyyyMMdd-HHmmss')
 $runDirectory = Join-Path $backendRoot ".run\m7-trade-sharding-$timestamp"
 $evidencePath = Join-Path $runDirectory 'verification.json'
@@ -748,7 +748,7 @@ try {
         }
         & $networkCheck
         if ($LASTEXITCODE -ne 0) {
-            throw "Network preflight failed with exit code $LASTEXITCODE."
+            throw "Host preflight failed with exit code $LASTEXITCODE."
         }
     }
 

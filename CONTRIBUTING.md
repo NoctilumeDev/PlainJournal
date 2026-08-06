@@ -35,7 +35,7 @@ pnpm check
 仓库门禁：
 
 ```bash
-node --test tools/*.test.mjs
+node tools/run-repository-tests.mjs
 node tools/check-markdown-links.mjs
 node tools/render-verification-summary.mjs --check
 git diff --check
@@ -59,4 +59,3 @@ git diff --check
 提交应按可审查主题拆分，例如 `ci: add public verification gates`、`docs: unify current
 verification baseline`。Pull Request 需填写影响边界、验证证据和回滚方式；修改 API、
 事件或数据库语义时，还需说明新旧版本是否允许并行运行。
-

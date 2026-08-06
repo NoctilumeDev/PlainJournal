@@ -20,7 +20,7 @@ $composeFile = Join-Path $composeDirectory 'compose.yml'
 $envFile = Join-Path $composeDirectory '.env'
 $runDirectory = Join-Path $PSScriptRoot '.run'
 $evidencePath = Join-Path $runDirectory $EvidenceFileName
-$networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+$networkCheck = Join-Path $PSScriptRoot 'tools\check-verification-host.ps1'
 $runToken = (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmssfff')
 $gatewayContainer = 'plainjournal-m3-gateway'
 $containerPrefix = "plainjournal-m3-trade-roll-$runToken"
@@ -651,7 +651,7 @@ foreach ($path in @($probePath, $probeStopPath, $probeStagePath)) {
 if (-not $SkipNetworkPreflight) {
     & $networkCheck
     if ($LASTEXITCODE -ne 0) {
-        throw 'Local development network preflight failed.'
+        throw 'Host preflight failed.'
     }
 }
 
