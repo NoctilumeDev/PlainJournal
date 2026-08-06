@@ -646,11 +646,14 @@ WHERE first_event.aggregate_type = '$aggregateType'
     Write-Host "Evidence: $evidencePath"
 }
 finally {
-    try {
-        Send-TradeMySql -Sql "DELETE FROM outbox_event WHERE aggregate_type LIKE '$aggregatePrefix%';"
-    }
-    catch {
-        Write-Warning "Probe-row cleanup failed: $($_.Exception.Message)"
+    $mysqlRunning = (docker inspect --format '{{.State.Running}}' plainjournal-mysql 2>$null) -eq 'true'
+    if ($mysqlRunning) {
+        try {
+            Send-TradeMySql -Sql "DELETE FROM outbox_event WHERE aggregate_type LIKE '$aggregatePrefix%';"
+        }
+        catch {
+            Write-Warning "Probe-row cleanup failed: $($_.Exception.Message)"
+        }
     }
     try {
         Remove-ProbeTopic
