@@ -220,7 +220,8 @@ NEEDS_ATTENTION
 - 顾客不能恢复邮件任务；`ADMIN/OPERATOR` 必须提供稳定 `commandId` 和原因，命令
   只允许 `NEEDS_ATTENTION -> RETRY`，不能直接写 `SENT`。
 - 相同恢复命令只追加一条 `notification_delivery_retry_audit`；命令与状态重置在
-  Notification 本地事务内完成。
+  Notification 本地事务内完成。事务以 `READ_COMMITTED` 运行，先锁定
+  `notification_delivery` 再复查命令审计，使投递记录成为恢复操作的唯一串行化边界。
 - 每个邮件任务持久化稳定 `provider_message_id`。SMTP 已接受邮件但响应丢失时，
   重试可能造成重复邮件；稳定 `Message-ID` 便于供应商或收件系统去重，但本项目
   不宣称 SMTP exactly-once。

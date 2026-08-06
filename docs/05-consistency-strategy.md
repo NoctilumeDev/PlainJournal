@@ -175,9 +175,10 @@ Redis 不可用时秒杀入口直接降级为“活动繁忙”，不能穿透�
 - 邮件任务通过 `PENDING / RETRY / SENDING` 状态和有期限 MySQL 租约抢占，
   事务提交后调用 SMTP。失败有限重试，达到上限进入 `NEEDS_ATTENTION`，不能把
   网络异常解释成发送成功。
-- 管理员恢复要求角色、稳定 `commandId` 和原因，在同一本地事务追加
-  `notification_delivery_retry_audit` 并执行 `NEEDS_ATTENTION -> RETRY`；命令不能
-  直接写 `SENT`。
+- 管理员恢复要求角色、稳定 `commandId` 和原因，在同一个 `READ_COMMITTED` 本地
+  事务内先锁定 `notification_delivery`、再复查并追加
+  `notification_delivery_retry_audit`，最后执行 `NEEDS_ATTENTION -> RETRY`。该顺序
+  保证等待行锁后的事务能看到胜出命令的提交结果；命令不能直接写 `SENT`。
 - 邮件持久化稳定 `provider_message_id`。SMTP 接受成功但响应丢失时仍可能产生重复
   邮件，因此只声明 at-least-once 尝试与可审计恢复，不声明外部邮件 exactly-once。
 - 无效事件先写 `consumer_failure.NEEDS_ATTENTION` 再 ACK；临时处理失败不 ACK。
