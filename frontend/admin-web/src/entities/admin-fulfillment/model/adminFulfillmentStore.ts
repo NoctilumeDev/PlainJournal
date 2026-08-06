@@ -187,12 +187,14 @@ function persistentPending(
   if (value.kind !== "trace") {
     return value;
   }
-  const payload = { ...value.payload };
-  delete payload.longitude;
-  delete payload.latitude;
   return {
-    ...value,
-    payload,
+    kind: "trace",
+    referenceNo: value.referenceNo,
+    commandKey: value.commandKey,
+    payload: {
+      externalEventId: value.commandKey,
+    },
+    createdAt: value.createdAt,
     requiresAuthorityRead: true,
   };
 }
