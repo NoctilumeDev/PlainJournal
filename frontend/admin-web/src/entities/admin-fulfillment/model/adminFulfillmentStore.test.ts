@@ -195,6 +195,49 @@ describe("admin fulfillment entity", () => {
     expect(store.traceForm(FULFILLMENT_NO).externalEventId).not.toBe(eventId);
   });
 
+  it("keeps an in-flight trace single-flight after the persistence split", async () => {
+    let resolveResponse!: (response: Response) => void;
+    let submitted!: AddLogisticsTraceInput;
+    const fetchMock = vi.fn((
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      submitted = JSON.parse(String(init?.body)) as AddLogisticsTraceInput;
+      return new Promise<Response>((resolve) => {
+        resolveResponse = resolve;
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const store = useAdminFulfillmentStore();
+    store.synchronizeAccess(ACCESS);
+    store.traceForm(FULFILLMENT_NO).description = "单飞轨迹命令";
+
+    const first = store.addTrace(ACCESS, FULFILLMENT_NO);
+    const duplicate = store.addTrace(ACCESS, FULFILLMENT_NO);
+
+    await expect(duplicate).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveResponse(success(fulfillmentFixture({
+      status: "IN_TRANSIT",
+      traces: [{
+        externalEventId: submitted.externalEventId,
+        nodeType: submitted.nodeType,
+        description: submitted.description,
+        locationName: submitted.locationName ?? null,
+        longitude: submitted.longitude ?? null,
+        latitude: submitted.latitude ?? null,
+        occurredAt: submitted.occurredAt,
+      }],
+    })));
+
+    await expect(first).resolves.toMatchObject({ status: "IN_TRANSIT" });
+    expect(store.commandPhase).toBe("accepted");
+    expect(store.pendingCommand).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
   it("redacts persisted coordinates and resolves a restored trace through authority", async () => {
     let eventId = "";
     const fetchMock = vi.fn(async (

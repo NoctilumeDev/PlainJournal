@@ -35,6 +35,11 @@ type FulfillmentCommandKind =
   | "receive"
   | "inspect";
 
+type NonTraceFulfillmentCommandKind = Exclude<
+  FulfillmentCommandKind,
+  "trace"
+>;
+
 export interface AdminFulfillmentAccessContext {
   authorized: boolean;
   operatorId: BusinessId | null;
@@ -48,14 +53,34 @@ interface ActiveAccess {
   api: FulfillmentApi;
 }
 
-interface PendingFulfillmentCommand {
-  kind: FulfillmentCommandKind;
+type FulfillmentCommandResult = Promise<
+  Fulfillment | ReturnReceipt | null
+>;
+
+type SubmissionDecision =
+  | { access: ActiveAccess }
+  | { result: FulfillmentCommandResult };
+
+interface PendingFulfillmentCommandBase {
   referenceNo: string;
   commandKey: string;
   payload: Record<string, unknown>;
   createdAt: string;
+}
+
+interface PendingTraceCommand extends PendingFulfillmentCommandBase {
+  kind: "trace";
   requiresAuthorityRead?: boolean;
 }
+
+interface PendingNonTraceCommand extends PendingFulfillmentCommandBase {
+  kind: NonTraceFulfillmentCommandKind;
+  requiresAuthorityRead?: never;
+}
+
+type PendingFulfillmentCommand =
+  | PendingTraceCommand
+  | PendingNonTraceCommand;
 
 interface ShipForm {
   carrier: string;
@@ -162,7 +187,11 @@ function parsePending(raw: string | null): PendingFulfillmentCommand | null {
     }
     const command = value as PendingFulfillmentCommand;
     return command.kind === "trace"
-      ? persistentPending(command)
+      ? traceAuthorityRecovery(
+          command.referenceNo,
+          command.commandKey,
+          command.createdAt,
+        )
       : command;
   } catch {
     return null;
@@ -181,37 +210,54 @@ function loadPending(operatorId: BusinessId): PendingFulfillmentCommand | null {
   return command;
 }
 
-function persistentPending(
-  value: PendingFulfillmentCommand,
-): PendingFulfillmentCommand {
-  if (value.kind !== "trace") {
-    return value;
-  }
+function traceAuthorityRecovery(
+  referenceNo: string,
+  externalEventId: string,
+  createdAt: string,
+): PendingTraceCommand {
   return {
     kind: "trace",
-    referenceNo: value.referenceNo,
-    commandKey: value.commandKey,
+    referenceNo,
+    commandKey: externalEventId,
     payload: {
-      externalEventId: value.commandKey,
+      externalEventId,
     },
-    createdAt: value.createdAt,
+    createdAt,
     requiresAuthorityRead: true,
   };
 }
 
-function savePending(
+function saveTraceAuthorityRecovery(
   operatorId: BusinessId,
-  value: PendingFulfillmentCommand | null,
+  referenceNo: string,
+  externalEventId: string,
+  createdAt: string,
 ) {
   if (typeof localStorage === "undefined") {
     return;
   }
-  if (value) {
-    localStorage.setItem(
-      storageKey(operatorId),
-      JSON.stringify(persistentPending(value)),
-    );
-  } else {
+  localStorage.setItem(
+    storageKey(operatorId),
+    JSON.stringify(traceAuthorityRecovery(
+      referenceNo,
+      externalEventId,
+      createdAt,
+    )),
+  );
+}
+
+function saveRetryablePending(
+  operatorId: BusinessId,
+  command: PendingNonTraceCommand,
+) {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  localStorage.setItem(storageKey(operatorId), JSON.stringify(command));
+}
+
+function clearPending(operatorId: BusinessId) {
+  if (typeof localStorage !== "undefined") {
     localStorage.removeItem(storageKey(operatorId));
   }
 }
@@ -534,14 +580,33 @@ export const useAdminFulfillmentStore = defineStore(
       return resolutionForms[referenceNo];
     }
 
-    function beginPending(
-      access: ActiveAccess,
+    function markPending(
       command: PendingFulfillmentCommand,
     ) {
       pendingCommand.value = command;
-      savePending(access.operatorId, command);
       commandPhase.value = "processing";
       commandMessage.value = `${pendingCommandLabel.value}命令正在等待 Fulfillment 确认。`;
+    }
+
+    function beginTracePending(
+      access: ActiveAccess,
+      command: PendingTraceCommand,
+    ) {
+      markPending(command);
+      saveTraceAuthorityRecovery(
+        access.operatorId,
+        command.referenceNo,
+        command.commandKey,
+        command.createdAt,
+      );
+    }
+
+    function beginRetryablePending(
+      access: ActiveAccess,
+      command: PendingNonTraceCommand,
+    ) {
+      markPending(command);
+      saveRetryablePending(access.operatorId, command);
     }
 
     function settleAccepted(
@@ -549,7 +614,7 @@ export const useAdminFulfillmentStore = defineStore(
       message: string,
     ) {
       pendingCommand.value = null;
-      savePending(access.operatorId, null);
+      clearPending(access.operatorId);
       commandPhase.value = "accepted";
       commandMessage.value = message;
     }
@@ -559,7 +624,7 @@ export const useAdminFulfillmentStore = defineStore(
       message: string,
     ) {
       pendingCommand.value = null;
-      savePending(access.operatorId, null);
+      clearPending(access.operatorId);
       commandPhase.value = "rejected";
       commandMessage.value = message;
     }
@@ -690,27 +755,32 @@ export const useAdminFulfillmentStore = defineStore(
       }
     }
 
-    function submit(
+    function decideSubmission(
       context: AdminFulfillmentAccessContext,
-      command: PendingFulfillmentCommand,
-    ): Promise<Fulfillment | ReturnReceipt | null> {
+    ): SubmissionDecision {
       const access = requireAccess(
         context,
         "当前会话无权提交 Fulfillment 命令。",
       );
       if (!access) {
-        return Promise.resolve(null);
+        return { result: Promise.resolve(null) };
       }
       if (pendingCommand.value) {
         commandPhase.value = "unknown";
         commandMessage.value =
           "已有一条结果未知命令，不能生成或提交第二条命令；请先读取权威事实或原样重试。";
-        return Promise.resolve(null);
+        return { result: Promise.resolve(null) };
       }
       if (activeCommandPromise) {
-        return activeCommandPromise;
+        return { result: activeCommandPromise };
       }
-      beginPending(access, command);
+      return { access };
+    }
+
+    function trackSubmission(
+      access: ActiveAccess,
+      command: PendingFulfillmentCommand,
+    ): Promise<Fulfillment | ReturnReceipt | null> {
       const request = executePending(access, command);
       activeCommandPromise = request;
       const clear = () => {
@@ -722,11 +792,35 @@ export const useAdminFulfillmentStore = defineStore(
       return request;
     }
 
+    function submitRetryable(
+      context: AdminFulfillmentAccessContext,
+      command: PendingNonTraceCommand,
+    ): FulfillmentCommandResult {
+      const decision = decideSubmission(context);
+      if ("result" in decision) {
+        return decision.result;
+      }
+      beginRetryablePending(decision.access, command);
+      return trackSubmission(decision.access, command);
+    }
+
+    function submitTrace(
+      context: AdminFulfillmentAccessContext,
+      command: PendingTraceCommand,
+    ): FulfillmentCommandResult {
+      const decision = decideSubmission(context);
+      if ("result" in decision) {
+        return decision.result;
+      }
+      beginTracePending(decision.access, command);
+      return trackSubmission(decision.access, command);
+    }
+
     function naturalCommand(
-      kind: FulfillmentCommandKind,
+      kind: NonTraceFulfillmentCommandKind,
       referenceNo: string,
       payload: Record<string, unknown> = {},
-    ): PendingFulfillmentCommand {
+    ): PendingNonTraceCommand {
       return {
         kind,
         referenceNo,
@@ -740,14 +834,20 @@ export const useAdminFulfillmentStore = defineStore(
       context: AdminFulfillmentAccessContext,
       fulfillmentNo: string,
     ) {
-      return submit(context, naturalCommand("picking", fulfillmentNo));
+      return submitRetryable(
+        context,
+        naturalCommand("picking", fulfillmentNo),
+      );
     }
 
     function markPacked(
       context: AdminFulfillmentAccessContext,
       fulfillmentNo: string,
     ) {
-      return submit(context, naturalCommand("packed", fulfillmentNo));
+      return submitRetryable(
+        context,
+        naturalCommand("packed", fulfillmentNo),
+      );
     }
 
     function ship(
@@ -762,7 +862,7 @@ export const useAdminFulfillmentStore = defineStore(
         commandMessage.value = "承运商和运单号不能为空。";
         return Promise.resolve(null);
       }
-      return submit(context, naturalCommand("ship", fulfillmentNo, {
+      return submitRetryable(context, naturalCommand("ship", fulfillmentNo, {
         carrier,
         trackingNo,
       }));
@@ -786,7 +886,7 @@ export const useAdminFulfillmentStore = defineStore(
         return Promise.resolve(null);
       }
       const occurredAt = new Date().toISOString();
-      return submit(context, {
+      return submitTrace(context, {
         kind: "trace",
         referenceNo: fulfillmentNo,
         commandKey: form.externalEventId,
@@ -813,9 +913,12 @@ export const useAdminFulfillmentStore = defineStore(
         commandMessage.value = "履约异常原因不能为空。";
         return Promise.resolve(null);
       }
-      return submit(context, naturalCommand("exception", fulfillmentNo, {
+      return submitRetryable(
+        context,
+        naturalCommand("exception", fulfillmentNo, {
         reason,
-      }));
+        }),
+      );
     }
 
     function resolveException(
@@ -829,7 +932,7 @@ export const useAdminFulfillmentStore = defineStore(
         commandMessage.value = "异常恢复原因不能为空。";
         return Promise.resolve(null);
       }
-      return submit(context, {
+      return submitRetryable(context, {
         kind: "resolve",
         referenceNo: fulfillmentNo,
         commandKey: form.commandId,
@@ -842,7 +945,10 @@ export const useAdminFulfillmentStore = defineStore(
       context: AdminFulfillmentAccessContext,
       returnReceiptNo: string,
     ) {
-      return submit(context, naturalCommand("receive", returnReceiptNo));
+      return submitRetryable(
+        context,
+        naturalCommand("receive", returnReceiptNo),
+      );
     }
 
     function inspectReturn(
@@ -855,7 +961,7 @@ export const useAdminFulfillmentStore = defineStore(
         commandMessage.value = "退货验收说明不能为空。";
         return Promise.resolve(null);
       }
-      return submit(context, naturalCommand("inspect", returnReceiptNo, {
+      return submitRetryable(context, naturalCommand("inspect", returnReceiptNo, {
         remark,
       }));
     }
