@@ -68,3 +68,11 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
   可漂移数字进入 CI 门禁。
 - [x] PlainJournal M0-M8 参考基线与独立 PlainJournalPro 的 M9+ 边界已写入文档。
 - [x] 完整 CI、Security、Release 附件与本机资源清理通过。
+
+## 9. v1.0.4 发布后边界补丁
+
+- [x] 结果未知的履约轨迹不再把说明、地点或坐标持久化到浏览器本地存储。
+- [x] 通知邮件人工恢复以投递行锁和 `READ_COMMITTED` 保证同命令并发回放可见性。
+- [x] 本地后端 14 模块、436 个测试、覆盖率和仓库文档门禁通过。
+- [x] PR 与 `main` 的 CI、Security 和 CodeQL 通过，公开代码扫描告警为 0。
+- [ ] `v1.0.4` 标签、Release Notes、ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
