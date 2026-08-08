@@ -322,6 +322,7 @@ test("V5 checkout blocks insufficient stock and keeps a lost order response unkn
   await expectNoSeriousAccessibilityViolations(page);
 
   await page.getByRole("button", { name: "使用原请求安全重试" }).click();
+  await expect.poll(() => createKeys.length).toBe(2);
   await expect(unknownNotice).toBeVisible();
   await expectNoRootOverflow(page);
 
@@ -332,7 +333,6 @@ test("V5 checkout blocks insufficient stock and keeps a lost order response unkn
     request: unknown;
   } | null;
   expect(stored?.key).toBe(createKeys[0]);
-  expect(createKeys).toHaveLength(2);
   expect(createKeys[1]).toBe(createKeys[0]);
   expect(diagnostics.pageErrors).toEqual([]);
   expect(diagnostics.consoleWarnings).toEqual([]);
