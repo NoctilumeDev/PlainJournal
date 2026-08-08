@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "targetRelease": "v1.0.4",
-  "status": "released",
-  "verifiedOn": "2026-08-06",
+  "targetRelease": "v1.0.5",
+  "status": "release-candidate",
+  "verifiedOn": "2026-08-08",
   "backend": {
     "surefireReports": 100,
     "tests": 436,
@@ -26,7 +26,7 @@
     "deliveryRules": 3,
     "deploymentRules": 3,
     "releaseMaterialRules": 3,
-    "lineCoverage": 70.11,
+    "lineCoverage": 70.16,
     "lineCoverageMinimum": 70
   },
   "realEvidence": {

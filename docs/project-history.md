@@ -39,7 +39,8 @@ PlainJournal 在本地 Git 工作区中开发，`2026-07-16` 建立可运行基�
 - 多商户、分账和 Go 异构服务不在本仓库实施，进入独立
   [PlainJournalPro](https://github.com/NoctilumeDev/PlainJournalPro)；
 - `v1.0.x` 先完成后端、数据库、测试、文档与开源交付；
-- 后续 `v1.1.0` 可以重构前端视觉，但不得改变所有者事实和交易状态机。
+- 后续任一 `1.x.x` 版本可以重构前端视觉，但不得改变所有者事实和交易状态机；版本号
+  由实际变更决定，不提前占位。
 
 控制变量、资源边界、并发数字解释和两个仓库的职责见
 [参考基线与 Pro 边界](reference-baseline-and-pro-boundary.md)。
