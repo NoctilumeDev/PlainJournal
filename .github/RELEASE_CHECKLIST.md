@@ -84,4 +84,12 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 - [x] 16GB 资源停止线正确阻止超预算组合，不宣称未经证明的 1000 同时在途结果。
 - [x] 后端 436 个测试、前端 322 个单元/契约测试及完整浏览器链路通过。
 - [x] `nanoid` 安全公告已修复，PR 的 CI、Security 和 CodeQL 全绿。
-- [ ] `v1.0.5` 标签、Release Notes、ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
+- [x] `v1.0.5` 标签的 Release 工作流暴露 V5 E2E 同步竞态，未创建正式 Release；
+  标签保持不可变并由后续补丁取代。
+
+## 11. v1.0.6 发布门禁修复
+
+- [x] V5 丢响应重试等待第二个 POST 网络事实，不再依赖已经可见的旧 UI 状态。
+- [x] V5 配置本机串行重复 10 轮、30/30 场景通过。
+- [ ] PR 与 `main` 的 CI、Security、CodeQL 和 Online Preview 全绿。
+- [ ] `v1.0.6` 标签、Release Notes、ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
