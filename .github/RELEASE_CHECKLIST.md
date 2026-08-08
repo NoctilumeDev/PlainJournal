@@ -91,5 +91,5 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 
 - [x] V5 丢响应重试等待第二个 POST 网络事实，不再依赖已经可见的旧 UI 状态。
 - [x] V5 配置本机串行重复 10 轮、30/30 场景通过。
-- [ ] PR 与 `main` 的 CI、Security、CodeQL 和 Online Preview 全绿。
-- [ ] `v1.0.6` 标签、Release Notes、ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
+- [x] PR 与 `main` 的 CI、Security、CodeQL 和 Online Preview 全绿。
+- [x] `v1.0.6` 标签、Release Notes、ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
