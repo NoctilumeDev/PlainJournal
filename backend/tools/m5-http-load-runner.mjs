@@ -91,6 +91,7 @@ function normalizeRequestVariant(rawVariant, scenarioName, index, defaults) {
     ...normalizeHeaders(rawVariant.headers),
   };
   return {
+    label: String(rawVariant.label ?? `${scenarioName}-${index}`),
     url,
     method: String(rawVariant.method ?? defaults.method).toUpperCase(),
     headers,
@@ -119,6 +120,11 @@ function normalizeScenario(rawScenario, index) {
 
   const method = String(rawScenario.method ?? 'GET').toUpperCase();
   const headers = normalizeHeaders(rawScenario.headers);
+  const captureJsonPaths = rawScenario.captureJsonPaths ?? [];
+  if (!Array.isArray(captureJsonPaths) || captureJsonPaths.some((value) =>
+    typeof value !== 'string' || !/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/u.test(value))) {
+    throw new Error(`Scenario ${name} captureJsonPaths must contain simple dot-separated paths.`);
+  }
   let requests;
   if (rawScenario.variants !== undefined) {
     if (!Array.isArray(rawScenario.variants) || rawScenario.variants.length === 0) {
@@ -158,7 +164,19 @@ function normalizeScenario(rawScenario, index) {
       rawScenario.expectedBodyIncludes === undefined
         ? undefined
         : String(rawScenario.expectedBodyIncludes),
+    captureJsonPaths: [...new Set(captureJsonPaths)],
   };
+}
+
+function normalizeSeed(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const seed = requireInteger(value, 'seed', 0);
+  if (seed > 0xFFFFFFFF) {
+    throw new Error('seed must be an integer between 0 and 4294967295.');
+  }
+  return seed >>> 0;
 }
 
 export function normalizeConfiguration(rawConfiguration) {
@@ -187,8 +205,66 @@ export function normalizeConfiguration(rawConfiguration) {
     warmupRequests: requireInteger(raw.warmupRequests ?? 0, 'warmupRequests', 0),
     timeoutMs: requireInteger(raw.timeoutMs ?? 10_000, 'timeoutMs', 1),
     maxErrorRate: requireNumber(raw.maxErrorRate ?? 0, 'maxErrorRate', 0, 1),
+    includeRecords: raw.includeRecords === true,
+    randomizeOrder: raw.randomizeOrder === true,
+    seed: normalizeSeed(raw.seed),
     scenarios: raw.scenarios.map(normalizeScenario),
   };
+}
+
+function readJsonPath(payload, jsonPath) {
+  return jsonPath.split('.').reduce(
+    (current, segment) => current === null || current === undefined
+      ? undefined
+      : current[segment],
+    payload,
+  );
+}
+
+function capturedJson(payload, paths) {
+  if (payload === undefined || paths.length === 0) {
+    return undefined;
+  }
+  return Object.fromEntries(paths.map((jsonPath) => [jsonPath, readJsonPath(payload, jsonPath)]));
+}
+
+function seededRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6D2B79F5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function createAssignments(configuration, requestCount, seedOffset = 0) {
+  const schedule = configuration.scenarios.flatMap((scenario) =>
+    Array.from({ length: scenario.weight }, () => scenario));
+  const scenarioCursors = new Map();
+  const assignments = Array.from({ length: requestCount }, (_, requestIndex) => {
+    const scenario = schedule[requestIndex % schedule.length];
+    const scenarioCursor = scenarioCursors.get(scenario.name) ?? 0;
+    scenarioCursors.set(scenario.name, scenarioCursor + 1);
+    return {
+      scenario,
+      requestVariant: scenario.requests[scenarioCursor % scenario.requests.length],
+    };
+  });
+
+  if (configuration.randomizeOrder) {
+    if (configuration.seed === null) {
+      throw new Error('randomizeOrder requires an explicit seed.');
+    }
+    const random = seededRandom((configuration.seed + seedOffset) >>> 0);
+    for (let index = assignments.length - 1; index > 0; index -= 1) {
+      const replacement = Math.floor(random() * (index + 1));
+      [assignments[index], assignments[replacement]] =
+        [assignments[replacement], assignments[index]];
+    }
+  }
+  return assignments;
 }
 
 function percentile(sortedValues, ratio) {
@@ -278,7 +354,7 @@ async function executeRequest(scenario, requestVariant, timeoutMs, fetchImplemen
   const startedAt = performance.now();
   let status = null;
   let responseBytes = 0;
-  const { url, method, headers, body } = requestVariant;
+  const { label, url, method, headers, body } = requestVariant;
   try {
     const response = await fetchImplementation(url, {
       method,
@@ -291,8 +367,10 @@ async function executeRequest(scenario, requestVariant, timeoutMs, fetchImplemen
     const responseBody = await response.text();
     responseBytes = Buffer.byteLength(responseBody);
     let responseCode;
+    let responsePayload;
     try {
-      responseCode = String(JSON.parse(responseBody)?.code);
+      responsePayload = JSON.parse(responseBody);
+      responseCode = String(responsePayload?.code);
     } catch {
       responseCode = undefined;
     }
@@ -301,6 +379,7 @@ async function executeRequest(scenario, requestVariant, timeoutMs, fetchImplemen
     if (!scenario.expectedStatuses.includes(response.status)) {
       return {
         scenario: scenario.name,
+        variant: label,
         url,
         status,
         responseBytes,
@@ -315,6 +394,7 @@ async function executeRequest(scenario, requestVariant, timeoutMs, fetchImplemen
         !responseBody.includes(scenario.expectedBodyIncludes)) {
       return {
         scenario: scenario.name,
+        variant: label,
         url,
         status,
         responseBytes,
@@ -326,12 +406,10 @@ async function executeRequest(scenario, requestVariant, timeoutMs, fetchImplemen
       };
     }
     if (scenario.expectedJsonCode !== undefined) {
-      let payload;
-      try {
-        payload = JSON.parse(responseBody);
-      } catch {
+      if (responsePayload === undefined) {
         return {
           scenario: scenario.name,
+          variant: label,
           url,
           status,
           responseBytes,
@@ -341,15 +419,16 @@ async function executeRequest(scenario, requestVariant, timeoutMs, fetchImplemen
           responseBodyExcerpt,
         };
       }
-      if (String(payload?.code) !== scenario.expectedJsonCode) {
+      if (String(responsePayload?.code) !== scenario.expectedJsonCode) {
         return {
           scenario: scenario.name,
+          variant: label,
           url,
           status,
           responseBytes,
           latencyMs: performance.now() - startedAt,
           errorType: 'validation',
-          errorMessage: `Expected JSON code ${scenario.expectedJsonCode} but received ${payload?.code}.`,
+          errorMessage: `Expected JSON code ${scenario.expectedJsonCode} but received ${responsePayload?.code}.`,
           responseCode,
           responseBodyExcerpt,
         };
@@ -357,16 +436,19 @@ async function executeRequest(scenario, requestVariant, timeoutMs, fetchImplemen
     }
     return {
       scenario: scenario.name,
+      variant: label,
       url,
       status,
       responseBytes,
       latencyMs: performance.now() - startedAt,
       errorType: null,
       errorMessage: null,
+      captured: capturedJson(responsePayload, scenario.captureJsonPaths),
     };
   } catch (error) {
     return {
       scenario: scenario.name,
+      variant: label,
       url,
       status,
       responseBytes,
@@ -377,11 +459,15 @@ async function executeRequest(scenario, requestVariant, timeoutMs, fetchImplemen
   }
 }
 
-async function executeBatch(configuration, requestCount, concurrency, fetchImplementation) {
-  const schedule = configuration.scenarios.flatMap((scenario) =>
-    Array.from({ length: scenario.weight }, () => scenario));
+async function executeBatch(
+  configuration,
+  requestCount,
+  concurrency,
+  fetchImplementation,
+  seedOffset = 0,
+) {
+  const assignments = createAssignments(configuration, requestCount, seedOffset);
   const records = [];
-  const scenarioCursors = new Map();
   let cursor = 0;
 
   async function worker() {
@@ -391,16 +477,16 @@ async function executeBatch(configuration, requestCount, concurrency, fetchImple
       if (requestIndex >= requestCount) {
         return;
       }
-      const scenario = schedule[requestIndex % schedule.length];
-      const scenarioCursor = scenarioCursors.get(scenario.name) ?? 0;
-      scenarioCursors.set(scenario.name, scenarioCursor + 1);
-      const requestVariant = scenario.requests[scenarioCursor % scenario.requests.length];
-      records.push(await executeRequest(
-        scenario,
-        requestVariant,
-        configuration.timeoutMs,
-        fetchImplementation,
-      ));
+      const { scenario, requestVariant } = assignments[requestIndex];
+      records.push({
+        requestIndex,
+        ...await executeRequest(
+          scenario,
+          requestVariant,
+          configuration.timeoutMs,
+          fetchImplementation,
+        ),
+      });
     }
   }
 
@@ -409,7 +495,7 @@ async function executeBatch(configuration, requestCount, concurrency, fetchImple
     Array.from({ length: Math.min(concurrency, requestCount) }, () => worker()),
   );
   return {
-    records,
+    records: records.sort((left, right) => left.requestIndex - right.requestIndex),
     elapsedMs: performance.now() - startedAt,
   };
 }
@@ -424,6 +510,7 @@ export async function runBenchmark(rawConfiguration, options = {}) {
       configuration.warmupRequests,
       Math.min(configuration.concurrency, configuration.warmupRequests),
       fetchImplementation,
+      1,
     );
   }
 
@@ -454,9 +541,13 @@ export async function runBenchmark(rawConfiguration, options = {}) {
       warmupRequests: configuration.warmupRequests,
       timeoutMs: configuration.timeoutMs,
       maxErrorRate: configuration.maxErrorRate,
+      includeRecords: configuration.includeRecords,
+      randomizeOrder: configuration.randomizeOrder,
+      seed: configuration.seed,
     },
     aggregate,
     scenarios,
+    ...(configuration.includeRecords ? { records } : {}),
     passed,
   };
 }

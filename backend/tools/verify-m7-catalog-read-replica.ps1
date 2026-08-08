@@ -17,7 +17,7 @@ $repositoryRoot = Split-Path -Parent $backendRoot
 $composeDirectory = Join-Path $repositoryRoot 'deploy\docker'
 $composeFile = Join-Path $composeDirectory 'compose.yml'
 $composeEnvFile = Join-Path $composeDirectory '.env'
-$networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+$networkCheck = Join-Path $PSScriptRoot 'check-verification-host.ps1'
 $catalogJar = Join-Path $backendRoot `
     'services\catalog-service\target\catalog-service.jar'
 $timestamp = [DateTimeOffset]::UtcNow.ToString('yyyyMMdd-HHmmss')
@@ -474,7 +474,7 @@ foreach ($required in @(
 if (-not $SkipNetworkPreflight) {
     & $networkCheck
     if ($LASTEXITCODE -ne 0) {
-        throw 'Local development network preflight failed.'
+        throw 'Host preflight failed.'
     }
 }
 docker info *> $null

@@ -186,13 +186,13 @@ $grafanaPort = if ($env:GRAFANA_PORT) { [int]$env:GRAFANA_PORT } else { 13000 }
 $tempoPort = if ($env:TEMPO_HTTP_PORT) { [int]$env:TEMPO_HTTP_PORT } else { 13200 }
 
 if (-not $SkipNetworkPreflight) {
-    $networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+    $networkCheck = Join-Path $PSScriptRoot '..\..\backend\tools\check-verification-host.ps1'
     if (-not (Test-Path -LiteralPath $networkCheck)) {
         throw "Missing required local network diagnostic: $networkCheck"
     }
     & $networkCheck
     if ($LASTEXITCODE -ne 0) {
-        throw "Local network preflight failed with exit code $LASTEXITCODE"
+        throw "Host preflight failed with exit code $LASTEXITCODE"
     }
 }
 

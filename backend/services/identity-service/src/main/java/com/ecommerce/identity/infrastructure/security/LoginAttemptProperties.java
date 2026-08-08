@@ -1,5 +1,6 @@
 package com.ecommerce.identity.infrastructure.security;
 
+import com.ecommerce.identity.application.port.LoginLockPolicy;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,5 +19,5 @@ public record LoginAttemptProperties(
         @NotNull Duration failureWindow,
         @NotNull Duration lockDuration,
         @Min(100) long localMaximumSize
-) {
+) implements LoginLockPolicy {
 }

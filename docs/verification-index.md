@@ -34,7 +34,7 @@ cd backend
 ./tools/verify-core-smoke.ps1
 ```
 
-完整资源、时间、网络预检和清理边界见 [Core Smoke 指南](core-smoke.md)。该层是普通
+完整资源、时间、宿主机预检和清理边界见 [Core Smoke 指南](core-smoke.md)。该层是普通
 评审者最值得运行的真实路径。
 
 ## 3. Full Lab
@@ -54,10 +54,33 @@ cd backend
 - `backend/tools/verify-m8-catalog-search.ps1`
 - `backend/tools/verify-m8-analytics.ps1`
 
-Full Lab 必须按文档 Profile 串行运行，测试前确认本机端口、内存、Docker Profile 和
-网络代理状态。它不是 GitHub Actions 的常驻任务。单变量、组合批次、随机顺序、
+Full Lab 必须按文档 Profile 串行运行，先执行仓库内的
+`backend/tools/check-verification-host.ps1`，再确认场景要求的 Docker Profile。预检
+检查内存、动态端口、近期端口耗尽事件和 Docker 状态，不绑定具体代理或网卡。它不是
+GitHub Actions 的常驻任务。单变量、组合批次、带种子的随机顺序、
 资源停止线和并发数字的统一解释见
 [参考基线与 Pro 边界](reference-baseline-and-pro-boundary.md)。
+
+在业务组合前，可用以下入口逐个验证核心中间件启动、基本读写/连接、资源占用和清理：
+
+```powershell
+cd backend
+./tools/verify-middleware-isolation.ps1
+```
+
+RocketMQ 的 NameServer、Broker 和 Proxy 是一个不可拆分阶段；该入口不是业务并发测试，
+不能替代 Core Smoke、故障注入或最终一致性核对。
+
+七个核心容器已健康且宿主机预检通过后，容量阶梯使用：
+
+```powershell
+cd backend
+./tools/verify-foundation-capacity-ladder.ps1
+```
+
+该入口逐级运行 `1 -> 10 -> 50 -> 100 -> 300 -> 500 -> 1000`，每级都复用完整数据库
+与跨服务一致性断言，并在首个资源或正确性失败处停止。脚本存在不代表最高一级已经通过；
+公开摘要只记录实际完成且工作区干净的证据。
 
 ## 公共 CI
 

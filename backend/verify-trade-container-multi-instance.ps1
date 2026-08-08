@@ -22,7 +22,7 @@ $envFile = Join-Path $composeDirectory '.env'
 $tradeJar = Join-Path $PSScriptRoot 'services\trade-service\target\trade-service.jar'
 $runDirectory = Join-Path $PSScriptRoot '.run'
 $evidencePath = Join-Path $runDirectory 'trade-container-multi-instance.json'
-$networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+$networkCheck = Join-Path $PSScriptRoot 'tools\check-verification-host.ps1'
 $probeTopic = 'plainjournal-m3-container-probe-v1'
 $aggregatePrefix = 'M3ContainerProbe:'
 $requiredContainers = @(
@@ -138,6 +138,23 @@ function Wait-Middleware {
         Start-Sleep -Seconds 2
     } while ((Get-Date) -lt $deadline)
     throw "Middleware readiness timed out: mysql=$mysqlHealth nacos=$nacosReady"
+}
+
+function Assert-HostPreflight {
+    param([switch]$RequireMiddleware)
+
+    if ($SkipNetworkPreflight) {
+        return
+    }
+    if ($RequireMiddleware) {
+        & $networkCheck -RequiredContainers $requiredContainers
+    }
+    else {
+        & $networkCheck
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Host preflight failed.'
+    }
 }
 
 function Get-NacosHeaders {
@@ -396,12 +413,7 @@ if (-not (Test-Path -LiteralPath $runDirectory)) {
     New-Item -ItemType Directory -Path $runDirectory | Out-Null
 }
 
-if (-not $SkipNetworkPreflight) {
-    & $networkCheck
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Local development network preflight failed.'
-    }
-}
+Assert-HostPreflight
 
 docker info *> $null
 if ($LASTEXITCODE -ne 0) {
@@ -441,6 +453,7 @@ try {
         }
     }
     Wait-Middleware
+    Assert-HostPreflight -RequireMiddleware
 
     [Environment]::SetEnvironmentVariable(
         'TRADE_CONTAINER_OUTBOX_TOPIC',
@@ -459,6 +472,7 @@ try {
         $containerIds = @(Wait-TradeContainers -ExpectedCount $scale)
         $containers = @($containerIds | ForEach-Object { Get-ContainerIdentity -ContainerId $_ })
         $nacosInstances = @(Wait-NacosInstanceCount -Headers $nacosHeaders -ExpectedCount $scale)
+        Assert-HostPreflight -RequireMiddleware
 
         if (@($containers | Where-Object Uid -ne '10001').Count -ne 0) {
             throw "Scale $scale contains a root or unexpected runtime UID."
@@ -632,11 +646,14 @@ WHERE first_event.aggregate_type = '$aggregateType'
     Write-Host "Evidence: $evidencePath"
 }
 finally {
-    try {
-        Send-TradeMySql -Sql "DELETE FROM outbox_event WHERE aggregate_type LIKE '$aggregatePrefix%';"
-    }
-    catch {
-        Write-Warning "Probe-row cleanup failed: $($_.Exception.Message)"
+    $mysqlRunning = (docker inspect --format '{{.State.Running}}' plainjournal-mysql 2>$null) -eq 'true'
+    if ($mysqlRunning) {
+        try {
+            Send-TradeMySql -Sql "DELETE FROM outbox_event WHERE aggregate_type LIKE '$aggregatePrefix%';"
+        }
+        catch {
+            Write-Warning "Probe-row cleanup failed: $($_.Exception.Message)"
+        }
     }
     try {
         Remove-ProbeTopic

@@ -14,6 +14,7 @@ param(
     [switch]$EnableCapacityBaseline,
     [ValidateRange(100, 100000)][int]$CapacityRequests = 1000,
     [ValidateRange(1, 1000)][int]$CapacityConcurrency = 100,
+    [ValidateRange(0, 2147483639)][int]$CapacitySeed = 20260806,
     [ValidateRange(2, 10000)][int]$CapacityInventorySuccesses = 100,
     [ValidateRange(1, 10000)][int]$CapacityTradeSuccesses = 100
 )
@@ -289,6 +290,76 @@ function Get-LatencySummary {
     }
 }
 
+function ConvertFrom-NodeLoadSummary {
+    param(
+        [Parameter(Mandatory)]$LoadResult,
+        [Parameter(Mandatory)][int]$Concurrency
+    )
+
+    return [pscustomobject]@{
+        requests = [int]$LoadResult.aggregate.requests
+        concurrency = $Concurrency
+        elapsedSeconds = [double]$LoadResult.aggregate.elapsedSeconds
+        requestsPerSecond = [double]$LoadResult.aggregate.requestsPerSecond
+        minMs = [double]$LoadResult.aggregate.latency.minMs
+        p50Ms = [double]$LoadResult.aggregate.latency.p50Ms
+        p95Ms = [double]$LoadResult.aggregate.latency.p95Ms
+        p99Ms = [double]$LoadResult.aggregate.latency.p99Ms
+        maxMs = [double]$LoadResult.aggregate.latency.maxMs
+    }
+}
+
+function Invoke-NodeHttpLoad {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][int]$Requests,
+        [Parameter(Mandatory)][int]$Concurrency,
+        [Parameter(Mandatory)][int]$Seed,
+        [Parameter(Mandatory)][object[]]$Scenarios,
+        [Parameter(Mandatory)][string]$OutputDirectory
+    )
+
+    if (-not $script:nodeExecutable -or -not $script:httpLoadRunner) {
+        throw 'The Node.js capacity runner was not initialized.'
+    }
+    $safeName = $Name -replace '[^A-Za-z0-9._-]', '-'
+    $configurationPath = Join-Path $OutputDirectory "$safeName.config.json"
+    $resultPath = Join-Path $OutputDirectory "$safeName.result.json"
+    $consolePath = Join-Path $OutputDirectory "$safeName.console.log"
+    try {
+        [ordered]@{
+            schemaVersion = 1
+            name = $Name
+            requests = $Requests
+            concurrency = $Concurrency
+            warmupRequests = 0
+            timeoutMs = 30000
+            maxErrorRate = 0
+            includeRecords = $true
+            randomizeOrder = $true
+            seed = $Seed
+            scenarios = $Scenarios
+        } | ConvertTo-Json -Depth 20 |
+            Set-Content -LiteralPath $configurationPath -Encoding utf8
+
+        $console = @(& $script:nodeExecutable $script:httpLoadRunner `
+                $configurationPath $resultPath 2>&1)
+        $exitCode = $LASTEXITCODE
+        $console | Set-Content -LiteralPath $consolePath -Encoding utf8
+    }
+    finally {
+        Remove-Item -LiteralPath $configurationPath -Force -ErrorAction SilentlyContinue
+    }
+    if ($exitCode -ne 0 -or -not (Test-Path -LiteralPath $resultPath)) {
+        throw "Node.js capacity run failed: name=$Name, exitCode=$exitCode, log=$consolePath"
+    }
+    $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json -Depth 30
+    if (-not $result.passed -or @($result.records).Count -ne $Requests) {
+        throw "Node.js capacity run did not satisfy its response contract: name=$Name, result=$resultPath"
+    }
+    return $result
+}
+
 function Remove-RedisKeys {
     param([Parameter(Mandatory)][string[]]$Keys)
 
@@ -553,6 +624,9 @@ if ($inventoryCompetitionSuccesses -ge $inventoryCompetitionAttempts) {
 if ($tradeCompetitionSuccesses -ge $tradeCompetitionAttempts) {
     throw 'CapacityTradeSuccesses must be lower than CapacityRequests so out-of-stock closure is exercised.'
 }
+if ($EnableCapacityBaseline -and $CapacityConcurrency -gt $CapacityRequests) {
+    throw 'CapacityConcurrency cannot be greater than CapacityRequests.'
+}
 if ($EnableInventoryReservationResponseLossFaultInjection -and $EnableCapacityBaseline) {
     throw 'Inventory response-loss fault injection and the capacity baseline must run separately.'
 }
@@ -571,14 +645,23 @@ if ($EnableExceptionalPaymentRecoveryVerification -and
         $EnableTradeMarketingResilienceFaultInjection)) {
     throw 'Exceptional-payment recovery and Trade process fault injection scenarios must run separately.'
 }
-$networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+$hostCheck = Join-Path $PSScriptRoot 'tools\check-verification-host.ps1'
+$requiredContainers = @(
+    'plainjournal-mysql',
+    'plainjournal-redis',
+    'plainjournal-nacos',
+    'plainjournal-rocketmq-namesrv',
+    'plainjournal-rocketmq-broker',
+    'plainjournal-rocketmq-proxy',
+    'plainjournal-minio'
+)
 if (-not $SkipNetworkPreflight) {
-    if (-not (Test-Path -LiteralPath $networkCheck)) {
-        throw "Missing required local network diagnostic: $networkCheck. Use -SkipNetworkPreflight only after an equivalent manual check."
+    if (-not (Test-Path -LiteralPath $hostCheck)) {
+        throw "Missing required host preflight: $hostCheck. Use -SkipNetworkPreflight only after an equivalent manual check."
     }
-    & $networkCheck
+    & $hostCheck -RequiredContainers $requiredContainers
     if ($LASTEXITCODE -ne 0) {
-        throw "Local network preflight failed with exit code $LASTEXITCODE. The smoke test did not change middleware state."
+        throw "Host preflight failed with exit code $LASTEXITCODE. The smoke test did not change middleware state."
     }
 }
 
@@ -640,12 +723,9 @@ if ($EnableCapacityBaseline) {
 
 docker info *> $null
 if ($LASTEXITCODE -ne 0) {
-    throw 'Docker Desktop is not ready. Start it only after Clash proxy validation, then rerun the smoke test.'
+    throw 'Docker Desktop is not ready. Start it, verify the host preflight, and rerun the smoke test.'
 }
-    foreach ($container in @(
-            'plainjournal-mysql', 'plainjournal-redis', 'plainjournal-nacos',
-            'plainjournal-rocketmq-namesrv', 'plainjournal-rocketmq-broker',
-            'plainjournal-rocketmq-proxy', 'plainjournal-minio')) {
+foreach ($container in $requiredContainers) {
     $running = docker inspect --format '{{.State.Running}}' $container 2>$null
     if ($running -ne 'true') {
         throw "Required container $container is not running. The smoke test will not start it automatically."
@@ -685,6 +765,19 @@ if ($LASTEXITCODE -ne 0) {
 
 $runDirectory = Join-Path $PSScriptRoot '.run'
 New-Item -ItemType Directory -Path $runDirectory -Force | Out-Null
+$script:nodeExecutable = $null
+$script:httpLoadRunner = $null
+if ($EnableCapacityBaseline) {
+    $nodeCommand = Get-Command node -CommandType Application -ErrorAction SilentlyContinue
+    if (-not $nodeCommand) {
+        throw 'Node.js was not found on PATH. Capacity verification uses the async HTTP runner.'
+    }
+    $script:nodeExecutable = $nodeCommand.Source
+    $script:httpLoadRunner = Join-Path $PSScriptRoot 'tools\m5-http-load-runner.mjs'
+    if (-not (Test-Path -LiteralPath $script:httpLoadRunner)) {
+        throw "Missing capacity runner: $($script:httpLoadRunner)"
+    }
+}
 $internalTrustZoneEvidencePath = Join-Path $runDirectory 'internal-trust-zones.json'
 $databaseTimeContractEvidencePath = Join-Path $runDirectory 'database-time-contract.json'
 
@@ -1359,33 +1452,76 @@ WHERE user_account.email = '$warehouseEmail';
 
     $warehouseIdForThreads = $inventoryWarehouseId
     $skuIdForThreads = $inventorySkuId
-    $inventoryCompetitionTimer = [Diagnostics.Stopwatch]::StartNew()
-    $reservationResults = 0..($inventoryCompetitionAttempts - 1) | ForEach-Object -Parallel {
-        $index = $_
-        $body = @{
-            reservationNo = "$using:inventoryReservationPrefix-$index"
-            orderNo = "SMOKE-ORDER-$index"
-            warehouseId = $using:warehouseIdForThreads
-            expiresAt = $using:inventoryReservationExpiresAt
-            items = @(@{ skuId = $using:skuIdForThreads; quantity = 1 })
-        } | ConvertTo-Json -Compress -Depth 10
-        $requestTimer = [Diagnostics.Stopwatch]::StartNew()
-        $response = Invoke-RestMethod -Method Post `
-            -Uri "$using:inventoryInternalBaseUrl/reservations" `
-            -Headers $using:internalHeaders `
-            -ContentType 'application/json' -Body $body -TimeoutSec 30
-        $requestTimer.Stop()
-        [pscustomobject]@{
-            ReservationNo = $response.data.reservationNo
-            Status = $response.data.status
-            LatencyMs = $requestTimer.Elapsed.TotalMilliseconds
-        }
-    } -ThrottleLimit $inventoryCompetitionConcurrency
-    $inventoryCompetitionTimer.Stop()
-    $inventoryLatencySummary = Get-LatencySummary `
-        -Values @($reservationResults | Select-Object -ExpandProperty LatencyMs) `
-        -Elapsed $inventoryCompetitionTimer.Elapsed `
-        -Concurrency $inventoryCompetitionConcurrency
+    if ($EnableCapacityBaseline) {
+        $inventoryVariants = @(0..($inventoryCompetitionAttempts - 1) | ForEach-Object {
+                $index = $_
+                [ordered]@{
+                    label = "inventory-$index"
+                    url = "$inventoryInternalBaseUrl/reservations"
+                    method = 'POST'
+                    headers = $internalHeaders
+                    body = [ordered]@{
+                        reservationNo = "$inventoryReservationPrefix-$index"
+                        orderNo = "SMOKE-ORDER-$index"
+                        warehouseId = $warehouseIdForThreads
+                        expiresAt = $inventoryReservationExpiresAt
+                        items = @([ordered]@{ skuId = $skuIdForThreads; quantity = 1 })
+                    }
+                }
+            })
+        $inventoryLoad = Invoke-NodeHttpLoad `
+            -Name "capacity-inventory-$inventoryReservationPrefix" `
+            -Requests $inventoryCompetitionAttempts `
+            -Concurrency $inventoryCompetitionConcurrency `
+            -Seed $CapacitySeed `
+            -OutputDirectory $runDirectory `
+            -Scenarios @([ordered]@{
+                    name = 'inventory-reservation'
+                    expectedStatuses = @(200)
+                    expectedJsonCode = 'OK'
+                    captureJsonPaths = @('data.reservationNo', 'data.status')
+                    variants = $inventoryVariants
+                })
+        $reservationResults = @($inventoryLoad.records | ForEach-Object {
+                [pscustomobject]@{
+                    ReservationNo = $_.captured.'data.reservationNo'
+                    Status = $_.captured.'data.status'
+                    LatencyMs = [double]$_.latencyMs
+                }
+            })
+        $inventoryLatencySummary = ConvertFrom-NodeLoadSummary `
+            -LoadResult $inventoryLoad `
+            -Concurrency $inventoryCompetitionConcurrency
+    }
+    else {
+        $inventoryCompetitionTimer = [Diagnostics.Stopwatch]::StartNew()
+        $reservationResults = 0..($inventoryCompetitionAttempts - 1) | ForEach-Object -Parallel {
+            $index = $_
+            $body = @{
+                reservationNo = "$using:inventoryReservationPrefix-$index"
+                orderNo = "SMOKE-ORDER-$index"
+                warehouseId = $using:warehouseIdForThreads
+                expiresAt = $using:inventoryReservationExpiresAt
+                items = @(@{ skuId = $using:skuIdForThreads; quantity = 1 })
+            } | ConvertTo-Json -Compress -Depth 10
+            $requestTimer = [Diagnostics.Stopwatch]::StartNew()
+            $response = Invoke-RestMethod -Method Post `
+                -Uri "$using:inventoryInternalBaseUrl/reservations" `
+                -Headers $using:internalHeaders `
+                -ContentType 'application/json' -Body $body -TimeoutSec 30
+            $requestTimer.Stop()
+            [pscustomobject]@{
+                ReservationNo = $response.data.reservationNo
+                Status = $response.data.status
+                LatencyMs = $requestTimer.Elapsed.TotalMilliseconds
+            }
+        } -ThrottleLimit $inventoryCompetitionConcurrency
+        $inventoryCompetitionTimer.Stop()
+        $inventoryLatencySummary = Get-LatencySummary `
+            -Values @($reservationResults | Select-Object -ExpandProperty LatencyMs) `
+            -Elapsed $inventoryCompetitionTimer.Elapsed `
+            -Concurrency $inventoryCompetitionConcurrency
+    }
 
     $reservedNumbers = @($reservationResults | Where-Object Status -eq 'RESERVED' |
         Select-Object -ExpandProperty ReservationNo)
@@ -2047,37 +2183,86 @@ WHERE rule_code LIKE '$marketingRulePrefix-%';
 
     $tradeProductIdForThreads = $productId
     $tradeSkuIdForThreads = $tradeSkuId
-    $tradeCompetitionTimer = [Diagnostics.Stopwatch]::StartNew()
-    $tradeResults = 0..($tradeCompetitionAttempts - 1) | ForEach-Object -Parallel {
-        $index = $_
-        $idempotencyKey = "smoke-trade-$index-$using:inventoryReservationPrefix"
-        $body = @{
-            addressId = $using:smokeAddressId
-            items = @(@{
-                productId = $using:tradeProductIdForThreads
-                skuId = $using:tradeSkuIdForThreads
-                quantity = 1
+    if ($EnableCapacityBaseline) {
+        $tradeVariants = @(0..($tradeCompetitionAttempts - 1) | ForEach-Object {
+                $index = $_
+                $idempotencyKey = "smoke-trade-$index-$inventoryReservationPrefix"
+                [ordered]@{
+                    label = $idempotencyKey
+                    url = "$tradeBaseUrl/orders"
+                    method = 'POST'
+                    headers = [ordered]@{
+                        Authorization = "Bearer $accessToken"
+                        'Idempotency-Key' = $idempotencyKey
+                    }
+                    body = [ordered]@{
+                        addressId = $smokeAddressId
+                        items = @([ordered]@{
+                                productId = $tradeProductIdForThreads
+                                skuId = $tradeSkuIdForThreads
+                                quantity = 1
+                            })
+                    }
+                }
             })
-        } | ConvertTo-Json -Compress -Depth 10
-        $requestTimer = [Diagnostics.Stopwatch]::StartNew()
-        $response = Invoke-RestMethod -Method Post -Uri "$using:tradeBaseUrl/orders" `
-            -Headers @{
-                Authorization = "Bearer $using:accessToken"
-                'Idempotency-Key' = $idempotencyKey
-            } -ContentType 'application/json' -Body $body -TimeoutSec 30
-        $requestTimer.Stop()
-        [pscustomobject]@{
-            Key = $idempotencyKey
-            OrderNo = $response.data.orderNo
-            Status = $response.data.status
-            LatencyMs = $requestTimer.Elapsed.TotalMilliseconds
-        }
-    } -ThrottleLimit $tradeCompetitionConcurrency
-    $tradeCompetitionTimer.Stop()
-    $tradeLatencySummary = Get-LatencySummary `
-        -Values @($tradeResults | Select-Object -ExpandProperty LatencyMs) `
-        -Elapsed $tradeCompetitionTimer.Elapsed `
-        -Concurrency $tradeCompetitionConcurrency
+        $tradeLoad = Invoke-NodeHttpLoad `
+            -Name "capacity-trade-$inventoryReservationPrefix" `
+            -Requests $tradeCompetitionAttempts `
+            -Concurrency $tradeCompetitionConcurrency `
+            -Seed ($CapacitySeed + 1) `
+            -OutputDirectory $runDirectory `
+            -Scenarios @([ordered]@{
+                    name = 'trade-order'
+                    expectedStatuses = @(200)
+                    expectedJsonCode = 'OK'
+                    captureJsonPaths = @('data.orderNo', 'data.status')
+                    variants = $tradeVariants
+                })
+        $tradeResults = @($tradeLoad.records | ForEach-Object {
+                [pscustomobject]@{
+                    Key = $_.variant
+                    OrderNo = $_.captured.'data.orderNo'
+                    Status = $_.captured.'data.status'
+                    LatencyMs = [double]$_.latencyMs
+                }
+            })
+        $tradeLatencySummary = ConvertFrom-NodeLoadSummary `
+            -LoadResult $tradeLoad `
+            -Concurrency $tradeCompetitionConcurrency
+    }
+    else {
+        $tradeCompetitionTimer = [Diagnostics.Stopwatch]::StartNew()
+        $tradeResults = 0..($tradeCompetitionAttempts - 1) | ForEach-Object -Parallel {
+            $index = $_
+            $idempotencyKey = "smoke-trade-$index-$using:inventoryReservationPrefix"
+            $body = @{
+                addressId = $using:smokeAddressId
+                items = @(@{
+                    productId = $using:tradeProductIdForThreads
+                    skuId = $using:tradeSkuIdForThreads
+                    quantity = 1
+                })
+            } | ConvertTo-Json -Compress -Depth 10
+            $requestTimer = [Diagnostics.Stopwatch]::StartNew()
+            $response = Invoke-RestMethod -Method Post -Uri "$using:tradeBaseUrl/orders" `
+                -Headers @{
+                    Authorization = "Bearer $using:accessToken"
+                    'Idempotency-Key' = $idempotencyKey
+                } -ContentType 'application/json' -Body $body -TimeoutSec 30
+            $requestTimer.Stop()
+            [pscustomobject]@{
+                Key = $idempotencyKey
+                OrderNo = $response.data.orderNo
+                Status = $response.data.status
+                LatencyMs = $requestTimer.Elapsed.TotalMilliseconds
+            }
+        } -ThrottleLimit $tradeCompetitionConcurrency
+        $tradeCompetitionTimer.Stop()
+        $tradeLatencySummary = Get-LatencySummary `
+            -Values @($tradeResults | Select-Object -ExpandProperty LatencyMs) `
+            -Elapsed $tradeCompetitionTimer.Elapsed `
+            -Concurrency $tradeCompetitionConcurrency
+    }
 
     $payableOrders = @($tradeResults | Where-Object Status -eq 'PENDING_PAYMENT')
     $unexpectedTradeResponses = @($tradeResults |
@@ -2123,29 +2308,42 @@ WHERE rule_code LIKE '$marketingRulePrefix-%';
 
     if ($EnableCapacityBaseline) {
         $concurrentOrderKey = "capacity-same-key-$inventoryReservationPrefix"
-        $concurrentOrderBody = @{
+        $concurrentOrderBody = [ordered]@{
             addressId = $smokeAddressId
-            items = @(@{ productId = $productId; skuId = $tradeSkuId; quantity = 1 })
-        } | ConvertTo-Json -Compress -Depth 10
-        $sameKeyTimer = [Diagnostics.Stopwatch]::StartNew()
-        $sameKeyResults = 1..100 | ForEach-Object -Parallel {
-            $requestTimer = [Diagnostics.Stopwatch]::StartNew()
-            $response = Invoke-RestMethod -Method Post -Uri "$using:tradeBaseUrl/orders" `
-                -Headers @{
-                    Authorization = "Bearer $using:accessToken"
-                    'Idempotency-Key' = $using:concurrentOrderKey
-                } -ContentType 'application/json' -Body $using:concurrentOrderBody -TimeoutSec 30
-            $requestTimer.Stop()
-            [pscustomobject]@{
-                OrderNo = $response.data.orderNo
-                Status = $response.data.status
-                LatencyMs = $requestTimer.Elapsed.TotalMilliseconds
-            }
-        } -ThrottleLimit 100
-        $sameKeyTimer.Stop()
-        $tradeIdempotencyLatencySummary = Get-LatencySummary `
-            -Values @($sameKeyResults | Select-Object -ExpandProperty LatencyMs) `
-            -Elapsed $sameKeyTimer.Elapsed -Concurrency 100
+            items = @([ordered]@{ productId = $productId; skuId = $tradeSkuId; quantity = 1 })
+        }
+        $sameKeyLoad = Invoke-NodeHttpLoad `
+            -Name "capacity-trade-same-key-$inventoryReservationPrefix" `
+            -Requests $CapacityRequests `
+            -Concurrency $CapacityConcurrency `
+            -Seed ($CapacitySeed + 2) `
+            -OutputDirectory $runDirectory `
+            -Scenarios @([ordered]@{
+                    name = 'trade-order-same-key'
+                    expectedStatuses = @(200)
+                    expectedJsonCode = 'OK'
+                    captureJsonPaths = @('data.orderNo', 'data.status')
+                    variants = @([ordered]@{
+                            label = $concurrentOrderKey
+                            url = "$tradeBaseUrl/orders"
+                            method = 'POST'
+                            headers = [ordered]@{
+                                Authorization = "Bearer $accessToken"
+                                'Idempotency-Key' = $concurrentOrderKey
+                            }
+                            body = $concurrentOrderBody
+                        })
+                })
+        $sameKeyResults = @($sameKeyLoad.records | ForEach-Object {
+                [pscustomobject]@{
+                    OrderNo = $_.captured.'data.orderNo'
+                    Status = $_.captured.'data.status'
+                    LatencyMs = [double]$_.latencyMs
+                }
+            })
+        $tradeIdempotencyLatencySummary = ConvertFrom-NodeLoadSummary `
+            -LoadResult $sameKeyLoad `
+            -Concurrency $CapacityConcurrency
         $sameKeyOrderNumbers = @($sameKeyResults | Select-Object -ExpandProperty OrderNo -Unique)
         if ($sameKeyOrderNumbers.Count -ne 1 -or
             @($sameKeyResults | Where-Object Status -notin @('PENDING_STOCK', 'CLOSED')).Count -ne 0) {
@@ -2394,23 +2592,34 @@ WHERE rule_code LIKE '$marketingRulePrefix-%';
         Wait-PortAvailable -Port $inventoryPort
     }
     if ($EnableCapacityBaseline) {
-        $callbackJson = $callbackBody | ConvertTo-Json -Compress -Depth 10
-        $callbackTimer = [Diagnostics.Stopwatch]::StartNew()
-        $paymentCallbackResults = 1..100 | ForEach-Object -Parallel {
-            $requestTimer = [Diagnostics.Stopwatch]::StartNew()
-            $response = Invoke-RestMethod -Method Post -Uri "$using:paymentBaseUrl/callbacks/mock" `
-                -ContentType 'application/json' -Body $using:callbackJson -TimeoutSec 30
-            $requestTimer.Stop()
-            [pscustomobject]@{
-                PaymentNo = $response.data.paymentNo
-                Status = $response.data.status
-                LatencyMs = $requestTimer.Elapsed.TotalMilliseconds
-            }
-        } -ThrottleLimit 100
-        $callbackTimer.Stop()
-        $paymentCallbackLatencySummary = Get-LatencySummary `
-            -Values @($paymentCallbackResults | Select-Object -ExpandProperty LatencyMs) `
-            -Elapsed $callbackTimer.Elapsed -Concurrency 100
+        $paymentCallbackLoad = Invoke-NodeHttpLoad `
+            -Name "capacity-payment-callback-$inventoryReservationPrefix" `
+            -Requests $CapacityRequests `
+            -Concurrency $CapacityConcurrency `
+            -Seed ($CapacitySeed + 3) `
+            -OutputDirectory $runDirectory `
+            -Scenarios @([ordered]@{
+                    name = 'payment-callback-same-event'
+                    expectedStatuses = @(200)
+                    expectedJsonCode = 'OK'
+                    captureJsonPaths = @('data.paymentNo', 'data.status')
+                    variants = @([ordered]@{
+                            label = $callbackEventId
+                            url = "$paymentBaseUrl/callbacks/mock"
+                            method = 'POST'
+                            body = $callbackBody
+                        })
+                })
+        $paymentCallbackResults = @($paymentCallbackLoad.records | ForEach-Object {
+                [pscustomobject]@{
+                    PaymentNo = $_.captured.'data.paymentNo'
+                    Status = $_.captured.'data.status'
+                    LatencyMs = [double]$_.latencyMs
+                }
+            })
+        $paymentCallbackLatencySummary = ConvertFrom-NodeLoadSummary `
+            -LoadResult $paymentCallbackLoad `
+            -Concurrency $CapacityConcurrency
         $paidPayment = [pscustomobject]@{ data = $paymentCallbackResults[0] }
         $duplicateCallback = [pscustomobject]@{ data = $paymentCallbackResults[-1] }
         if (@($paymentCallbackResults | Where-Object {
@@ -3259,24 +3468,34 @@ SELECT ROW_COUNT();
         signature = $refundSignature
     }
     if ($EnableCapacityBaseline) {
-        $refundCallbackJson = $refundCallbackBody | ConvertTo-Json -Compress -Depth 10
-        $refundCallbackTimer = [Diagnostics.Stopwatch]::StartNew()
-        $refundCallbackResults = 1..100 | ForEach-Object -Parallel {
-            $requestTimer = [Diagnostics.Stopwatch]::StartNew()
-            $response = Invoke-RestMethod -Method Post `
-                -Uri "$using:paymentBaseUrl/callbacks/mock/refunds" `
-                -ContentType 'application/json' -Body $using:refundCallbackJson -TimeoutSec 30
-            $requestTimer.Stop()
-            [pscustomobject]@{
-                RefundNo = $response.data.refundNo
-                Status = $response.data.status
-                LatencyMs = $requestTimer.Elapsed.TotalMilliseconds
-            }
-        } -ThrottleLimit 100
-        $refundCallbackTimer.Stop()
-        $refundCallbackLatencySummary = Get-LatencySummary `
-            -Values @($refundCallbackResults | Select-Object -ExpandProperty LatencyMs) `
-            -Elapsed $refundCallbackTimer.Elapsed -Concurrency 100
+        $refundCallbackLoad = Invoke-NodeHttpLoad `
+            -Name "capacity-refund-callback-$inventoryReservationPrefix" `
+            -Requests $CapacityRequests `
+            -Concurrency $CapacityConcurrency `
+            -Seed ($CapacitySeed + 4) `
+            -OutputDirectory $runDirectory `
+            -Scenarios @([ordered]@{
+                    name = 'refund-callback-same-event'
+                    expectedStatuses = @(200)
+                    expectedJsonCode = 'OK'
+                    captureJsonPaths = @('data.refundNo', 'data.status')
+                    variants = @([ordered]@{
+                            label = $refundEventId
+                            url = "$paymentBaseUrl/callbacks/mock/refunds"
+                            method = 'POST'
+                            body = $refundCallbackBody
+                        })
+                })
+        $refundCallbackResults = @($refundCallbackLoad.records | ForEach-Object {
+                [pscustomobject]@{
+                    RefundNo = $_.captured.'data.refundNo'
+                    Status = $_.captured.'data.status'
+                    LatencyMs = [double]$_.latencyMs
+                }
+            })
+        $refundCallbackLatencySummary = ConvertFrom-NodeLoadSummary `
+            -LoadResult $refundCallbackLoad `
+            -Concurrency $CapacityConcurrency
         $refunded = [pscustomobject]@{ data = $refundCallbackResults[0] }
         $duplicateRefund = [pscustomobject]@{ data = $refundCallbackResults[-1] }
         if (@($refundCallbackResults | Where-Object {
@@ -4406,13 +4625,17 @@ WHERE status <> 'PUBLISHED' AND aggregate_id IN ($paymentOutboxAggregateSqlList)
     if ($EnableCapacityBaseline) {
         $capacityEvidencePath = Join-Path $runDirectory 'capacity-baseline.json'
         $gitCommit = (& git -C $repositoryRoot rev-parse HEAD 2>$null | Select-Object -Last 1)
+        $gitWorkingTreeDirty = @(& git -C $repositoryRoot status --porcelain 2>$null).Count -gt 0
         $capacityEvidence = [ordered]@{
-            schemaVersion = 3
+            schemaVersion = 4
             generatedAtUtc = [DateTimeOffset]::UtcNow.ToString('o')
             gitCommit = $gitCommit
+            gitWorkingTreeDirty = $gitWorkingTreeDirty
             parameters = [ordered]@{
                 requestsPerScenario = $CapacityRequests
                 concurrency = $CapacityConcurrency
+                seed = $CapacitySeed
+                loadEngine = 'node-undici-async'
                 inventorySuccesses = $CapacityInventorySuccesses
                 tradeSuccesses = $CapacityTradeSuccesses
             }
@@ -4533,9 +4756,9 @@ WHERE status <> 'PUBLISHED' AND aggregate_id IN ($paymentOutboxAggregateSqlList)
     Write-Output "    P50=$($tradeLatencySummary.p50Ms) ms, P95=$($tradeLatencySummary.p95Ms) ms, P99=$($tradeLatencySummary.p99Ms) ms, RPS=$($tradeLatencySummary.requestsPerSecond)"
     if ($EnableCapacityBaseline) {
         Write-Output "  Capacity evidence: $capacityEvidencePath"
-        Write-Output "  Same order key x100: P95=$($tradeIdempotencyLatencySummary.p95Ms) ms, one cross-domain fact: PASS"
-        Write-Output "  Same payment callback x100: P95=$($paymentCallbackLatencySummary.p95Ms) ms, one effective result: PASS"
-        Write-Output "  Same refund callback x100: P95=$($refundCallbackLatencySummary.p95Ms) ms, one effective result: PASS"
+        Write-Output "  Same order key x${CapacityRequests}: P95=$($tradeIdempotencyLatencySummary.p95Ms) ms, one cross-domain fact: PASS"
+        Write-Output "  Same payment callback x${CapacityRequests}: P95=$($paymentCallbackLatencySummary.p95Ms) ms, one effective result: PASS"
+        Write-Output "  Same refund callback x${CapacityRequests}: P95=$($refundCallbackLatencySummary.p95Ms) ms, one effective result: PASS"
         Write-Output "  Payment-chain convergence: $paymentChainConvergenceSeconds s; active unpaid reservations at convergence: $expectedActiveTradeReservations"
     }
     Write-Output '  Trade snapshot/idempotency/cancellation: PASS'

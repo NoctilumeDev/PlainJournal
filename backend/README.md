@@ -169,7 +169,7 @@ Catalog 真实读副本使用独立互斥 Profile，验证暂停复制、读己�
 ./tools/verify-m7-catalog-read-replica.ps1
 ```
 
-脚本会执行机器级网络预检，只启动一个 512 MiB MySQL 副本和一个 Catalog
+脚本会执行机器级宿主机预检，只启动一个 512 MiB MySQL 副本和一个 Catalog
 JVM，专项关闭 Catalog 缓存，并在结束时移除容器、临时复制账号、探针和
 应用进程。当前主库 GTID 关闭，因此本机证据使用一致快照加 binlog 文件/位置，
 不把它描述为生产自动故障转移。完整结果收敛在
@@ -669,7 +669,10 @@ With MySQL, Nacos, RocketMQ NameServer, Broker, and Proxy already running, execu
 The script builds one image, scales Trade through 1, 2, and 3 instances, verifies
 Docker and Nacos health, publishes 1000 real Outbox events, requires all three
 publishers to participate, checks aggregate ordering and retry/state-conflict
-budgets, and stops one instance gracefully. The formal result converged in
+budgets, and stops one instance gracefully. It repeats the host resource preflight
+after middleware startup and after every scale change, so a 16GB workstation
+stops and cleans up before memory or dynamic-port pressure invalidates the run.
+The formal result converged in
 16212.205 ms with a 350/311/339 distribution, zero retries, zero state conflicts,
 and zero order violations. Evidence is written to
 `.run/trade-container-multi-instance.json`. For a smaller connectivity smoke such
@@ -763,19 +766,41 @@ remain enabled, open the Trade circuit with five logical failures, and verify th
 fifth order is rejected before remote I/O. Restart Marketing to prove five unique
 pricing locks converge before all stock is released by cancellation.
 
-Add `-EnableCapacityBaseline` for two 1000-request, 100-concurrency correctness
-scenarios, plus 100-way same-order-key, same-payment-callback, and
-same-refund-callback replay. The command writes ignored evidence to
-`.run/capacity-baseline.json`, polls MySQL to the final state, and validates stock
-against the number of reservations that are still active when the asynchronous
-chain converges. The baseline and its Outbox tail-latency finding are included in
-the [`M0-M8 three-layer acceptance`](../docs/evidence/m0-m8-three-layer-acceptance-20260728.md).
+Add `-EnableCapacityBaseline` to run the inventory competition, order competition,
+same-order-key replay, same-payment-callback replay, and same-refund-callback
+replay through the Node.js asynchronous HTTP worker. Defaults are 1000 requests,
+100 simultaneously in-flight requests, and seed `20260806`; override them with
+`-CapacityRequests`, `-CapacityConcurrency`, and `-CapacitySeed`. The command
+writes ignored per-request evidence under `.run/`, polls MySQL to final state, and
+validates stock and unique business side effects after the asynchronous chain
+converges. Runner configuration files are removed immediately after execution so
+JWT and internal headers are not retained as evidence. Capacity evidence records
+both the current commit and whether the working tree was dirty; only a clean-tree
+run can be cited as formal release evidence. The published acceptance currently proves the documented 1000/100
+baseline; higher simultaneous concurrency is not evidence until the complete
+resource-bounded ladder has passed.
 
-The smoke script first runs its repository-local network preflight and never
-starts missing containers automatically. It does not stop Redis by default.
+After the seven core containers are already healthy, run the formal ladder with:
+
+```powershell
+./tools/verify-foundation-capacity-ladder.ps1
+```
+
+It executes `1 -> 10 -> 50 -> 100 -> 300 -> 500 -> 1000` serially, reuses the
+Foundation Smoke business assertions, and stops at the first resource,
+4231/4266, transport, database, or consistency failure. It does not own the core
+containers. A dirty working tree is rejected unless
+`-AllowDirtyWorktree` is explicitly used for a non-formal development run.
+
+The smoke script first runs its repository-local host preflight and never starts
+missing containers automatically. The preflight checks memory, Windows dynamic
+ports, recent 4231/4266 exhaustion events, Docker, and required containers; it
+does not assume a proxy product, adapter name, gateway, or private workstation
+path. It does not stop Redis by default.
 Run `./run-foundation-smoke.ps1 -EnableRedisFaultInjection` only when an
-intentional Redis outage test is desired; `-SkipNetworkPreflight` is for an
-equivalent manual network check, not a normal shortcut.
+intentional Redis outage test is desired; the legacy-named
+`-SkipNetworkPreflight` switch is for an equivalent manual host check, not a
+normal shortcut.
 
 The script loads ignored local credentials from `deploy/docker/.env`, packages
 the backend, starts identity, catalog, inventory, marketing, trade, payment, fulfillment, and gateway in hidden

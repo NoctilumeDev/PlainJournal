@@ -17,7 +17,7 @@ $composeDirectory = Join-Path $repositoryRoot 'deploy\docker'
 $composeEnvFile = Join-Path $composeDirectory '.env'
 $tradeJar = Join-Path $backendRoot 'services\trade-service\target\trade-service.jar'
 $runDirectory = Join-Path $backendRoot '.run\m7-distributed-id'
-$networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+$networkCheck = Join-Path $PSScriptRoot 'check-verification-host.ps1'
 $namespace = 'm7-distributed-id'
 $leaseDurationSeconds = 30
 $renewalIntervalSeconds = 5
@@ -363,7 +363,7 @@ foreach ($required in @(
 if (-not $SkipNetworkPreflight) {
     & $networkCheck
     if ($LASTEXITCODE -ne 0) {
-        throw 'Local development network preflight failed.'
+        throw 'Host preflight failed.'
     }
 }
 

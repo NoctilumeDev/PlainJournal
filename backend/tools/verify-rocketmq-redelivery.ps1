@@ -84,9 +84,9 @@ New-Item -ItemType Directory -Path $classesDirectory -Force | Out-Null
 
 try {
     if (-not $SkipNetworkPreflight) {
-        & 'D:\DevTools\Network\check-dev-network.ps1' | Out-Host
+        & (Join-Path $PSScriptRoot 'check-verification-host.ps1') | Out-Host
         if ($LASTEXITCODE -ne 0) {
-            throw 'Network preflight failed.'
+            throw 'Host preflight failed.'
         }
     }
 

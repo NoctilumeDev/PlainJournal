@@ -19,7 +19,7 @@ $repositoryRoot = Split-Path -Parent $backendRoot
 $composeDirectory = Join-Path $repositoryRoot 'deploy\docker'
 $composeFile = Join-Path $composeDirectory 'compose.yml'
 $environmentFile = Join-Path $composeDirectory '.env'
-$networkCheck = 'D:\DevTools\Network\check-dev-network.ps1'
+$networkCheck = Join-Path $PSScriptRoot 'check-verification-host.ps1'
 $migrationDirectory = Join-Path $backendRoot `
     'services\trade-service\src\main\resources\db\migration'
 $reshardingTool = Join-Path $PSScriptRoot 'invoke-m7-trade-resharding.ps1'
@@ -944,7 +944,7 @@ try {
         Invoke-TimedStage -Name 'network-preflight' -Body {
             & $networkCheck
             if ($LASTEXITCODE -ne 0) {
-                throw 'Machine network preflight failed.'
+                throw 'Host preflight failed.'
             }
         }
     }

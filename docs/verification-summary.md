@@ -48,7 +48,7 @@ GitHub Actions 运行后，外部访问者可在仓库 Actions 页面复核同�
 
 ```bash
 # 仓库与架构
-node --test tools/*.test.mjs
+node tools/run-repository-tests.mjs
 node tools/check-backend-boundaries.mjs
 node tools/check-markdown-links.mjs
 node tools/render-verification-summary.mjs --check
