@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   parentVersionFromPom,
   projectVersionFromPom,
+  validateFrontendVersionStatement,
+  validateReleaseStatus,
   versionFromReleaseTag,
 } from "./check-release-version.mjs";
 
@@ -11,6 +13,30 @@ test("accepts only stable vMAJOR.MINOR.PATCH release tags", () => {
   assert.equal(versionFromReleaseTag("v1.0.3"), "1.0.3");
   assert.throws(() => versionFromReleaseTag("v1.0.3-rc.1"), /vMAJOR\.MINOR\.PATCH/u);
   assert.throws(() => versionFromReleaseTag("v1.0.3-extra"), /vMAJOR\.MINOR\.PATCH/u);
+});
+
+test("requires a released verification baseline when validating a tag", () => {
+  assert.deepEqual(validateReleaseStatus("release-candidate"), []);
+  assert.deepEqual(validateReleaseStatus("released", "v1.0.7"), []);
+  assert.match(
+    validateReleaseStatus("release-candidate", "v1.0.7")[0],
+    /requires status released/u,
+  );
+});
+
+test("keeps candidate and released README statements aligned with the baseline", () => {
+  assert.deepEqual(
+    validateFrontendVersionStatement("`v1.0.7` 验收候选", "v1.0.7", "release-candidate"),
+    [],
+  );
+  assert.deepEqual(
+    validateFrontendVersionStatement("`v1.0.7` 正式发布", "v1.0.7", "released"),
+    [],
+  );
+  assert.match(
+    validateFrontendVersionStatement("`v1.0.7` 正式发布", "v1.0.7", "release-candidate")[0],
+    /candidate version/u,
+  );
 });
 
 test("reads the root project version outside the Spring Boot parent", () => {

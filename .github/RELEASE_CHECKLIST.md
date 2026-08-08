@@ -93,3 +93,11 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 - [x] V5 配置本机串行重复 10 轮、30/30 场景通过。
 - [x] PR 与 `main` 的 CI、Security、CodeQL 和 Online Preview 全绿。
 - [x] `v1.0.6` 标签、Release Notes、ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
+
+## 12. v1.0.7 发布事实修复
+
+- [x] `release-candidate` 在 PR 阶段仍可验证，但不能再通过正式标签门禁。
+- [x] 后端、前端、验证基线、Changelog 和 Release Notes 统一为 `1.0.7`。
+- [x] `v1.0.6` 标签保持不可变，历史状态差异在 Changelog 和项目时间线中如实记录。
+- [ ] PR、`main`、Security、Online Preview 和 Release 工作流全部通过。
+- [ ] `v1.0.7` ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
