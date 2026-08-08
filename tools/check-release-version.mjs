@@ -12,6 +12,39 @@ export function versionFromReleaseTag(tag) {
   return match.groups.version;
 }
 
+export function validateReleaseStatus(status, requestedTag) {
+  const violations = [];
+  if (!["release-candidate", "released"].includes(status)) {
+    violations.push(`Unsupported verification status: ${status}`);
+  }
+  if (requestedTag && status !== "released") {
+    violations.push(`Release tag requires status released, found ${status}`);
+  }
+  return violations;
+}
+
+export function validateFrontendVersionStatement(source, targetRelease, status) {
+  const violations = [];
+  const releasedStatement = `\`${targetRelease}\` 正式发布`;
+  const candidateStatement = `\`${targetRelease}\` 验收候选`;
+  if (status === "released") {
+    if (!source.includes(releasedStatement)) {
+      violations.push("frontend/README.md must state the released version");
+    }
+    if (source.includes(candidateStatement)) {
+      violations.push("frontend/README.md still describes a released version as a candidate");
+    }
+  } else if (status === "release-candidate") {
+    if (!source.includes(candidateStatement)) {
+      violations.push("frontend/README.md must state the release candidate version");
+    }
+    if (source.includes(releasedStatement)) {
+      violations.push("frontend/README.md describes a release candidate as released");
+    }
+  }
+  return violations;
+}
+
 export function projectVersionFromPom(source, sourcePath) {
   const projectSection = source.replace(/<parent>[\s\S]*?<\/parent>/u, "");
   const match = /<artifactId>plainjournal-backend<\/artifactId>\s*<version>([^<]+)<\/version>/u
@@ -62,9 +95,7 @@ export async function validateReleaseVersion(repositoryRoot, requestedTag) {
     return violations;
   }
 
-  if (!["release-candidate", "released"].includes(baseline.status)) {
-    violations.push(`Unsupported verification status: ${baseline.status}`);
-  }
+  violations.push(...validateReleaseStatus(baseline.status, requestedTag));
   if (requestedTag && requestedTag !== baseline.targetRelease) {
     violations.push(
       `Release tag ${requestedTag} does not match verification baseline ${baseline.targetRelease}`,
@@ -124,15 +155,10 @@ export async function validateReleaseVersion(repositoryRoot, requestedTag) {
     violations.push(`Missing release notes: ${path.relative(repositoryRoot, releaseNotesPath)}`);
   }
 
-  if (baseline.status === "released") {
-    const frontendReadme = await fs.readFile(path.join(frontendRoot, "README.md"), "utf8");
-    if (!frontendReadme.includes(`\`${baseline.targetRelease}\` 正式发布`)) {
-      violations.push("frontend/README.md must state the released version");
-    }
-    if (frontendReadme.includes("验收候选")) {
-      violations.push("frontend/README.md still describes a released version as a candidate");
-    }
-  }
+  const frontendReadme = await fs.readFile(path.join(frontendRoot, "README.md"), "utf8");
+  violations.push(
+    ...validateFrontendVersionStatement(frontendReadme, baseline.targetRelease, baseline.status),
+  );
 
   return violations;
 }

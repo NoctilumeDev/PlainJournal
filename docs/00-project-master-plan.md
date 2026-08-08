@@ -2,7 +2,7 @@
 
 > 项目：素简记（PlainJournal）  
 > 当前范围：M0-M8 单经营主体、自营 B2C 参考基线  
-> 当前目标版本：`v1.0.6`，权威状态见[验证摘要](verification-summary.md)  
+> 当前目标版本：`v1.0.7`，权威状态见[验证摘要](verification-summary.md)  
 > 边界确认日期：2026-08-08
 
 ## 1. 项目定位
