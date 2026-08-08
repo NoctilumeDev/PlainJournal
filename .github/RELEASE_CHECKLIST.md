@@ -76,3 +76,12 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 - [x] 本地后端 14 模块、436 个测试、覆盖率和仓库文档门禁通过。
 - [x] PR 与 `main` 的 CI、Security 和 CodeQL 通过，公开代码扫描告警为 0。
 - [x] `v1.0.4` 标签、Release Notes、ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
+
+## 10. v1.0.5 参考基线加固
+
+- [x] 接口、应用和基础设施层的权责收口，跨服务导入、事务和 schema 所有权进入门禁。
+- [x] 宿主机预检、串行中间件隔离、固定种子负载与容量阶梯均为仓库内可移植入口。
+- [x] 16GB 资源停止线正确阻止超预算组合，不宣称未经证明的 1000 同时在途结果。
+- [x] 后端 436 个测试、前端 322 个单元/契约测试及完整浏览器链路通过。
+- [x] `nanoid` 安全公告已修复，PR 的 CI、Security 和 CodeQL 全绿。
+- [ ] `v1.0.5` 标签、Release Notes、ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
