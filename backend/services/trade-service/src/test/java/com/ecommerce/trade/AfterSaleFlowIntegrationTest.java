@@ -28,6 +28,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,7 +80,9 @@ class AfterSaleFlowIntegrationTest {
 
     @BeforeEach
     void seedCompletedOrderWithPriceAllocations() {
-        Instant now = Instant.parse("2026-07-16T08:00:00Z");
+        Timestamp databaseNow = jdbcTemplate.queryForObject("SELECT CURRENT_TIMESTAMP(3)", Timestamp.class);
+        assertThat(databaseNow).isNotNull();
+        Instant now = databaseNow.toInstant();
         jdbcTemplate.update("""
                 INSERT INTO trade_order
                     (id, order_no, user_id, idempotency_key, request_hash, reservation_no,
