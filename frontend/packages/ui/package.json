@@ -17,7 +17,7 @@
   },
   "peerDependencies": {
     "@plain-journal/design-system": "workspace:*",
-    "vue": "3.5.40"
+    "vue": "3.5.41"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "6.0.8",
@@ -26,7 +26,7 @@
     "typescript": "6.0.3",
     "vite": "8.1.5",
     "vitest": "4.1.10",
-    "vue": "3.5.40",
+    "vue": "3.5.41",
     "vue-tsc": "3.3.7"
   }
 }
