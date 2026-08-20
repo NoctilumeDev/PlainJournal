@@ -44,8 +44,8 @@
     "check": "pnpm check:boundaries && pnpm check:delivery && pnpm check:production-deploy && pnpm check:release && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm e2e && pnpm e2e:production:built"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.12.1",
-    "@playwright/test": "^1.61.1",
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.62.1",
     "@vitest/coverage-v8": "4.1.10"
   }
 }
