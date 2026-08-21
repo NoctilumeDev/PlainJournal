@@ -99,5 +99,19 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 - [x] `release-candidate` 在 PR 阶段仍可验证，但不能再通过正式标签门禁。
 - [x] 后端、前端、验证基线、Changelog 和 Release Notes 统一为 `1.0.7`。
 - [x] `v1.0.6` 标签保持不可变，历史状态差异在 Changelog 和项目时间线中如实记录。
-- [ ] PR、`main`、Security、Online Preview 和 Release 工作流全部通过。
-- [ ] `v1.0.7` ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
+- [x] PR、`main`、Security、Online Preview 和 Release 工作流全部通过。
+- [x] `v1.0.7` ZIP、SHA-256、manifest 和 SPDX SBOM 已公开。
+
+## 13. v1.0.8 维护发布
+
+- [x] `v1.0.7` 后已合入的 `nanoid` 安全修复、售后数据库时钟夹具和 PR / merge queue
+  Workflow 触发器进入同一候选。
+- [x] 五个 Dependabot 组逐项裁决；兼容的 Action、Maven、Java 和前端依赖进入候选，
+  Spring Cloud 2025.1 / Spring Cloud Alibaba 2025.1 因发布列车不兼容明确暂缓。
+- [x] 后端 436 个测试、PMD、72.40% 聚合行覆盖率与前端 323 + 60 + 3 测试、
+  70.16% 聚合行覆盖率在新依赖图上通过。
+- [x] 后端、前端、版本矩阵、验证基线、Changelog 和 Release Notes 统一为 `1.0.8`
+  验收候选。
+- [ ] PR、`main`、CI、Security、CodeQL 和 Online Preview 对同一候选提交全部通过。
+- [ ] 验证基线从 `release-candidate` 变更为 `released`，且最终提交重新通过远端门禁。
+- [ ] `v1.0.8` 标签、Release、ZIP、SHA-256、manifest 和 SPDX SBOM 指向同一不可变提交。

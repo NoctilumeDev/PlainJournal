@@ -16,7 +16,7 @@ frontend/
 
 - Node.js 22.12 或更高版本；当前基线为 Node.js 24。
 - pnpm 11。
-- TypeScript 6.0.3；当前 `vue-tsc 3.3.7` 尚不能使用 TypeScript 7 的新包导出结构。
+- TypeScript 6.0.3；当前 `vue-tsc 3.3.10` 尚不能使用 TypeScript 7 的新包导出结构。
 - 本地开发默认通过 Vite 代理访问 `http://127.0.0.1:18000` Gateway。
 - 使用 `PATH` 和 Corepack 解析 Node/pnpm，不依赖本机盘符或固定安装目录。
 
@@ -101,7 +101,7 @@ Payment 授权补偿和四域只读对账；缺少列表或通用管理契约的
 History fallback、分级缓存、Gateway/WS 边界和版本标签回退。V7.4 又完成真实双
 Nginx 镜像构建、OCI 元数据、Header/404、同源 API、HEALTHCHECK、两个不可变标签
 回退与恢复，以及 README/CHANGELOG/SECURITY/Release checklist 和三张最终截图。
-2026-08-04 最新串行门禁已覆盖单元/契约、开发态与生产构建 Playwright、分层、
+2026-08-21 最新串行门禁已覆盖单元/契约、开发态与生产构建 Playwright、分层、
 交付、部署、类型检查、两端构建和关键页面 axe 检查；精确计数只维护在仓库生成的
 [`docs/verification-summary.md`](../docs/verification-summary.md)。真实 Chromium
 网络取证证明当前选择 `image/avif`，且没有把 PNG fallback 作为图片下载；生产构建还
@@ -112,7 +112,7 @@ RocketMQ、MinIO、Gateway 和所有者服务证据。
 当前前端交付边界、真实浏览器链路和工程冻结证据见
 [`v1.0.2` 工程验收快照](../docs/evidence/v1.0.2-engineering-acceptance-20260804.md)；
 逐批视觉迁移记录由 Git 历史追溯，不再随主分支持续携带。
-当前前端已冻结为 `v1.0.7` 正式发布，基础演示和 E2E 编排使用跨平台 Node 入口，并以
+当前前端已冻结为 `v1.0.8` 验收候选，基础演示和 E2E 编排使用跨平台 Node 入口，并以
 四包聚合行覆盖率 70% 作为公开门禁；复杂 Docker 和真实故障脚本继续使用
 PowerShell 7。仓库采用 Apache-2.0，后续只处理明确缺陷，不扩大当前自营业务边界；
 视觉系统重构不预留具体 `1.x.x` 版本，待方案成熟后再按实际变更发布。

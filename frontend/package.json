@@ -1,7 +1,7 @@
 {
   "name": "plain-journal-frontend",
   "private": true,
-  "version": "1.0.7",
+  "version": "1.0.8",
   "packageManager": "pnpm@11.9.0",
   "engines": {
     "node": ">=22.12.0",
@@ -44,8 +44,8 @@
     "check": "pnpm check:boundaries && pnpm check:delivery && pnpm check:production-deploy && pnpm check:release && pnpm typecheck && pnpm test:coverage && pnpm build && pnpm e2e && pnpm e2e:production:built"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.12.1",
-    "@playwright/test": "^1.61.1",
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.62.1",
     "@vitest/coverage-v8": "4.1.10"
   }
 }

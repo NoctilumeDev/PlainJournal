@@ -5,6 +5,41 @@
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-08-21
+
+> 收拢 `v1.0.7` 之后已经合入的维护修复、兼容依赖更新和公开发布坐标；不增加业务域，
+> 不修改数据库结构、交易状态机或前端视觉。
+
+### Fixed
+
+- 将传递依赖 `nanoid` 固定到 `3.3.18`，修复新的安全公告并恢复完整 pnpm 依赖图
+  0 已知漏洞；
+- Trade 售后集成测试夹具改用数据库时钟构造时间边界，消除应用时钟与数据库时钟
+  漂移造成的偶发失败；
+- CI 与 Security Workflow 显式响应 PR 更新和 merge queue 事件，避免只在初次打开
+  PR 时执行旧检查结果。
+
+### Changed
+
+- CodeQL Action 更新到新的 v4 完整提交 SHA；
+- Maven Wrapper 更新到 3.9.16，RocketMQ Java Client 更新到 5.2.1，JaCoCo 更新到
+  0.8.15，Trade 使用的 Apache Commons Lang 更新到 3.20.0；
+- Vue、Pinia、Vite、`vue-tsc`、Playwright 与 axe Playwright 集成更新到已通过完整
+  前端门禁的兼容补丁版本；
+- Spring Cloud 2025.1 / Spring Cloud Alibaba 2025.1 平台升级未纳入本版本：该组合
+  需要 Spring Framework 7 的 HTTP Service Group API，与当前 Spring Boot 3.5.16 /
+  Spring Framework 6.2.19 基线不兼容，继续保持同一发布列车而不做强制覆盖。
+
+### Verification
+
+- 后端 14 个 Reactor 模块、100 份 Surefire 报告、436 个测试和 PMD 全部通过，
+  0 失败、0 错误、0 跳过；JaCoCo 0.8.15 重新计数后的聚合行覆盖率为 72.40%；
+- 前端 323 个单元/契约测试、60 个开发态 E2E、3 个生产构建 E2E、类型检查、两端
+  构建、axe、分层、交付、部署和发布材料门禁全部通过，聚合行覆盖率为 70.16%；
+- `pnpm audit --audit-level moderate` 报告 0 已知漏洞；既有真实中间件、三实例、容量
+  和 Chromium F12/CDP 证据按原验证日期保留，不把本次代码回归冒充为重新执行的
+  真实基础设施实验。
+
 ## [1.0.7] - 2026-08-08
 
 > 修正正式标签与机器可读验证状态的顺序，不增加业务域，不修改数据库、并发实现或

@@ -5,7 +5,7 @@
 | 组件 | 当前版本 | 状态 |
 | --- | --- | --- |
 | JDK | 17.0.12 LTS | 固定，可用于 Spring Boot 3 |
-| Maven | 3.9.11 | 固定 |
+| Maven | 3.9.16 | 固定 |
 | Git | 2.53.0.windows.2 | 固定 |
 | Node.js | 24.14.0 | M4/M5.5 前端与容量工具已验证 |
 | pnpm | 11.9.0 | M4/M5.5 workspace 已验证 |
@@ -59,7 +59,10 @@ OpenSearch Java SDK。
 
 ## 3. 已冻结应用基线
 
-以下精确版本已在 `poc/middleware-compatibility` 中通过真实中间件测试。
+以下为当前应用基线，并同步固化在 `poc/middleware-compatibility`。真实中间件验收的
+执行日期与证据边界以[验证摘要](verification-summary.md)为准；`v1.0.8` 将 RocketMQ
+Java Client 从 5.2.0 更新到 5.2.1，并验证 POC 可编译，但不把这次离线编译表述为
+重新执行了真实中间件批次。
 
 | 技术 | 冻结版本 | 选择说明 |
 | --- | --- | --- |
@@ -67,7 +70,7 @@ OpenSearch Java SDK。
 | Spring Cloud | 2025.0.3 | 与 Boot 3.5 发布线匹配 |
 | Spring Cloud Alibaba | 2025.0.0.0 | 与 Cloud 2025.0.x、Boot 3.5.x 匹配 |
 | MyBatis-Plus | 3.5.17 | 使用 Spring Boot 3 starter |
-| RocketMQ Java Client | 5.2.0 | 直接使用 gRPC Client，并封装在基础设施适配层 |
+| RocketMQ Java Client | 5.2.1 | 直接使用 gRPC Client，并封装在基础设施适配层 |
 | MinIO Java SDK | 9.0.3 | 已按 9.x API 完成上传和签名 URL 验证 |
 | Spring Security | 由 Boot BOM 管理 | 不手工覆盖版本 |
 | Resilience4j | 由兼容 BOM/Starter 管理 | 超时、隔离、熔断，不用于掩盖业务错误 |
@@ -83,15 +86,15 @@ RocketMQ Spring Starter 2.3.6 可以完成收发，但在 Spring Boot 3.5 下会
 | --- | --- | --- |
 | Node.js | 24.14.0 | 工程最低要求 22.12.0 |
 | pnpm | 11.9.0 | workspace 包管理器 |
-| Vue | 3.5.40 | 顾客端与管理端 |
+| Vue | 3.5.41 | 顾客端与管理端 |
 | Vue Router | 5.2.0 | URL 状态与刷新恢复 |
-| Pinia | 4.0.2 | 会话、购物袋、地址、订单、支付、履约、售后与结果未知状态 |
-| Vite | 8.1.5 | 两端 CSR 构建 |
-| TypeScript | 6.0.3 | `vue-tsc 3.3.7` 暂不兼容 TypeScript 7 包导出；启用未使用符号门禁 |
+| Pinia | 4.0.3 | 会话、购物袋、地址、订单、支付、履约、售后与结果未知状态 |
+| Vite | 8.2.1 | 两端 CSR 构建 |
+| TypeScript | 6.0.3 | `vue-tsc 3.3.10` 暂不兼容 TypeScript 7 包导出；启用未使用符号门禁 |
 | Vitest | 4.1.10 | 单元与组件测试 |
 | Vue Test Utils | 2.4.11 | 顾客端组件测试 |
-| Playwright | 1.61.1 | 两端关键浏览器流程、路由恢复与 axe 检查 |
-| axe-core/playwright | 4.12.1 | serious / critical 可访问性门禁 |
+| Playwright | 1.62.1 | 两端关键浏览器流程、路由恢复与 axe 检查 |
+| axe-core/playwright | 4.13.0 | serious / critical 可访问性门禁 |
 | 请求层 | 原生 `fetch` + 自有类型化 API 客户端 | 不引入 Axios 双实现 |
 | UI | 自有设计令牌与语义组件 | 不引入 Element Plus，不继承旧项目视觉 |
 
