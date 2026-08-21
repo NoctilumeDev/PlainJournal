@@ -22,7 +22,7 @@
         <spring-cloud.version>2025.0.3</spring-cloud.version>
         <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
-        <rocketmq-client.version>5.2.0</rocketmq-client.version>
+        <rocketmq-client.version>5.2.1</rocketmq-client.version>
         <minio.version>9.0.3</minio.version>
     </properties>
 

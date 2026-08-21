@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "targetRelease": "v1.0.7",
-  "status": "released",
-  "verifiedOn": "2026-08-08",
+  "targetRelease": "v1.0.8",
+  "status": "release-candidate",
+  "verifiedOn": "2026-08-21",
   "backend": {
     "surefireReports": 100,
     "tests": 436,
@@ -15,11 +15,11 @@
     "spotbugsPriority1": 0,
     "spotbugsPriority2": 247,
     "spotbugsPriority3": 66,
-    "lineCoverage": 72.43,
+    "lineCoverage": 72.4,
     "lineCoverageMinimum": 70
   },
   "frontend": {
-    "unitAndContractTests": 322,
+    "unitAndContractTests": 323,
     "developmentE2E": 60,
     "productionE2E": 3,
     "layerRules": 28,

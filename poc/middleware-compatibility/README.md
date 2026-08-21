@@ -9,7 +9,7 @@ This project verifies the application stack against the real local middleware. I
 - Spring Cloud 2025.0.3
 - Spring Cloud Alibaba 2025.0.0.0
 - MyBatis-Plus 3.5.17
-- RocketMQ Java Client 5.2.0 over the 5.x gRPC protocol
+- RocketMQ Java Client 5.2.1 over the 5.x gRPC protocol
 - MinIO Java SDK 9.0.3
 
 The RocketMQ client is integrated directly behind an infrastructure adapter. The
