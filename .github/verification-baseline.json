@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "targetRelease": "v1.0.8",
-  "status": "release-candidate",
+  "status": "released",
   "verifiedOn": "2026-08-21",
   "backend": {
     "surefireReports": 100,
