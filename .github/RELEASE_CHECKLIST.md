@@ -113,5 +113,5 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
 - [x] 后端、前端、版本矩阵、验证基线、Changelog 和 Release Notes 统一为 `1.0.8`
   验收候选。
 - [x] PR、`main`、CI、Security、CodeQL 和 Online Preview 对同一候选提交全部通过。
-- [ ] 验证基线从 `release-candidate` 变更为 `released`，且最终提交重新通过远端门禁。
+- [x] 验证基线从 `release-candidate` 变更为 `released`，且最终提交重新通过远端门禁。
 - [ ] `v1.0.8` 标签、Release、ZIP、SHA-256、manifest 和 SPDX SBOM 指向同一不可变提交。
