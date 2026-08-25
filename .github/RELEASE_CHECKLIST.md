@@ -117,3 +117,12 @@ Workflow 只在已存在标签时打包，并且仅在 GitHub Release 尚不存�
 - [x] 验证基线从 `release-candidate` 变更为 `released`，且最终提交重新通过远端门禁。
 - [x] `v1.0.8` 标签解析到发布提交；Release、ZIP、SHA-256、manifest 和 SPDX SBOM
   已回读对齐该标签，后续 Workflow 重跑会拒绝覆盖既有 Release。
+
+## 14. v1.0.9 追加写发布治理
+
+- [x] Vite 8.2.2、Vitest 4.1.11、CodeQL v4 Action 与锁定传递依赖通过完整门禁。
+- [x] 稳定 Release 已存在时工作流明确失败，且不存在 edit、upload 或 clobber 路径。
+- [x] 后端、前端、版本矩阵、验证基线、Changelog 和 Release Notes 统一为 `1.0.9`。
+- [x] 本地仓库、后端、前端、浏览器、构建、Compose 与发布材料门禁全部通过。
+- [ ] PR、`main`、CI、Security、CodeQL 和 Online Preview 对同一提交全部通过。
+- [ ] `v1.0.9` 标签、Release、ZIP、SHA-256、manifest 和 SPDX SBOM 回读一致。

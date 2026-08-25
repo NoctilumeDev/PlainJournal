@@ -89,9 +89,9 @@ RocketMQ Spring Starter 2.3.6 可以完成收发，但在 Spring Boot 3.5 下会
 | Vue | 3.5.41 | 顾客端与管理端 |
 | Vue Router | 5.2.0 | URL 状态与刷新恢复 |
 | Pinia | 4.0.3 | 会话、购物袋、地址、订单、支付、履约、售后与结果未知状态 |
-| Vite | 8.2.1 | 两端 CSR 构建 |
+| Vite | 8.2.2 | 两端 CSR 构建 |
 | TypeScript | 6.0.3 | `vue-tsc 3.3.10` 暂不兼容 TypeScript 7 包导出；启用未使用符号门禁 |
-| Vitest | 4.1.10 | 单元与组件测试 |
+| Vitest | 4.1.11 | 单元与组件测试 |
 | Vue Test Utils | 2.4.11 | 顾客端组件测试 |
 | Playwright | 1.62.1 | 两端关键浏览器流程、路由恢复与 axe 检查 |
 | axe-core/playwright | 4.13.0 | serious / critical 可访问性门禁 |
