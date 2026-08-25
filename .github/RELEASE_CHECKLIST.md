@@ -1,7 +1,8 @@
 # PlainJournal 发布清单
 
 本清单用于仓库所有者冻结版本。自动化不得自行提交、推送或创建标签；Release
-Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
+Workflow 只在已存在标签时打包，并且仅在 GitHub Release 尚不存在时创建；重跑必须
+拒绝覆盖既有 Release 与附件。
 
 ## 1. 法律与仓库身份
 
@@ -114,4 +115,5 @@ Workflow 只在已存在标签时打包并创建或更新 GitHub Release。
   验收候选。
 - [x] PR、`main`、CI、Security、CodeQL 和 Online Preview 对同一候选提交全部通过。
 - [x] 验证基线从 `release-candidate` 变更为 `released`，且最终提交重新通过远端门禁。
-- [ ] `v1.0.8` 标签、Release、ZIP、SHA-256、manifest 和 SPDX SBOM 指向同一不可变提交。
+- [x] `v1.0.8` 标签解析到发布提交；Release、ZIP、SHA-256、manifest 和 SPDX SBOM
+  已回读对齐该标签，后续 Workflow 重跑会拒绝覆盖既有 Release。
