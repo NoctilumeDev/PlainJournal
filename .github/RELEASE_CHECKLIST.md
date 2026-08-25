@@ -124,5 +124,6 @@ Workflow 只在已存在标签时打包，并且仅在 GitHub Release 尚不存�
 - [x] 稳定 Release 已存在时工作流明确失败，且不存在 edit、upload 或 clobber 路径。
 - [x] 后端、前端、版本矩阵、验证基线、Changelog 和 Release Notes 统一为 `1.0.9`。
 - [x] 本地仓库、后端、前端、浏览器、构建、Compose 与发布材料门禁全部通过。
-- [ ] PR、`main`、CI、Security、CodeQL 和 Online Preview 对同一提交全部通过。
+- [x] 候选 PR 提交 `bcf02e2` 与对应 `main` 合并提交 `d891143` 的 CI、Security、
+  CodeQL 和 Online Preview 全部通过。
 - [ ] `v1.0.9` 标签、Release、ZIP、SHA-256、manifest 和 SPDX SBOM 回读一致。

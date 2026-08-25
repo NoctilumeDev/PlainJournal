@@ -21,11 +21,12 @@
 
 ### Verification boundary
 
-- 本候选已通过仓库结构、文档、版本、Compose 和发布材料门禁；后端 436 项测试、
+- `v1.0.9` 维护基线已通过仓库结构、文档、版本、Compose 和发布材料门禁；后端 436 项测试、
   72.42% 行覆盖率和 12 份零违规 PMD 报告通过，前端 323 项单元/契约测试、60 项开发态
   E2E、3 项生产构建 E2E、70.16% 行覆盖率与依赖审计通过；
-- PR、最终 `main` 提交、Security、CodeQL、Online Preview 和 Release 资产仍按发布
-  阶段分别回读，不在候选提交中提前宣称；
+- 候选 PR 与对应 `main` 合并提交的 CI、Security、CodeQL 和 Online Preview 已通过；
+  正式标签只允许指向重新通过远端门禁的 `released` 提交，Release 资产由标签工作流
+  生成并按 manifest 独立回读；
 - 既有真实中间件、三实例、容量和 Chromium F12/CDP 证据保持原验证边界，不把本次
   维护回归冒充为重新执行的真实基础设施实验。
 
