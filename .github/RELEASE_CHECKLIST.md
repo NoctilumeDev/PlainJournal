@@ -126,4 +126,8 @@ Workflow 只在已存在标签时打包，并且仅在 GitHub Release 尚不存�
 - [x] 本地仓库、后端、前端、浏览器、构建、Compose 与发布材料门禁全部通过。
 - [x] 候选 PR 提交 `bcf02e2` 与对应 `main` 合并提交 `d891143` 的 CI、Security、
   CodeQL 和 Online Preview 全部通过。
-- [ ] `v1.0.9` 标签、Release、ZIP、SHA-256、manifest 和 SPDX SBOM 回读一致。
+- [x] 正式发布提交 `0cfe97e` 在打标签前重新通过 CI、Security、CodeQL 和
+  Online Preview，验证基线处于 `released`。
+- [x] `v1.0.9` 注解标签解析到 `0cfe97e`；Release、ZIP、SHA-256、manifest 和
+  SPDX 2.3 SBOM 已回读一致，ZIP SHA-256 为
+  `122c21d3a3552924aaea2e50998c07921da7b1e617c53379402d7fbaa40b6df5`。
