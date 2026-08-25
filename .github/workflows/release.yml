@@ -70,20 +70,17 @@ jobs:
         with:
           name: plainjournal-${{ steps.release.outputs.tag }}
           path: release/
-      - name: Create or update GitHub Release
+      - name: Create append-only GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           notes_file=".github/release-notes/${RELEASE_TAG}.md"
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" release/* --clobber
-            if [ -f "$notes_file" ]; then
-              gh release edit "$RELEASE_TAG" \
-                --notes-file "$notes_file" \
-                --title "PlainJournal $RELEASE_TAG"
-            fi
-          elif [ -f "$notes_file" ]; then
+            echo "::error::Release $RELEASE_TAG already exists; stable releases are append-only and must not be overwritten."
+            exit 1
+          fi
+          if [ -f "$notes_file" ]; then
             gh release create "$RELEASE_TAG" release/* \
               --verify-tag \
               --notes-file "$notes_file" \

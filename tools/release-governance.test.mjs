@@ -35,3 +35,18 @@ test("Release accepts only stable semantic-version tags and validates repository
   assert.match(bundle, /\/\^v\\d\+\\\.\\d\+\\\.\\d\+\$\/u/u);
   assert.doesNotMatch(bundle, /\(\?:\[-\+\]/u);
 });
+
+test("Stable releases are append-only and cannot replace published assets", async () => {
+  const workflow = await fs.readFile(
+    path.join(repositoryRoot, ".github", "workflows", "release.yml"),
+    "utf8",
+  );
+
+  assert.match(
+    workflow,
+    /Release \$RELEASE_TAG already exists; stable releases are append-only[\s\S]*?exit 1/u,
+  );
+  assert.doesNotMatch(workflow, /gh release upload/u);
+  assert.doesNotMatch(workflow, /gh release edit/u);
+  assert.doesNotMatch(workflow, /--clobber/u);
+});
