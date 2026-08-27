@@ -233,7 +233,9 @@ Proxy to return the actual host or Compose-network entry point used by each clie
 Run the following commands from this directory:
 
 ```powershell
-docker compose --env-file .env --profile core config
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+./bootstrap-resources.ps1 -PrepareEnvironmentOnly
+docker compose --env-file .env --profile core config --quiet
 docker compose --env-file .env --profile core pull
 docker compose --env-file .env --profile core up -d
 docker compose --env-file .env --profile core ps
@@ -268,7 +270,9 @@ Stop containers without deleting D-drive data:
 docker compose --env-file .env --profile core down
 ```
 
-The local `.env` file contains development credentials and is ignored by Git. Copy `.env.example` when creating a new environment. The bootstrap script creates the isolated `ecom_identity`, `ecom_catalog`, `ecom_inventory`, `ecom_trade`, `ecom_payment`, `ecom_fulfillment`, `ecom_marketing`, and `ecom_chat` schemas with separate least-scope application users. Missing database passwords, the identity JWT secret, the internal service token, the mock payment callback secret, the metrics scrape token, and the Grafana administrator password are generated once and appended only to the ignored `.env` file. The scrape token is mirrored into ignored `.runtime-secrets` for Compose secret mounting; its value is never printed.
+The local `.env` file contains development credentials and is ignored by Git. Copy `.env.example` only when `.env` does not already exist, then run `bootstrap-resources.ps1 -PrepareEnvironmentOnly` before the first Compose command. This phase generates and validates the Nacos signing key before Nacos reads it. It preserves a valid custom key, migrates only the repository's former placeholder, and rejects any other malformed or duplicate value instead of silently rotating it. The validated key is copied into an ignored, Nacos-only runtime environment file so an ambient shell variable cannot replace it during Compose interpolation. The bootstrap script creates the isolated `ecom_identity`, `ecom_catalog`, `ecom_inventory`, `ecom_trade`, `ecom_payment`, `ecom_fulfillment`, `ecom_marketing`, and `ecom_chat` schemas with separate least-scope application users. Missing database passwords, the identity JWT secret, the internal service token, the mock payment callback secret, the metrics scrape token, the Nacos signing key, and the Grafana administrator password are generated once and written only to ignored local files.
+
+The bootstrap script does not print generated secret values. Keep Compose inspection quiet and treat raw Nacos startup logs as sensitive diagnostics: the upstream `v3.2.2` image enables shell tracing in its entrypoint and may echo environment-derived values.
 
 `APP_ENV` is part of every application-owned Redis key. Local keys therefore use
 the `ecommerce:local:*` prefix and cannot collide with test or production data.

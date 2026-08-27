@@ -22,8 +22,19 @@ Core Smoke 复用 `backend/run-foundation-smoke.ps1`，不复制第二套业务�
 - 建议为 Docker 与 Java 进程预留至少 8 GiB 可用内存；
 - 首次拉取镜像和 Maven 依赖不计入执行时间，稳定环境通常需要约 20–45 分钟。
 
-复制 `deploy/docker/.env.example` 为忽略的 `.env`，再运行资源初始化脚本。不要把
-真实 `.env`、生成密钥或中间件数据目录提交到 Git。
+复制 `deploy/docker/.env.example` 为忽略的 `.env`，在第一次启动 Compose 前先运行：
+
+```powershell
+cd deploy/docker
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+./bootstrap-resources.ps1 -PrepareEnvironmentOnly
+docker compose --env-file .env --profile core up -d
+./bootstrap-resources.ps1
+```
+
+准备阶段会在本地生成并严格校验 Nacos 签名密钥；非法或重复的自定义值会在容器启动前
+被拒绝，不会被静默替换。已有 `.env` 不得用示例文件覆盖。不要把真实 `.env`、生成密钥、
+原始 Compose 配置输出、Nacos 启动日志或中间件数据目录提交到 Git。
 
 ## 执行
 

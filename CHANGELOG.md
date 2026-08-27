@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- 修复 fresh Docker 环境在第一次 Compose 启动前缺少合法 Nacos JWT 签名密钥的问题：
+  bootstrap 现在只在本地生成或严格校验该密钥，迁移旧占位值，拒绝非法、过短或重复配置，
+  并通过 Nacos 专用的 ignored runtime env 文件阻断宿主同名变量覆盖；既有合法自定义密钥
+  保持不变。
+
 ## [1.0.9] - 2026-08-26
 
 > 收拢 `v1.0.8` 之后已合入的兼容依赖、Action 更新和不可覆盖发布治理；不增加业务域，

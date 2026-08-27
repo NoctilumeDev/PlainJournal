@@ -37,15 +37,10 @@ jobs:
           node tools/check-release-version.mjs
           node tools/render-verification-summary.mjs --check
       - name: Parse Compose configurations
-        env:
-          IDENTITY_JWT_SECRET: ci-only-identity-jwt-secret-not-for-runtime
-          TRADE_DB_PASSWORD: ci-only-trade-database-password
-          TRADE_INTERNAL_SERVICE_TOKEN: ci-only-trade-service-token
-          PAYMENT_INTERNAL_SERVICE_TOKEN: ci-only-payment-service-token
-          METRICS_SCRAPE_TOKEN: ci-only-metrics-token
-          GRAFANA_ADMIN_PASSWORD: ci-only-grafana-password
         run: |
-          docker compose --file deploy/docker/compose.yml --env-file deploy/docker/.env.example --profile core config --quiet
+          cp deploy/docker/.env.example deploy/docker/.env
+          pwsh -NoLogo -NoProfile -File deploy/docker/bootstrap-resources.ps1 -PrepareEnvironmentOnly
+          docker compose --file deploy/docker/compose.yml --env-file deploy/docker/.env --profile core config --quiet
           docker compose --file frontend/deploy/nginx/compose.yml config --quiet
       - name: Check patch whitespace
         env:
