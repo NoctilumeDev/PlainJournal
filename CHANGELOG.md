@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- 新增 32 GiB 扩展验收协议，冻结 fresh bootstrap、默认 Core Smoke、代表服务三实例、
+  资源有界并发阶梯、故障恢复、浏览器和清理顺序；该协议保持 `PLANNED / DEFERRED`，
+  不把脚本能力或 16 GiB 宿主停止线冒充为新的运行通过证据。
+
 ### Fixed
 
 - 修复 fresh Docker 环境在第一次 Compose 启动前缺少合法 Nacos JWT 签名密钥的问题：

@@ -31,6 +31,7 @@ const REQUIRED_CURRENT_FILES = [
   "23-trade-scheduling-isolation.md",
   "24-distributed-tracing.md",
   "25-trade-fulfillment-reconciliation.md",
+  "32gib-extended-validation-runbook.md",
   "core-smoke.md",
   "project-history.md",
   "reference-baseline-and-pro-boundary.md",
