@@ -46,7 +46,7 @@ netsh int ipv4 show dynamicport tcp
 netsh int ipv4 show dynamicport udp
 
 docker info
-docker compose -f deploy/docker/compose.yaml config --quiet
+docker compose -f deploy/docker/compose.yml config --quiet
 ```
 
 继续检查项目端口是否被其他进程占用：
