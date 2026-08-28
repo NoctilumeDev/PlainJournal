@@ -25,6 +25,10 @@ const environmentExamplePath = path.join(
 const composePath = path.join(repositoryRoot, "deploy", "docker", "compose.yml");
 const legacyNacosTokenPlaceholder =
   "replace-with-base64-token-longer-than-32-bytes";
+const invalidNacosTokenDiagnostic =
+  /canonical standard Base64.*least 32 bytes/u;
+const concurrentBootstrapDiagnostic =
+  /already preparing this.*environment/u;
 
 async function createBootstrapFixture(transformEnvironment = (value) => value) {
   const fixture = await fs.mkdtemp(
@@ -198,7 +202,7 @@ test("environment preparation rejects interpolated Nacos tokens without interpre
     assert.notEqual(result.status, 0);
     assert.match(
       normalizeProcessOutput(result),
-      /canonical standard Base64 and decode to at least 32 bytes/u,
+      invalidNacosTokenDiagnostic,
     );
     assert.equal(await fs.readFile(environmentPath, "utf8"), before);
     await assert.rejects(
@@ -233,7 +237,7 @@ test("failed revalidation invalidates a previously prepared Nacos runtime token"
     assert.notEqual(second.status, 0);
     assert.match(
       normalizeProcessOutput(second),
-      /canonical standard Base64 and decode to at least 32 bytes/u,
+      invalidNacosTokenDiagnostic,
     );
     await assert.rejects(
       fs.access(path.join(fixture, ".runtime-secrets", "nacos-auth-token.env")),
@@ -278,7 +282,7 @@ test("concurrent environment preparation cannot create duplicate Nacos tokens", 
     for (const result of results.filter((candidate) => candidate.status !== 0)) {
       assert.match(
         normalizeProcessOutput(result),
-        /already preparing this environment/u,
+        concurrentBootstrapDiagnostic,
       );
     }
 
@@ -353,7 +357,7 @@ test("environment preparation rejects malformed or undersized custom Nacos token
       assert.notEqual(result.status, 0);
       assert.match(
         normalizeProcessOutput(result),
-        /canonical standard Base64 and decode to at least 32 bytes/u,
+        invalidNacosTokenDiagnostic,
       );
       assert.equal(await fs.readFile(environmentPath, "utf8"), before);
     } finally {
