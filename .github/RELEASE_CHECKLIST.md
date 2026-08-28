@@ -139,10 +139,12 @@ Workflow 只在已存在标签时打包，并且仅在 GitHub Release 尚不存�
 - [x] 专用 ignored runtime env 阻断宿主同名变量覆盖；重叠准备、大小写 `EXPORT` 差异
   和失败后旧 runtime 复用均有回归门禁。
 - [x] 16 GiB 本轮停止事实与历史发布证据、未来 32 GiB 协议分层记录；32 GiB、三实例、
-  容量和故障恢复仍未由本次候选执行。
+  容量和故障恢复仍未由本次维护回归执行。
 - [x] 产品修复合并提交 `1453aaaf6746700c1d75e4f9d26f28f95bc4d599` 的 CI、Security
   和 Online Preview 已通过。
-- [x] 后端、前端、验证摘要、Changelog 和 Release Notes 已统一为 `1.0.10` 候选。
-- [ ] 候选 PR 与候选合并提交的 CI、Security、CodeQL 和 Online Preview 全部通过。
+- [x] 后端、前端、验证摘要、Changelog 和 Release Notes 已统一为 `1.0.10`
+  正式发布基线。
+- [x] 候选 PR 提交 `df80c04` 与候选合并提交 `cf05c0c` 的 CI、Security、CodeQL 和
+  Online Preview 全部通过。
 - [ ] 验证基线提升为 `released`，且正式发布提交重新通过远端门禁。
 - [ ] `v1.0.10` 注解标签、Release、ZIP、SHA-256、manifest 和 SPDX SBOM 回读一致。
