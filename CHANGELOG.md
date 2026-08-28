@@ -27,8 +27,11 @@
 ### Verification boundary
 
 - 产品修复提交 `1453aaaf6746700c1d75e4f9d26f28f95bc4d599` 的 CI、Security 和 Online
-  Preview 已通过；`v1.0.10` 候选 PR、最终 `main`、标签工作流和 Release 资产仍须按
-  发布阶段分别读回，不能在候选中提前宣称；
+  Preview 已通过；候选 PR 提交 `df80c0411306261212ee936655a0539fa8495c1d` 与候选合并
+  提交 `cf05c0cdac430304847b9af2b72c002020c674b8` 的 CI、Security、CodeQL 和 Online
+  Preview 也已通过；
+- 验证基线现提升为 `released`；正式标签只允许指向重新通过远端门禁的发布提交，Release
+  资产仍须由标签工作流生成并按 manifest 独立读回；
 - 本轮 16 GiB fresh Core Smoke 保持 `INCONCLUSIVE / HOST CAPACITY BOUNDARY`：完整
   JVM 拓扑启动后宿主仅余约 0.46 GiB，验收按合同停止且强制中断留下隔离业务事实；
 - 32 GiB 协议保持 `PLANNED / DEFERRED`。既有历史三实例和容量证据不被本次受限宿主
