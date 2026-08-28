@@ -39,7 +39,14 @@ a {
 .hero__shade {
   position: absolute;
   inset: 0;
-  background: rgba(12, 23, 20, 0.62);
+  background: linear-gradient(
+    90deg,
+    rgba(12, 23, 20, 1) 0%,
+    rgba(12, 23, 20, 1) 56%,
+    rgba(12, 23, 20, 0.92) 64%,
+    rgba(12, 23, 20, 0.72) 78%,
+    rgba(12, 23, 20, 0.5) 100%
+  );
 }
 
 .nav,
@@ -211,7 +218,7 @@ footer {
 @media (max-width: 640px) {
   .hero {
     min-height: 760px;
-    background-position: 58% center;
+    background: #25322e;
   }
 
   .nav,
