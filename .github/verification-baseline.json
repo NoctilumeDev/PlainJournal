@@ -1,40 +1,90 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "targetRelease": "v1.0.10",
   "status": "released",
-  "verifiedOn": "2026-08-28",
-  "backend": {
-    "surefireReports": 100,
-    "tests": 436,
-    "failures": 0,
-    "errors": 0,
-    "skipped": 0,
-    "pmdReports": 12,
-    "pmdViolations": 0,
-    "spotbugsReports": 12,
-    "spotbugsPriority1": 0,
-    "spotbugsPriority2": 247,
-    "spotbugsPriority3": 66,
-    "lineCoverage": 72.4,
-    "lineCoverageMinimum": 70
+  "codeGateEvidence": {
+    "verifiedOn": "2026-08-28",
+    "objectRef": "refs/tags/v1.0.10",
+    "objectCommit": "52f7de692d26e760661c4d3172746f1ac517952c",
+    "sourcePath": ".github/verification-baseline.json",
+    "sourceBlob": "4ac8d553009c432be454e00baf22263312fcebae",
+    "backend": {
+      "surefireReports": 100,
+      "tests": 436,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "pmdReports": 12,
+      "pmdViolations": 0,
+      "spotbugsReports": 12,
+      "spotbugsPriority1": 0,
+      "spotbugsPriority2": 247,
+      "spotbugsPriority3": 66,
+      "lineCoverage": 72.4,
+      "lineCoverageMinimum": 70
+    },
+    "frontend": {
+      "unitAndContractTests": 323,
+      "developmentE2E": 60,
+      "productionE2E": 3,
+      "layerRules": 28,
+      "deliveryRules": 3,
+      "deploymentRules": 3,
+      "releaseMaterialRules": 3,
+      "lineCoverage": 70.16,
+      "lineCoverageMinimum": 70
+    }
   },
-  "frontend": {
-    "unitAndContractTests": 323,
-    "developmentE2E": 60,
-    "productionE2E": 3,
-    "layerRules": 28,
-    "deliveryRules": 3,
-    "deploymentRules": 3,
-    "releaseMaterialRules": 3,
-    "lineCoverage": 70.16,
-    "lineCoverageMinimum": 70
-  },
-  "realEvidence": {
+  "historicalRuntimeEvidence": {
+    "status": "FROZEN HISTORICAL EVIDENCE",
+    "observedFrom": "2026-07-28",
+    "observedThrough": "2026-08-04",
+    "hostBoundary": "16 GiB Windows；分组与串行拓扑",
+    "sourceSnapshots": [
+      {
+        "path": "docs/evidence/m0-m8-three-layer-acceptance-20260728.md",
+        "objectRef": "refs/tags/v1.0.0",
+        "objectCommit": "d563507f16f50602e997d2272a400fa54606ff93",
+        "sourceCommit": "7b54cff681363555c0318621d9b8a6ad8d7edb47",
+        "sourceBlob": "612aa5b639ff37f2fd8f0018aa2c7e892c522120"
+      },
+      {
+        "path": "docs/evidence/v1.0.2-engineering-acceptance-20260804.md",
+        "objectRef": "refs/tags/v1.0.2",
+        "objectCommit": "da5ae5597e35089ec891e34cf49cc82f5c136298",
+        "sourceCommit": "7b54cff681363555c0318621d9b8a6ad8d7edb47",
+        "sourceBlob": "72b820bf2acab356c6b2b69b14a950958bafec48"
+      }
+    ],
     "coreMiddleware": 7,
     "representativeInstances": 3,
     "capacityRequests": 1000,
     "capacityConcurrency": 100,
     "browserConsoleErrors": 0,
     "browserNetworkErrors": 0
+  },
+  "freshRevalidation": {
+    "observedOn": "2026-08-28",
+    "objectCommit": "a4fecf46e918278e625c1815b16ff6fe2656ffc7",
+    "fixedByCommit": "1453aaaf6746700c1d75e4f9d26f28f95bc4d599",
+    "objectBoundary": "v1.0.10 修复前的公开提交；公开 Nacos 模板缺陷仍存在",
+    "evidenceClass": "SESSION READBACK SUMMARY / RAW OUTPUT NOT PERSISTED",
+    "runtimeAdjustment": "仅在 ignored .env 中替换 Nacos token，以继续定位宿主容量",
+    "status": "INCONCLUSIVE / HOST CAPACITY BOUNDARY",
+    "coreMiddlewareStarted": 7,
+    "businessJvmPortsObserved": 8,
+    "businessJvmPortsExpected": 8,
+    "minimumAvailablePhysicalMemoryGiB": 0.46,
+    "coreSmokeVerdict": "NOT COMPLETED",
+    "capacityValidation": "NOT RUN",
+    "representativeThreeInstanceValidation": "NOT RUN",
+    "failureRecoveryValidation": "NOT RUN",
+    "browserBusinessRevalidation": "NOT RUN",
+    "sourcePath": "docs/32gib-extended-validation-runbook.md",
+    "sourceCommit": "a42f21fec26e6973f34115e2376428a0beef9c5d",
+    "sourceBlob": "9d987675eb8a94601e3631e712ea01e6c774ba4e"
+  },
+  "deferred32GiBValidation": {
+    "executed": false
   }
 }

@@ -11,8 +11,10 @@ PlainJournal 是一个单经营主体、自营 B2C 分布式电商项目。它�
 JDK 17 和 Vue 3，围绕数据所有权、交易一致性、结果未知恢复、多实例竞争和故障治理
 建立可运行实现，而不是用服务数量代替工程证据。
 
-当前仓库是 16GB Windows 单机约束下已经闭环的 M0-M8 参考基线，不是等待平台化补齐
-的 Basic 版。`v1.0.x` 只修复明确缺陷和工程边界；前端后续可单独进行视觉重构，但
+当前仓库保存的是在 16GB Windows 单机、分组与串行条件下已经闭环的 M0-M8 历史参考
+基线，不是等待平台化补齐的 Basic 版。2026-08-28 的 fresh 全拓扑复验因宿主只余约
+0.46 GiB 可用物理内存而停止，没有重新取得 Core Smoke PASS；历史证据、本轮边界与未来
+32 GiB 协议分别记录，不能压成同一次“完整验证”。`v1.0.x` 只修复明确缺陷和工程边界；前端后续可单独进行视觉重构，但
 不能改变所有者事实和交易状态机。多商户、平台账本、结算和 Java/Go 异构协作进入
 独立仓库 [PlainJournalPro](https://github.com/NoctilumeDev/PlainJournalPro)，完整
 边界见[参考基线与 Pro 边界](docs/reference-baseline-and-pro-boundary.md)。
@@ -123,8 +125,9 @@ Windows `cmd.exe` 可使用 `mvnw.cmd`。真实中间件准备见
 
 ## 当前验证
 
-当前版本、测试、覆盖率和真实链路证据的单一事实源是
-[验证摘要](docs/verification-summary.md)，发布后的每次变更都必须同步更新并通过生成门禁。
+`v1.0.10` 发布对象代码门禁、历史运行证据、本轮 fresh 宿主边界和未来 32 GiB 协议的单一索引是
+[验证摘要](docs/verification-summary.md)。该索引按时间、对象和宿主条件分层；发布后的每次
+变更都必须同步更新并通过生成门禁。
 
 GitHub Actions 公开复跑后端、前端、架构、文档和安全门禁。真实 MySQL、Redis、
 Nacos、RocketMQ、MinIO、ClamAV、OpenSearch、故障与容量实验继续由专项脚本证明，

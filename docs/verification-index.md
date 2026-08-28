@@ -42,6 +42,10 @@ cd backend
 **用途**：验证代表服务三实例、滚动升级、消费者竞争、1000/100 容量、故障注入、
 分片/副本/归档、Chat、ClamAV、OpenSearch、观测追踪和对账恢复。
 
+这些能力的公开 PASS 来自 2026-07-28 至 2026-08-04 的冻结历史快照；2026-08-28 的
+fresh 全拓扑复验在业务链完成前触发 16 GiB 宿主停止线，没有把它们重新执行成当日 PASS。
+两条证据线及未来 32 GiB 协议由[验证摘要](verification-summary.md)分开索引。
+
 主要入口：
 
 - `backend/verify-trade-outbox-multi-instance.ps1`
