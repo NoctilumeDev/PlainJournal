@@ -146,5 +146,8 @@ Workflow 只在已存在标签时打包，并且仅在 GitHub Release 尚不存�
   正式发布基线。
 - [x] 候选 PR 提交 `df80c04` 与候选合并提交 `cf05c0c` 的 CI、Security、CodeQL 和
   Online Preview 全部通过。
-- [ ] 验证基线提升为 `released`，且正式发布提交重新通过远端门禁。
-- [ ] `v1.0.10` 注解标签、Release、ZIP、SHA-256、manifest 和 SPDX SBOM 回读一致。
+- [x] 正式发布提交 `52f7de6` 在打标签前重新通过 CI、Security、CodeQL 和
+  Online Preview，验证基线处于 `released`。
+- [x] `v1.0.10` 注解标签对象 `c9ffdc0` 解析到 `52f7de6`；Release、ZIP、SHA-256、
+  manifest 和 SPDX 2.3 SBOM 已回读一致，ZIP SHA-256 为
+  `e8a2dc3f9c263bd85ea8f422b07f9eb7b33ec4a4d42269cb05efb19009409884`。
