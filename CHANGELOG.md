@@ -5,6 +5,11 @@
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-08-28
+
+> 修复公开 fresh Nacos bootstrap 合同并冻结受限宿主与未来扩容复验边界；不增加业务域，
+> 不修改数据库结构、交易状态机、公开 API 或前端视觉。
+
 ### Changed
 
 - 新增 32 GiB 扩展验收协议，冻结 fresh bootstrap、默认 Core Smoke、代表服务三实例、
@@ -18,6 +23,16 @@
   通过 Nacos 专用的 ignored runtime env 文件阻断宿主同名变量覆盖，以跨进程单写者锁
   防止重叠准备毒化本机环境，并在重新校验前使旧 runtime 载体失效；既有合法的 literal
   自定义密钥保持不变。
+
+### Verification boundary
+
+- 产品修复提交 `1453aaaf6746700c1d75e4f9d26f28f95bc4d599` 的 CI、Security 和 Online
+  Preview 已通过；`v1.0.10` 候选 PR、最终 `main`、标签工作流和 Release 资产仍须按
+  发布阶段分别读回，不能在候选中提前宣称；
+- 本轮 16 GiB fresh Core Smoke 保持 `INCONCLUSIVE / HOST CAPACITY BOUNDARY`：完整
+  JVM 拓扑启动后宿主仅余约 0.46 GiB，验收按合同停止且强制中断留下隔离业务事实；
+- 32 GiB 协议保持 `PLANNED / DEFERRED`。既有历史三实例和容量证据不被本次受限宿主
+  现场覆盖，本次也不声称重新执行了真实中间件、容量、故障恢复或浏览器业务验收。
 
 ## [1.0.9] - 2026-08-26
 
