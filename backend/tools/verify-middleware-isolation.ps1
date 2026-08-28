@@ -17,6 +17,7 @@ $repositoryRoot = Split-Path -Parent $backendRoot
 $composeRoot = Join-Path $repositoryRoot 'deploy\docker'
 $composeFile = Join-Path $composeRoot 'compose.yml'
 $environmentFile = Join-Path $composeRoot '.env'
+$environmentBootstrap = Join-Path $composeRoot 'bootstrap-resources.ps1'
 $hostPreflight = Join-Path $PSScriptRoot 'check-verification-host.ps1'
 $runId = [DateTimeOffset]::UtcNow.ToString('yyyyMMdd-HHmmss')
 $runDirectory = Join-Path $backendRoot ".run\middleware-isolation-$runId"
@@ -154,7 +155,7 @@ function Write-Evidence {
 if (-not (Test-Path -LiteralPath $environmentFile)) {
     throw "Missing local environment file: $environmentFile"
 }
-foreach ($path in @($composeFile, $hostPreflight)) {
+foreach ($path in @($composeFile, $environmentBootstrap, $hostPreflight)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Missing verification dependency: $path"
     }
@@ -165,6 +166,7 @@ foreach ($command in @('docker')) {
     }
 }
 
+& $environmentBootstrap -PrepareEnvironmentOnly
 Import-DotEnv -Path $environmentFile
 [IO.Directory]::CreateDirectory((Split-Path -Parent $evidencePath)) | Out-Null
 

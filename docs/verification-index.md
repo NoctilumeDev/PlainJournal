@@ -82,6 +82,11 @@ cd backend
 与跨服务一致性断言，并在首个资源或正确性失败处停止。脚本存在不代表最高一级已经通过；
 公开摘要只记录实际完成且工作区干净的证据。
 
+32 GiB 物理内存升级后的完整执行顺序、资源停止线、代表服务三实例、高并发、故障恢复、
+浏览器现实和 bind-mount 清理边界见
+[32 GiB 扩展验收协议](32gib-extended-validation-runbook.md)。该文件当前状态为
+`PLANNED / DEFERRED`，不能作为尚未执行的 32 GiB 或 1000 并发通过证据。
+
 ## 公共 CI
 
 GitHub Actions 公开运行：

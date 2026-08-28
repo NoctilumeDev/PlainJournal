@@ -10,6 +10,8 @@
   并发数字解释，以及 PlainJournalPro 职责；
 - [当前验证摘要](verification-summary.md)：版本、测试、覆盖率和真实证据事实源；
 - [验证索引](verification-index.md)：UI Demo、Core Smoke、Full Lab 三档入口；
+- [32 GiB 扩展验收协议](32gib-extended-validation-runbook.md)：内存升级后的 fresh
+  bootstrap、默认 Core Smoke、代表服务三实例、容量阶梯、故障恢复和清理；
 - [项目历史](project-history.md)：阶段演进、Git 公开历史和版本边界；
 - [验收证据](evidence/README.md)：M0-M8 三层验收与正式发布前的工程冻结快照。
 

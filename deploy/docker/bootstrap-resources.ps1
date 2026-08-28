@@ -1,5 +1,12 @@
+[CmdletBinding()]
+param(
+    [switch]$PrepareEnvironmentOnly
+)
+
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+$nacosAuthTokenPlaceholder = 'replace-with-base64-token-longer-than-32-bytes'
 
 function Get-EnvValue {
     param([Parameter(Mandatory)][string]$Name)
@@ -40,6 +47,174 @@ function New-HexSecret {
     return [Convert]::ToHexString(
         [Security.Cryptography.RandomNumberGenerator]::GetBytes($ByteLength)
     ).ToLowerInvariant()
+}
+
+function New-Base64Secret {
+    param([int]$ByteLength = 48)
+
+    return [Convert]::ToBase64String(
+        [Security.Cryptography.RandomNumberGenerator]::GetBytes($ByteLength)
+    )
+}
+
+function Enter-BootstrapLock {
+    $runtimeSecretDirectory = Join-Path $PSScriptRoot '.runtime-secrets'
+    [System.IO.Directory]::CreateDirectory($runtimeSecretDirectory) | Out-Null
+    $lockPath = Join-Path $runtimeSecretDirectory 'bootstrap.lock'
+
+    try {
+        $stream = [System.IO.FileStream]::new(
+            $lockPath,
+            [System.IO.FileMode]::OpenOrCreate,
+            [System.IO.FileAccess]::ReadWrite,
+            [System.IO.FileShare]::None
+        )
+        $stream.SetLength(0)
+        $metadata = [System.Text.Encoding]::UTF8.GetBytes(
+            "pid=$PID startedAt=$([DateTimeOffset]::UtcNow.ToString('O'))`n"
+        )
+        $stream.Write($metadata, 0, $metadata.Length)
+        $stream.Flush($true)
+        return $stream
+    }
+    catch [System.IO.IOException] {
+        throw (
+            'Another bootstrap-resources.ps1 process is already preparing this environment. ' +
+            'Wait for it to finish, then retry.'
+        )
+    }
+}
+
+function Test-NacosAuthToken {
+    param([AllowEmptyString()][string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value) -or
+        $Value -notmatch '^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$') {
+        return $false
+    }
+
+    try {
+        $decoded = [Convert]::FromBase64String($Value)
+    }
+    catch {
+        return $false
+    }
+
+    return $decoded.Length -ge 32 -and [string]::Equals(
+        [Convert]::ToBase64String($decoded),
+        $Value,
+        [StringComparison]::Ordinal
+    )
+}
+
+function ConvertFrom-DotEnvAssignment {
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Line)
+
+    $statement = $Line.TrimStart()
+    if (-not $statement -or $statement.StartsWith('#')) {
+        return $null
+    }
+    if ($statement -cmatch '^export\s+') {
+        $statement = $statement.Substring($Matches[0].Length)
+    }
+    elseif ($statement -match '^export\s+') {
+        throw 'The dotenv export prefix is case-sensitive and must be lowercase.'
+    }
+
+    $equalsIndex = $statement.IndexOf('=')
+    $colonIndex = $statement.IndexOf(':')
+    $delimiterIndex = if ($equalsIndex -ge 0 -and ($colonIndex -lt 0 -or $equalsIndex -lt $colonIndex)) {
+        $equalsIndex
+    }
+    else {
+        $colonIndex
+    }
+
+    if ($delimiterIndex -lt 0) {
+        return [pscustomobject]@{
+            Name = $statement.Trim()
+            Value = $null
+        }
+    }
+
+    $name = $statement.Substring(0, $delimiterIndex).Trim()
+    $rawValue = $statement.Substring($delimiterIndex + 1).TrimStart()
+    $value = if ($rawValue -match "^'([^']*)'(?:\s*(?:#.*)?)?$") {
+        $Matches[1]
+    }
+    elseif ($rawValue -match '^"([^"]*)"(?:\s*(?:#.*)?)?$') {
+        $Matches[1]
+    }
+    else {
+        $commentIndex = $rawValue.IndexOf(' #')
+        if ($commentIndex -ge 0) {
+            $rawValue.Substring(0, $commentIndex).TrimEnd()
+        }
+        else {
+            $rawValue.TrimEnd()
+        }
+    }
+
+    return [pscustomobject]@{
+        Name = $name
+        Value = $value
+    }
+}
+
+function Ensure-NacosAuthToken {
+    $envPath = Join-Path $PSScriptRoot '.env'
+    $lines = [System.IO.File]::ReadAllLines($envPath)
+    $assignments = @(
+        for ($index = 0; $index -lt $lines.Length; $index++) {
+            $assignment = ConvertFrom-DotEnvAssignment -Line $lines[$index]
+            if ($assignment -and [string]::Equals(
+                    $assignment.Name,
+                    'NACOS_AUTH_TOKEN',
+                    [StringComparison]::Ordinal)) {
+                [pscustomobject]@{
+                    Index = $index
+                    Value = $assignment.Value
+                }
+            }
+        }
+    )
+
+    if ($assignments.Count -gt 1) {
+        throw 'NACOS_AUTH_TOKEN must appear exactly once in .env.'
+    }
+
+    if ($assignments.Count -eq 0) {
+        $generated = New-Base64Secret
+        [System.IO.File]::AppendAllText(
+            $envPath,
+            "`r`nNACOS_AUTH_TOKEN=$generated",
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        return $generated
+    }
+
+    $lineIndex = $assignments[0].Index
+    $value = $assignments[0].Value
+    if (Test-NacosAuthToken -Value $value) {
+        return $value
+    }
+
+    if ([string]::IsNullOrEmpty($value) -or
+        [string]::Equals($value, $nacosAuthTokenPlaceholder, [StringComparison]::Ordinal)) {
+        $generated = New-Base64Secret
+        $lines[$lineIndex] = "NACOS_AUTH_TOKEN=$generated"
+        [System.IO.File]::WriteAllLines(
+            $envPath,
+            $lines,
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        return $generated
+    }
+
+    throw (
+        'NACOS_AUTH_TOKEN must be canonical standard Base64 and decode to at least 32 bytes. ' +
+        'Correct or remove the local value, then prepare the environment before starting Compose.'
+    )
 }
 
 function Initialize-ServiceDatabase {
@@ -127,6 +302,16 @@ function Wait-CoreMiddleware {
     )
 }
 
+$bootstrapLock = Enter-BootstrapLock
+try {
+$runtimeSecretDirectory = Join-Path $PSScriptRoot '.runtime-secrets'
+$nacosRuntimeEnvironmentPath = Join-Path $runtimeSecretDirectory 'nacos-auth-token.env'
+# The runtime file is derived. Remove it first so failed validation cannot leave
+# a stale Compose-readable credential behind.
+[System.IO.File]::Delete($nacosRuntimeEnvironmentPath)
+
+$nacosAuthToken = Ensure-NacosAuthToken
+
 $identityDbName = Ensure-EnvValue -Name 'IDENTITY_DB_NAME' -Value 'ecom_identity'
 $identityDbUser = Ensure-EnvValue -Name 'IDENTITY_DB_USER' -Value 'ecom_identity_app'
 $identityDbPassword = Ensure-EnvValue -Name 'IDENTITY_DB_PASSWORD' -Value (New-HexSecret -ByteLength 24)
@@ -172,13 +357,22 @@ $analyticsDbName = Ensure-EnvValue -Name 'ANALYTICS_DB_NAME' -Value 'ecom_analyt
 $analyticsDbUser = Ensure-EnvValue -Name 'ANALYTICS_DB_USER' -Value 'ecom_analytics_app'
 $analyticsDbPassword = Ensure-EnvValue -Name 'ANALYTICS_DB_PASSWORD' -Value (New-HexSecret -ByteLength 24)
 
-$runtimeSecretDirectory = Join-Path $PSScriptRoot '.runtime-secrets'
 [System.IO.Directory]::CreateDirectory($runtimeSecretDirectory) | Out-Null
 [System.IO.File]::WriteAllText(
     (Join-Path $runtimeSecretDirectory 'metrics-scrape-token'),
     $metricsScrapeToken,
     [System.Text.UTF8Encoding]::new($false)
 )
+[System.IO.File]::WriteAllText(
+    $nacosRuntimeEnvironmentPath,
+    "NACOS_AUTH_TOKEN=$nacosAuthToken`n",
+    [System.Text.UTF8Encoding]::new($false)
+)
+
+if ($PrepareEnvironmentOnly) {
+    Write-Host 'Prepared ignored local environment secrets for Docker Compose.'
+    return
+}
 
 $requiredContainers = @(
     'plainjournal-mysql',
@@ -322,3 +516,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host 'Service databases/secrets, observability credentials, Nacos configuration, RocketMQ topics, and MinIO buckets are ready.'
+}
+finally {
+    $bootstrapLock.Dispose()
+}
