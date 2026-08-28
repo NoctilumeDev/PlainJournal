@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -53,6 +53,35 @@ function runEnvironmentPreparation(fixture) {
     ],
     { encoding: "utf8", windowsHide: true },
   );
+}
+
+function runEnvironmentPreparationAsync(fixture) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      "pwsh",
+      [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        path.join(fixture, "bootstrap-resources.ps1"),
+        "-PrepareEnvironmentOnly",
+      ],
+      { windowsHide: true },
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", reject);
+    child.on("close", (status) => resolve({ status, stdout, stderr }));
+  });
 }
 
 function readSingleEnvironmentValue(environment, name) {
@@ -144,6 +173,122 @@ test("environment preparation preserves a valid custom Nacos token", async () =>
     const environment = await fs.readFile(path.join(fixture, ".env"), "utf8");
     assert.match(environment, new RegExp(customToken, "u"));
     assert.equal(await readRuntimeNacosToken(fixture), customToken);
+  } finally {
+    await fs.rm(fixture, { recursive: true, force: true });
+  }
+});
+
+test("environment preparation rejects interpolated Nacos tokens without interpreting Compose expressions", async () => {
+  const referencedToken = Buffer.alloc(32, 0x5a).toString("base64");
+  const fixture = await createBootstrapFixture(
+    (example) =>
+      `${example}\nNACOS_TOKEN=${referencedToken}\nNACOS_AUTH_TOKEN=\${NACOS_TOKEN}\n`,
+  );
+  try {
+    const environmentPath = path.join(fixture, ".env");
+    const before = await fs.readFile(environmentPath, "utf8");
+    const result = runEnvironmentPreparation(fixture);
+    assert.notEqual(result.status, 0);
+    assert.match(
+      `${result.stdout}\n${result.stderr}`,
+      /canonical standard Base64 and decode to at least 32 bytes/u,
+    );
+    assert.equal(await fs.readFile(environmentPath, "utf8"), before);
+    await assert.rejects(
+      fs.access(path.join(fixture, ".runtime-secrets", "nacos-auth-token.env")),
+    );
+  } finally {
+    await fs.rm(fixture, { recursive: true, force: true });
+  }
+});
+
+test("failed revalidation invalidates a previously prepared Nacos runtime token", async () => {
+  const fixture = await createBootstrapFixture();
+  try {
+    const first = runEnvironmentPreparation(fixture);
+    assert.equal(first.status, 0, `${first.stdout}\n${first.stderr}`);
+    await fs.access(
+      path.join(fixture, ".runtime-secrets", "nacos-auth-token.env"),
+    );
+
+    const environmentPath = path.join(fixture, ".env");
+    const environment = await fs.readFile(environmentPath, "utf8");
+    await fs.writeFile(
+      environmentPath,
+      environment.replace(
+        /^NACOS_AUTH_TOKEN=.*$/mu,
+        "NACOS_AUTH_TOKEN=operator-chosen-but-invalid",
+      ),
+      "utf8",
+    );
+
+    const second = runEnvironmentPreparation(fixture);
+    assert.notEqual(second.status, 0);
+    assert.match(
+      `${second.stdout}\n${second.stderr}`,
+      /canonical standard Base64 and decode to at least 32 bytes/u,
+    );
+    await assert.rejects(
+      fs.access(path.join(fixture, ".runtime-secrets", "nacos-auth-token.env")),
+    );
+  } finally {
+    await fs.rm(fixture, { recursive: true, force: true });
+  }
+});
+
+test("environment preparation rejects export prefixes that Docker Compose cannot parse", async () => {
+  const validToken = Buffer.alloc(32, 0x5a).toString("base64");
+  for (const exportPrefix of ["EXPORT", "Export"]) {
+    const fixture = await createBootstrapFixture(
+      (example) => `${example}\n${exportPrefix} NACOS_AUTH_TOKEN=${validToken}\n`,
+    );
+    try {
+      const environmentPath = path.join(fixture, ".env");
+      const before = await fs.readFile(environmentPath, "utf8");
+      const result = runEnvironmentPreparation(fixture);
+      assert.notEqual(result.status, 0);
+      assert.match(
+        `${result.stdout}\n${result.stderr}`,
+        /export prefix is case-sensitive and must be lowercase/u,
+      );
+      assert.equal(await fs.readFile(environmentPath, "utf8"), before);
+      await assert.rejects(
+        fs.access(path.join(fixture, ".runtime-secrets", "nacos-auth-token.env")),
+      );
+    } finally {
+      await fs.rm(fixture, { recursive: true, force: true });
+    }
+  }
+});
+
+test("concurrent environment preparation cannot create duplicate Nacos tokens", async () => {
+  const fixture = await createBootstrapFixture();
+  try {
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () => runEnvironmentPreparationAsync(fixture)),
+    );
+    assert.ok(results.some((result) => result.status === 0));
+    for (const result of results.filter((candidate) => candidate.status !== 0)) {
+      assert.match(
+        `${result.stdout}\n${result.stderr}`,
+        /already preparing this environment/u,
+      );
+    }
+
+    const environment = await fs.readFile(path.join(fixture, ".env"), "utf8");
+    const token = readSingleEnvironmentValue(environment, "NACOS_AUTH_TOKEN");
+    assertCanonicalNacosToken(token);
+    assert.equal(await readRuntimeNacosToken(fixture), token);
+
+    const final = runEnvironmentPreparation(fixture);
+    assert.equal(final.status, 0, `${final.stdout}\n${final.stderr}`);
+    assert.equal(
+      readSingleEnvironmentValue(
+        await fs.readFile(path.join(fixture, ".env"), "utf8"),
+        "NACOS_AUTH_TOKEN",
+      ),
+      token,
+    );
   } finally {
     await fs.rm(fixture, { recursive: true, force: true });
   }

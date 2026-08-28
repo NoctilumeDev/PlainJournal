@@ -32,9 +32,11 @@ docker compose --env-file .env --profile core up -d
 ./bootstrap-resources.ps1
 ```
 
-准备阶段会在本地生成并严格校验 Nacos 签名密钥；非法或重复的自定义值会在容器启动前
-被拒绝，不会被静默替换。已有 `.env` 不得用示例文件覆盖。不要把真实 `.env`、生成密钥、
-原始 Compose 配置输出、Nacos 启动日志或中间件数据目录提交到 Git。
+准备阶段会在本地生成并严格校验 Nacos 签名密钥；自定义值必须直接写成 canonical Base64，
+不能用 Compose 变量表达式间接提供。非法或重复值会在容器启动前被拒绝，派生的 Nacos
+runtime env 也会失效，不能让 Compose 继续复用旧值。已有 `.env` 不得用示例文件覆盖。
+不要把真实 `.env`、生成密钥、原始 Compose 配置输出、Nacos 启动日志或中间件数据目录
+提交到 Git。
 
 ## 执行
 
