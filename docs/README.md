@@ -22,6 +22,8 @@
 
 - [产品范围](01-product-scope.md)
 - [服务架构](02-service-architecture.md)
+- [系统架构图](visuals/system-architecture.html)：使用者、网关、十个事实所有者与运行底座
+- [功能模块图](visuals/functional-modules.html)：两个产品入口、六个任务域与十六个功能模块
 - [核心状态机](03-core-state-machines.md)
 - [数据所有权](04-data-ownership.md)
 - [一致性策略](05-consistency-strategy.md)

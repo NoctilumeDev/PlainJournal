@@ -1,0 +1,955 @@
+.diagram-header {
+  border-bottom: 1px solid var(--line);
+  background: rgb(249 247 241 / 86%);
+  backdrop-filter: blur(18px);
+}
+
+.diagram-nav,
+.diagram-main,
+.diagram-footer {
+  width: min(96rem, calc(100% - 3rem));
+  margin-inline: auto;
+}
+
+.diagram-nav {
+  min-height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.diagram-brand,
+.diagram-nav__links a {
+  text-decoration: none;
+}
+
+.diagram-brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .7rem;
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  letter-spacing: .15em;
+}
+
+.diagram-brand small {
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: .68rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.diagram-nav__links {
+  display: flex;
+  align-items: center;
+  gap: 1.35rem;
+  color: var(--ink-soft);
+  font-size: .82rem;
+}
+
+.diagram-nav__links a[aria-current="page"] {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--vermillion);
+  text-underline-offset: .45rem;
+}
+
+.diagram-nav a:focus-visible {
+  outline: 2px solid #385f54;
+  outline-offset: 3px;
+}
+
+.diagram-main {
+  padding-block: clamp(2.6rem, 5vw, 4.6rem) 5rem;
+}
+
+.diagram-intro {
+  max-width: 74rem;
+}
+
+.diagram-eyebrow,
+.entrance-node > span,
+.function-root-node > span {
+  color: #74837b;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.diagram-eyebrow {
+  margin: 0 0 .7rem;
+}
+
+.diagram-intro h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(2.7rem, 5vw, 5rem);
+  font-weight: 400;
+  letter-spacing: .04em;
+  line-height: 1.08;
+}
+
+.diagram-summary {
+  max-width: 68rem;
+  margin: 1rem 0 0;
+  color: var(--ink-soft);
+  font-family: var(--font-serif);
+  font-size: clamp(.96rem, 1.2vw, 1.12rem);
+  line-height: 1.8;
+}
+
+.diagram-statline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .7rem 0;
+  margin-top: 1.2rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  padding-inline: .8rem;
+  border-left: 1px solid var(--line-strong);
+  color: #53635b;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .66rem;
+}
+
+.diagram-statline .meta-pill:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.diagram-board,
+#module-root {
+  margin-top: 2.25rem;
+}
+
+.diagram-reading-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .45rem .75rem;
+  padding: .72rem .9rem;
+  border-block: 1px solid var(--line);
+  color: #526259;
+  font-size: .72rem;
+}
+
+.diagram-reading-note > span {
+  color: var(--vermillion);
+}
+
+.diagram-reading-note strong {
+  font-family: var(--font-serif);
+  font-size: .88rem;
+  font-weight: 500;
+}
+
+.diagram-reading-note i {
+  color: #7d8c84;
+  font-style: normal;
+}
+
+/* 功能树节点底板；系统架构图在独立样式表中维护。 */
+.entrance-node,
+.domain-node,
+.module-node,
+.function-root-node {
+  border: 1px solid var(--line-strong);
+  background: rgb(252 251 247 / 88%);
+}
+
+/* 功能模块图 */
+.functional-page {
+  --functional-copy-gap: 1rem;
+  --functional-rule-inset: 2rem;
+  --section-label-gap: .7rem;
+  --connector-color: #687c72;
+  --connector-stroke: 1px solid var(--connector-color);
+  --function-card-background:
+    radial-gradient(circle at 14% 18%, rgb(190 203 185 / 24%), transparent 54%),
+    linear-gradient(100deg, #d5d8c7 0%, #dfe0d1 31%, #ebe9dd 61.8%, #f2f0e7 100%);
+  --function-card-border: rgb(84 99 91 / 30%);
+}
+
+.functional-page pj-paper-atmosphere {
+  transform: translate3d(0, var(--paper-drift, 0), 0);
+  will-change: transform;
+}
+
+.functional-page .diagram-main,
+.functional-page .diagram-footer {
+  width: min(100% - 3rem, 64rem);
+}
+
+.functional-page .diagram-main {
+  padding-bottom: 2.5rem;
+}
+
+.functional-page .diagram-footer {
+  margin-top: .75rem;
+  padding-top: .8rem;
+}
+
+.functional-page .diagram-intro {
+  max-width: none;
+  text-align: center;
+}
+
+.functional-page .diagram-summary {
+  margin-top: var(--functional-copy-gap);
+  margin-inline: auto;
+}
+
+.functional-page .diagram-statline,
+.functional-page .diagram-reading-note {
+  justify-content: center;
+  text-align: center;
+}
+
+.functional-page .diagram-statline {
+  margin-top: var(--functional-copy-gap);
+}
+
+.functional-page #module-root,
+.functional-page .diagram-vertical-flow {
+  margin-top: var(--functional-copy-gap);
+}
+
+.functional-page .diagram-reading-note {
+  width: min(100%, 30rem);
+  margin-inline: auto;
+  padding: .65rem .9rem;
+  border-block: 1px solid var(--line);
+}
+
+.diagram-vertical-flow {
+  margin-top: 1rem;
+}
+
+.flow-cue {
+  width: max-content;
+  margin: 0 auto .45rem;
+  padding: .28rem .55rem;
+  border: 1px solid var(--line);
+  color: #617068;
+  background: rgb(250 248 242 / 82%);
+  font-size: .62rem;
+}
+
+.function-canvas {
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  background: rgb(253 252 248 / 68%);
+}
+
+.function-mobile-canvas {
+  display: none;
+}
+
+.function-tree {
+  --root-tier-gap: 1.4rem;
+  padding: 1.4rem;
+}
+
+.function-root-node {
+  width: min(100%, 18rem);
+  margin-inline: auto;
+  padding: 1rem 1.15rem;
+  text-align: center;
+}
+
+.function-root-node h2 {
+  margin: .32rem 0 0;
+  font-family: var(--font-serif);
+  font-size: 1.38rem;
+  font-weight: 500;
+}
+
+.function-root-node p {
+  margin: .42rem 0 0;
+  color: var(--ink-soft);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .58rem;
+}
+
+.branch-bracket {
+  position: relative;
+  width: 1px;
+  height: 2.2rem;
+  margin-inline: auto;
+}
+
+.branch-bracket > span {
+  position: absolute;
+  top: 0;
+  bottom: -.3rem;
+  left: 0;
+  border-left: var(--connector-stroke);
+}
+
+.entrance-branches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.15rem;
+  align-items: start;
+}
+
+.entrance-branch {
+  position: relative;
+  padding: 1rem .7rem 1.15rem;
+  border: 1px solid var(--function-card-border);
+  background: rgb(252 251 247 / 42%);
+}
+
+.entrance-branch::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: calc(1rem + .67px);
+  border-left: var(--connector-stroke);
+  transform: translateX(-50%);
+}
+
+.entrance-node {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 14rem);
+  margin-inline: auto;
+  padding: .88rem 1rem;
+  text-align: center;
+}
+
+.entrance-node::before,
+.domain-node::before,
+.module-node::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  box-sizing: border-box;
+  top: -9.66px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-right: var(--connector-stroke);
+  border-bottom: var(--connector-stroke);
+  transform: rotate(45deg);
+}
+
+.entrance-node h2 {
+  margin: .3rem 0 0;
+  font-family: var(--font-serif);
+  font-size: 1.18rem;
+  font-weight: 500;
+}
+
+.entrance-node p {
+  margin: .4rem 0 0;
+  overflow-wrap: anywhere;
+  color: var(--ink-soft);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .53rem;
+  line-height: 1.45;
+}
+
+.domain-rows {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.65rem;
+  padding: .3rem .2rem .35rem;
+}
+
+.domain-row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.domain-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .55rem;
+  width: min(100%, 16rem);
+  min-height: 3.7rem;
+  margin-inline: auto;
+  padding: .72rem .85rem;
+  text-align: center;
+}
+
+.domain-node span {
+  color: var(--vermillion);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .5rem;
+}
+
+.domain-node h3 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: .86rem;
+  font-weight: 500;
+}
+
+.module-branch {
+  --module-gap: .65rem;
+  --branch-height: 1.95rem;
+  --branch-midpoint: calc(var(--branch-height) / 2);
+  position: relative;
+  display: grid;
+  gap: var(--module-gap);
+  min-width: 0;
+  height: var(--branch-height);
+}
+
+.root-branch {
+  --module-gap: 1.15rem;
+  --branch-height: calc(var(--root-tier-gap) * 2);
+  --branch-midpoint: var(--root-tier-gap);
+}
+
+.root-branch i::after,
+.root-branch::after {
+  display: none;
+}
+
+.module-branch--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.module-branch--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.module-branch--2::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: var(--branch-midpoint);
+  border-left: var(--connector-stroke);
+  transform: translateX(-50%);
+}
+
+.module-branch > span {
+  position: relative;
+  min-width: 0;
+}
+
+.module-branch > span::after {
+  content: "";
+  position: absolute;
+  top: var(--branch-midpoint);
+  height: 0;
+  border-top: var(--connector-stroke);
+}
+
+.module-branch > span:first-child::after {
+  right: calc(var(--module-gap) / -2);
+  left: 50%;
+}
+
+.module-branch > span:last-child::after {
+  right: 50%;
+  left: calc(var(--module-gap) / -2);
+}
+
+.module-branch--3 > span:nth-child(2)::after {
+  right: calc(var(--module-gap) / -2);
+  left: calc(var(--module-gap) / -2);
+}
+
+.module-branch i {
+  position: absolute;
+  top: var(--branch-midpoint);
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  border-left: var(--connector-stroke);
+  transform: translateX(-50%);
+}
+
+.module-branch--3 > span:nth-child(2) i {
+  top: 0;
+}
+
+.module-branch i::after {
+  display: none;
+}
+
+.module-nodes {
+  --module-gap: .65rem;
+  position: relative;
+  display: grid;
+  gap: var(--module-gap);
+  min-width: 0;
+}
+
+.module-nodes--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.module-nodes--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.domain-row:not(:last-child) .module-nodes::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: -1.95rem;
+  bottom: -1.65rem;
+  left: 50%;
+  width: 0;
+  border-left: var(--connector-stroke);
+  transform: translateX(-50%);
+}
+
+.module-node {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 4.15rem;
+  padding: .75rem .8rem;
+  text-align: center;
+}
+
+.function-root-node,
+.entrance-node,
+.domain-node,
+.module-node {
+  border: 1px solid var(--function-card-border);
+  background: var(--function-card-background);
+}
+
+.module-node h4 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: .86rem;
+  font-weight: 500;
+}
+
+.module-node p {
+  margin: .34rem 0 0;
+  color: var(--ink-soft);
+  font-size: .6rem;
+  line-height: 1.45;
+}
+
+.ownership-index,
+.principle-section {
+  margin-top: 2.5rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--line-strong);
+}
+
+.ownership-index > header {
+  display: grid;
+  grid-template-columns: max-content minmax(18rem, 1fr);
+  gap: .2rem 2rem;
+  align-items: end;
+}
+
+.ownership-index > header .diagram-eyebrow {
+  grid-column: 1;
+}
+
+.ownership-index > header h2 {
+  grid-column: 1;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.45rem, 2.5vw, 2.2rem);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.ownership-index > header > p:last-child {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: .72rem;
+  line-height: 1.65;
+}
+
+.ownership-table {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .55rem;
+  margin-top: 1rem;
+  background: transparent;
+}
+
+.functional-page .ownership-table {
+  background: transparent;
+}
+
+.ownership-row {
+  min-width: 0;
+  padding: .62rem .7rem;
+  border: 1px solid var(--function-card-border, var(--line));
+  background: var(--function-card-background, rgb(249 248 243 / 94%));
+}
+
+.ownership-row span,
+.ownership-row strong {
+  display: block;
+}
+
+.ownership-row span {
+  font-family: var(--font-serif);
+  font-size: .7rem;
+}
+
+.ownership-row strong {
+  margin-top: .25rem;
+  overflow-wrap: anywhere;
+  color: #50675c;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .52rem;
+  font-weight: 500;
+}
+
+.functional-page .ownership-index > header {
+  grid-template-columns: 1fr;
+  gap: .8rem;
+  text-align: center;
+}
+
+.functional-page .ownership-index,
+.functional-page .principle-section {
+  position: relative;
+  border-top: 0;
+}
+
+.functional-page .ownership-index {
+  padding-top: var(--section-label-gap);
+}
+
+.functional-page .ownership-index::before,
+.functional-page .principle-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: var(--functional-rule-inset);
+  left: var(--functional-rule-inset);
+  border-top: 1px solid var(--line-strong);
+}
+
+.functional-page .ownership-index > header .diagram-eyebrow {
+  box-sizing: border-box;
+  width: calc(100% - (var(--functional-rule-inset) * 2));
+  margin: 0 auto;
+  padding-bottom: var(--section-label-gap);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.functional-page .ownership-index > header .diagram-eyebrow,
+.functional-page .ownership-index > header h2,
+.functional-page .ownership-index > header > p:last-child {
+  grid-column: 1;
+  grid-row: auto;
+}
+
+.functional-page .ownership-row {
+  text-align: center;
+}
+
+.functional-page .principle-section {
+  margin-top: 1.5rem;
+  padding-top: var(--section-label-gap);
+  text-align: center;
+}
+
+.functional-page .principle-section .diagram-eyebrow {
+  margin-bottom: var(--section-label-gap);
+}
+
+.principle-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: principle;
+}
+
+.functional-page .principle-list {
+  box-sizing: border-box;
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: var(--functional-rule-inset);
+}
+
+.principle-list li {
+  position: relative;
+  padding: .8rem .8rem .8rem 2.4rem;
+  border-top: 1px solid var(--line);
+  color: #53625b;
+  font-family: var(--font-serif);
+  font-size: .8rem;
+  line-height: 1.6;
+  counter-increment: principle;
+}
+
+.principle-list li::before {
+  content: counter(principle, decimal-leading-zero);
+  position: absolute;
+  top: .85rem;
+  left: 0;
+  color: var(--vermillion);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .62rem;
+}
+
+.functional-page .principle-list li {
+  padding-inline: 1.2rem;
+  text-align: center;
+}
+
+.functional-page .principle-list li::before {
+  position: static;
+  display: block;
+  margin-bottom: .35rem;
+}
+
+.diagram-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-top: 1rem;
+  padding-block: 2rem 3rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: .68rem;
+}
+
+.diagram-footer p,
+.no-script {
+  margin: 0;
+}
+
+.no-script {
+  margin-top: 2rem;
+  padding: 1rem;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-light);
+}
+
+@media (max-width: 980px) {
+  .diagram-nav,
+  .diagram-main,
+  .diagram-footer {
+    width: min(100% - 2rem, 96rem);
+  }
+
+  .ownership-table {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ownership-index > header {
+    grid-template-columns: 1fr;
+    gap: .35rem;
+  }
+
+  .ownership-index > header .diagram-eyebrow,
+  .ownership-index > header h2,
+  .ownership-index > header > p:last-child {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .diagram-nav,
+  .diagram-main,
+  .diagram-footer {
+    width: min(100% - 1.5rem, 96rem);
+  }
+
+  .functional-page .diagram-main,
+  .functional-page .diagram-footer {
+    width: min(100% - 1.5rem, 64rem);
+  }
+
+  .functional-page {
+    --functional-rule-inset: .8rem;
+  }
+
+  .functional-page .diagram-reading-note {
+    width: min(calc(100% - 1.6rem - 1px), 30rem);
+  }
+
+  .diagram-nav {
+    min-height: 4.5rem;
+  }
+
+  .diagram-brand {
+    font-size: 1.04rem;
+  }
+
+  .diagram-brand small {
+    display: none;
+  }
+
+  .diagram-nav__links {
+    gap: .8rem;
+    font-size: .72rem;
+  }
+
+  .diagram-main {
+    padding-top: 2.5rem;
+  }
+
+  .diagram-intro h1 {
+    font-size: 2.55rem;
+  }
+
+  /*
+   * 功能图窄屏使用独立的线性树结构；桌面扇出树不参与窄屏排版，
+   * 避免通过层层覆盖把桌面容器压成“卡片套卡片”。
+   */
+  .functional-page .function-canvas {
+    display: none;
+  }
+
+  .functional-page .function-mobile-canvas {
+    display: block;
+  }
+
+  .function-mobile-tree {
+    padding: .8rem 0;
+  }
+
+  .function-mobile-tree .function-root-node {
+    width: min(100%, 18rem);
+  }
+
+  .functional-mobile-entrances,
+  .functional-mobile-domains,
+  .functional-mobile-domain,
+  .functional-mobile-entrance {
+    display: grid;
+    justify-items: center;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .functional-mobile-entrance .entrance-node {
+    width: min(100%, 18rem);
+  }
+
+  .functional-mobile-domain .domain-node {
+    width: min(100%, 16rem);
+  }
+
+  .functional-mobile-module-group {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .7rem;
+    width: min(100%, 20rem);
+    padding: .7rem;
+    border: 1px solid rgb(84 99 91 / 18%);
+    background: rgb(251 250 246 / 6%);
+  }
+
+  .functional-mobile-module-group .module-node {
+    width: 100%;
+  }
+
+  .functional-mobile-connector {
+    position: relative;
+    width: 0;
+    height: 1.45rem;
+    margin-inline: auto;
+    border-left: var(--connector-stroke);
+  }
+
+  .functional-mobile-connector::after {
+    content: "";
+    position: absolute;
+    right: auto;
+    bottom: 1px;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    margin-left: -3px;
+    border-right: var(--connector-stroke);
+    border-bottom: var(--connector-stroke);
+    transform: rotate(45deg);
+  }
+
+  .functional-mobile-entrance + .functional-mobile-entrance {
+    margin-top: 2rem;
+  }
+
+  .function-mobile-tree .entrance-node::before,
+  .function-mobile-tree .domain-node::before,
+  .function-mobile-tree .module-node::before,
+  .function-mobile-tree .module-node::after {
+    display: none;
+  }
+
+  .ownership-index > header {
+    grid-template-columns: 1fr;
+    gap: .35rem;
+  }
+
+  .ownership-index > header .diagram-eyebrow,
+  .ownership-index > header h2,
+  .ownership-index > header > p:last-child {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .principle-list {
+    grid-template-columns: 1fr;
+  }
+
+  .diagram-footer {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .diagram-nav__links a:last-child {
+    display: none;
+  }
+
+  .diagram-intro h1 {
+    font-size: 2.2rem;
+  }
+
+  .diagram-summary {
+    font-size: .9rem;
+  }
+
+  .ownership-table {
+    grid-template-columns: 1fr;
+  }
+
+  .functional-page .ownership-table {
+    width: 61.8%;
+    margin-inline: auto;
+  }
+}
+
+@media print {
+  .diagram-nav__links {
+    display: none;
+  }
+
+  .function-canvas {
+    min-width: 0;
+  }
+}

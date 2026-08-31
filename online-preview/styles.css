@@ -155,6 +155,15 @@ h1 {
   background: #f3f5f1;
 }
 
+.band--paper {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, transparent 0 16%, rgba(83, 101, 91, 0.055) 16.1%, transparent 16.45%),
+    linear-gradient(90deg, transparent 0 61.8%, rgba(83, 101, 91, 0.045) 61.9%, transparent 62.25%),
+    #f7f4ec;
+}
+
 .band--ink {
   color: #e8eeeb;
   background: #202b28;
@@ -168,6 +177,17 @@ h1 {
 .section-heading {
   max-width: 760px;
   margin-bottom: 34px;
+}
+
+.section-heading--wide {
+  max-width: 880px;
+}
+
+.section-summary {
+  max-width: 780px;
+  margin: 20px 0 0;
+  color: #52615c;
+  line-height: 1.85;
 }
 
 h2 {
@@ -184,6 +204,64 @@ h2 {
   border: 1px solid #cbd4ce;
   border-radius: 6px;
   box-shadow: 0 28px 70px rgba(28, 38, 36, 0.12);
+}
+
+.visual-doc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.visual-doc-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 14px 20px;
+  border: 1px solid rgba(80, 99, 89, 0.22);
+  color: #27342f;
+  background: rgba(253, 251, 245, 0.78);
+  box-shadow: 0 24px 64px rgba(43, 53, 48, 0.08);
+  text-decoration: none;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.visual-doc-card:hover,
+.visual-doc-card:focus-visible {
+  border-color: rgba(69, 95, 82, 0.55);
+  transform: translateY(-3px);
+}
+
+.visual-doc-card:focus-visible {
+  outline: 2px solid #4f7668;
+  outline-offset: 3px;
+}
+
+.visual-doc-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  margin-bottom: 10px;
+  border: 1px solid rgba(80, 99, 89, 0.18);
+  object-fit: cover;
+  object-position: top;
+}
+
+.visual-doc-card strong {
+  font-family: "Noto Serif SC", "Songti SC", Georgia, serif;
+  font-size: 1.65rem;
+  font-weight: 600;
+}
+
+.visual-doc-card > span:last-child {
+  color: #617069;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.visual-doc-card__meta {
+  color: #8c5348;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .evidence > p {
@@ -249,6 +327,10 @@ footer {
 
   .band {
     padding-block: 64px;
+  }
+
+  .visual-doc-grid {
+    grid-template-columns: 1fr;
   }
 
   footer {

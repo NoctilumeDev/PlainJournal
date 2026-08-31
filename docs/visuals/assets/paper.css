@@ -1,0 +1,266 @@
+:root {
+  color-scheme: light;
+  --paper: #f7f5ee;
+  --paper-light: #fbfaf6;
+  --paper-deep: #ece9df;
+  --ink: #26352f;
+  --ink-soft: #67716c;
+  --line: rgb(57 77 68 / 16%);
+  --line-strong: rgb(57 77 68 / 27%);
+  --wash: 103 123 112;
+  --crease: 78 72 60;
+  --vermillion: #a85648;
+  --font-serif: "Songti SC", "STSong", "Noto Serif SC", SimSun, Georgia, serif;
+  --font-sans: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  background:
+    repeating-linear-gradient(7deg, rgb(var(--crease) / 0.7%) 0 1px, transparent 1px 6px),
+    linear-gradient(180deg, var(--paper-light), var(--paper));
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  z-index: -2;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 24% 18%, rgb(255 255 255 / 48%), transparent 28%),
+    radial-gradient(ellipse at 72% 58%, rgb(88 76 58 / 2.5%), transparent 37%),
+    repeating-linear-gradient(0deg, transparent 0 8px, rgb(76 65 48 / 1.1%) 8px 9px),
+    repeating-linear-gradient(90deg, transparent 0 18px, rgb(255 255 255 / 11%) 18px 19px);
+  pointer-events: none;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+pj-paper-atmosphere {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/*
+ * The architecture view uses a dedicated photographic paper plate. Keep this
+ * layer page-scoped so the functional diagram retains its CSS-built folds,
+ * washes and leaf without inheriting the raster composition.
+ */
+.architecture-page pj-paper-atmosphere {
+  background-image: url("./system-architecture-paper.png");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+}
+
+.architecture-page pj-paper-atmosphere > * {
+  display: none;
+}
+
+.paper-fold {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: var(--fold-length);
+  background: linear-gradient(180deg, rgb(var(--crease) / 8%), rgb(var(--crease) / 5.8%) 72%, transparent);
+  opacity: var(--fold-depth, 0.8);
+  transform: rotate(var(--fold-lean, 0deg));
+  transform-origin: top center;
+  clip-path: polygon(0 0, 100% 0, 70% 100%, 30% 100%);
+}
+
+.paper-fold::before,
+.paper-fold::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  filter: blur(0.9px);
+  mask-image: linear-gradient(180deg, #000 0 72%, rgb(0 0 0 / 64%) 86%, transparent 100%);
+}
+
+.paper-fold::before {
+  left: -4px;
+  width: 5px;
+  background: linear-gradient(90deg, transparent, rgb(var(--crease) / 2.3%) 34%, rgb(var(--crease) / 7%));
+}
+
+.paper-fold::after {
+  left: 2px;
+  width: 4px;
+  background: linear-gradient(90deg, rgb(255 255 255 / 34%), rgb(255 255 255 / 17%) 46%, transparent);
+}
+
+.paper-fold--1 { left: 15%; --fold-length: 9.2vh; --fold-depth: 0.62; --fold-lean: -0.2deg; }
+.paper-fold--2 { left: 37%; --fold-length: 17.7vh; --fold-depth: 0.69; --fold-lean: -0.12deg; }
+.paper-fold--3 { left: 57%; --fold-length: 28.9vh; --fold-depth: 0.76; --fold-lean: -0.05deg; }
+.paper-fold--4 { left: 73%; --fold-length: 40.7vh; --fold-depth: 0.8; --fold-lean: 0.05deg; }
+.paper-fold--5 { left: 85%; --fold-length: 51.9vh; --fold-depth: 0.84; --fold-lean: 0.12deg; }
+.paper-fold--6 { left: 94%; --fold-length: 61.8vh; --fold-depth: 0.88; --fold-lean: 0.2deg; }
+
+.paper-wash,
+.paper-wash-light,
+.paper-leaf {
+  position: absolute;
+  pointer-events: none;
+}
+
+.paper-wash {
+  z-index: 1;
+  filter: saturate(0.62) blur(1.5px);
+  mix-blend-mode: multiply;
+}
+
+.paper-wash--west {
+  top: 24%;
+  left: -10rem;
+  width: 27rem;
+  height: 19rem;
+  background:
+    radial-gradient(ellipse 43% 42% at 58% 50%, rgb(var(--wash) / 20%) 0 41%, rgb(var(--wash) / 10%) 59%, transparent 78%),
+    radial-gradient(ellipse 29% 31% at 80% 27%, rgb(var(--wash) / 14%) 0 36%, transparent 74%),
+    radial-gradient(ellipse 33% 28% at 28% 67%, rgb(var(--wash) / 12%) 0 37%, transparent 75%);
+  opacity: 0.92;
+  transform: rotate(4deg);
+}
+
+.paper-wash-light--west {
+  z-index: 2;
+  top: calc(24% + 3rem);
+  left: -1.2rem;
+  width: 14rem;
+  height: 8rem;
+  background:
+    radial-gradient(ellipse 57% 43% at 44% 50%, rgb(255 254 250 / 88%) 0 20%, rgb(252 250 245 / 66%) 39%, rgb(249 247 241 / 28%) 57%, transparent 76%),
+    radial-gradient(ellipse 25% 24% at 72% 62%, rgb(255 254 250 / 42%) 0 18%, transparent 69%);
+  filter: blur(9px);
+  opacity: 0.9;
+  transform: rotate(-7deg);
+}
+
+.paper-wash--east {
+  z-index: 2;
+  top: 7rem;
+  right: -8rem;
+  width: clamp(24rem, 39vw, 39rem);
+  height: clamp(28rem, 47vw, 47rem);
+  background:
+    radial-gradient(ellipse 39% 34% at 70% 21%, rgb(var(--wash) / 11%) 0 38%, rgb(var(--wash) / 5%) 58%, transparent 76%),
+    radial-gradient(ellipse 47% 39% at 56% 48%, rgb(var(--wash) / 13%) 0 41%, rgb(var(--wash) / 6%) 59%, transparent 78%),
+    radial-gradient(ellipse 36% 38% at 73% 74%, rgb(var(--wash) / 11%) 0 39%, rgb(var(--wash) / 5%) 61%, transparent 80%);
+  opacity: 0.78;
+  transform: rotate(5deg);
+}
+
+.paper-wash--south {
+  bottom: -13rem;
+  left: -8rem;
+  width: clamp(30rem, 50vw, 50rem);
+  height: clamp(23rem, 35vw, 35rem);
+  background:
+    radial-gradient(ellipse 43% 42% at 38% 57%, rgb(var(--wash) / 19%) 0 41%, rgb(var(--wash) / 10%) 59%, transparent 78%),
+    radial-gradient(ellipse 34% 30% at 72% 45%, rgb(var(--wash) / 15%) 0 37%, rgb(var(--wash) / 7%) 59%, transparent 77%),
+    radial-gradient(ellipse 29% 27% at 18% 27%, rgb(var(--wash) / 12%) 0 35%, transparent 73%);
+  opacity: 0.9;
+  transform: rotate(-3deg);
+}
+
+.paper-wash--drop {
+  right: 5%;
+  bottom: 7%;
+  width: 12rem;
+  height: 8rem;
+  background:
+    radial-gradient(ellipse 43% 45% at 44% 51%, rgb(var(--wash) / 14%) 0 35%, transparent 75%),
+    radial-gradient(ellipse 29% 31% at 69% 44%, rgb(var(--wash) / 9%) 0 32%, transparent 72%);
+  opacity: 0.9;
+}
+
+.paper-leaf {
+  z-index: 1;
+  top: 14%;
+  right: -2.5rem;
+  width: clamp(18rem, 31vw, 31rem);
+  height: clamp(12rem, 21vw, 21rem);
+  overflow: hidden;
+  border-radius: 51% 49% 46% 54% / 61% 58% 42% 39%;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 57% 100%, 50% 76%, 43% 100%, 0 100%);
+  background:
+    repeating-conic-gradient(from -56deg at 50% 105%, transparent 0 12.7deg, rgb(var(--wash) / 9%) 13deg 13.7deg, transparent 14deg 25.5deg),
+    radial-gradient(ellipse at 50% 54%, rgb(var(--wash) / 8%) 0 42%, rgb(var(--wash) / 4%) 64%, transparent 77%),
+    linear-gradient(180deg, rgb(250 248 243 / 98%), rgb(247 245 238 / 96%));
+  filter: blur(0.65px) saturate(0.62);
+  transform: rotate(-8deg);
+  transform-origin: 70% 50%;
+}
+
+.page-shell {
+  position: relative;
+  z-index: 3;
+  min-height: 100vh;
+}
+
+@media (max-width: 720px) {
+  .architecture-page pj-paper-atmosphere {
+    background-position: left bottom;
+    background-size: auto 100%;
+  }
+
+  .paper-fold--2,
+  .paper-fold--4 {
+    display: none;
+  }
+
+  .paper-fold--1 { left: 14%; --fold-length: 12vh; }
+  .paper-fold--3 { left: 52%; --fold-length: 31vh; }
+  .paper-fold--5 { left: 79%; --fold-length: 47vh; }
+  .paper-fold--6 { left: 92%; --fold-length: 61.8vh; }
+
+  .paper-leaf {
+    top: 15%;
+    right: -9rem;
+    width: 20rem;
+    height: 14rem;
+  }
+
+  .paper-wash--west {
+    top: 29%;
+    left: -13rem;
+  }
+
+  .paper-wash-light--west {
+    top: calc(29% + 3rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
