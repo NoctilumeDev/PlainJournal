@@ -32,6 +32,7 @@ jobs:
         run: |
           node tools/run-repository-tests.mjs
           node tools/check-backend-boundaries.mjs
+          node tools/check-visual-docs.mjs
           node tools/check-documentation-structure.mjs
           node tools/check-markdown-links.mjs
           node tools/check-release-version.mjs

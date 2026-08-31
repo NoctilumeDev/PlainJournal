@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="素简记 PlainJournal 系统架构图：使用者经两端应用和统一网关访问十个事实所有者，并通过同步短链与 RocketMQ 协作。"
+    />
+    <title>系统架构图 · 素简记</title>
+    <link rel="stylesheet" href="assets/paper.css" />
+    <link rel="stylesheet" href="assets/diagram.css?v=20260831-7" />
+    <link rel="stylesheet" href="assets/system-architecture.css?v=20260831-3" />
+    <script type="module" src="assets/paper-atmosphere.js"></script>
+    <script type="module" src="system-architecture.js?v=20260831-3"></script>
+  </head>
+  <body class="architecture-page">
+    <pj-paper-atmosphere></pj-paper-atmosphere>
+    <div class="page-shell">
+      <header class="diagram-header">
+        <nav class="diagram-nav" aria-label="架构图导航">
+          <a class="diagram-brand" href="../">
+            素简记
+            <small>PlainJournal</small>
+          </a>
+          <div class="diagram-nav__links">
+            <a href="functional-modules.html">功能模块图</a>
+            <a aria-current="page" href="system-architecture.html">系统架构图</a>
+            <a href="https://github.com/NoctilumeDev/PlainJournal">源码仓库</a>
+          </div>
+        </nav>
+      </header>
+
+      <main class="diagram-main">
+        <section class="diagram-intro" aria-labelledby="page-title">
+          <p class="diagram-eyebrow" id="page-eyebrow"></p>
+          <h1 id="page-title"></h1>
+          <p class="diagram-summary" id="page-summary"></p>
+          <div class="diagram-statline" id="page-stats" aria-label="架构摘要"></div>
+        </section>
+
+        <section class="diagram-board" id="architecture-root" aria-label="PlainJournal 系统架构拓扑"></section>
+        <section class="architecture-principle-section" id="principle-root" aria-label="架构约束"></section>
+
+        <noscript>
+          <p class="no-script">该图由仓库内的架构数据清单渲染；请启用 JavaScript 查看。</p>
+        </noscript>
+      </main>
+
+      <footer class="diagram-footer" id="page-footer">
+        <p>事实来源：docs/02-service-architecture.md 与 docs/04-data-ownership.md</p>
+        <p>结构底稿：docs/visuals/system-architecture-draft.md</p>
+      </footer>
+    </div>
+  </body>
+</html>

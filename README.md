@@ -30,6 +30,20 @@ JDK 17 和 Vue 3，围绕数据所有权、交易一致性、结果未知恢复�
 
 ![素简记补偿与对账工作区](docs/assets/v7-4/admin-governance.jpg)
 
+### 架构导览
+
+- [系统架构图](https://noctilumedev.github.io/PlainJournal/visuals/system-architecture.html)：
+  从使用者、两端应用和统一网关进入十个事实所有者，再区分同步短链与异步收敛；
+- [功能模块图](https://noctilumedev.github.io/PlainJournal/visuals/functional-modules.html)：
+  从系统根节点分出顾客端与管理端，再沿六个任务域展开 16 个真实功能模块。
+
+![素简记系统架构图](docs/assets/visuals/system-architecture.png)
+
+![素简记功能模块图](docs/assets/visuals/functional-modules.png)
+
+两页支持桌面与手机浏览，只复用纸张材质和基础图元；结构底稿、事实清单及渲染器分别维护。
+仓库门禁会把图中的服务与真实应用目录比对，避免微服务演进后文档静默漂移。
+
 ## 核心能力
 
 - **所有者事实明确**：Identity、Catalog、Inventory、Trade、Payment、
@@ -51,6 +65,7 @@ flowchart LR
     Browser["Storefront / Admin"] --> Gateway["Spring Cloud Gateway"]
     Gateway --> Identity["Identity"]
     Gateway --> Catalog["Catalog"]
+    Gateway --> Inventory["Inventory"]
     Gateway --> Trade["Trade"]
     Gateway --> Payment["Payment"]
     Gateway --> Fulfillment["Fulfillment"]
@@ -59,7 +74,7 @@ flowchart LR
     Gateway --> Notification["Notification"]
     Gateway --> Analytics["Analytics"]
 
-    Trade --> Inventory["Inventory"]
+    Trade --> Inventory
     Trade --> Catalog
     Trade --> Marketing
     Payment --> Trade
