@@ -114,7 +114,7 @@ test("V7 admin serves the shared catalog AVIF variants without duplicating sourc
   await page.getByRole("button", { name: "登录工作区 →" }).click();
   await expect(page).toHaveURL("http://127.0.0.1:18201/catalog");
 
-  const image = page.locator(".catalog-product__media img").first();
+  const image = page.locator(".catalog-list__media img").first();
   await expect(image).toBeVisible();
   await expect.poll(() => image.evaluate((element) =>
     element.complete && element.naturalWidth > 0)).toBe(true);

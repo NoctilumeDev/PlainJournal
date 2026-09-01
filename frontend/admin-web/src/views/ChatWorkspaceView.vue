@@ -13,9 +13,7 @@ import {
   PjActionGroup,
   PjButton,
   PjField,
-  PjPageContainer,
   PjStatusNotice,
-  PjSurface,
 } from "@plain-journal/ui";
 
 import {
@@ -180,103 +178,104 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <PjPageContainer as="section" size="wide" class="chat-page">
-    <header class="chat-hero">
-      <div>
+  <section class="chat-workbench" aria-label="客服会话工作台">
+    <aside class="chat-scope-pane">
+      <header class="chat-scope-pane__header">
         <p class="eyebrow">Chat 所有者域</p>
         <h1>客服会话</h1>
         <p>
           队列只暴露会话摘要。客服成为会话成员后，页面才读取 MySQL 中的私聊正文；
           WebSocket 负责提示新事实，不承担发送成功或最终状态证明。
         </p>
-      </div>
-      <span
-        class="chat-realtime"
-        :data-connected="chat.realtimeStatus === 'connected'"
-      >
-        {{ chat.realtimeStatus === "connected" ? "实时可用" : "历史查询可用" }}
-      </span>
-    </header>
+      </header>
 
-    <PjStatusNotice
-      :tone="chat.realtimeStatus === 'connected' ? 'neutral' : 'warning'"
-      title="可靠 REST 与实时提示保持分工"
-    >
-      <p>
-        消息先通过可靠 REST 持久化，再由实时链路提示页面刷新。实时连接失败不会被解释为
-        消息未保存或已送达；连接恢复使用新的短期单次票据。
-      </p>
-      <p>{{ chat.realtimeMessage }}</p>
-      <template v-if="chat.realtimeStatus !== 'connected'" #actions>
+      <section class="chat-reliability-summary" aria-labelledby="chat-reliability-title">
+        <div class="chat-reliability-summary__heading">
+          <div>
+            <p class="eyebrow">可靠性边界</p>
+            <h2 id="chat-reliability-title">REST 确认，实时提示</h2>
+          </div>
+          <span
+            class="chat-realtime"
+            :data-connected="chat.realtimeStatus === 'connected'"
+          >
+            {{ chat.realtimeStatus === "connected" ? "实时可用" : "历史查询可用" }}
+          </span>
+        </div>
+        <p>
+          消息先持久化，再由实时链路提示刷新；连接状态不证明发送成功或最终送达。
+        </p>
+        <p class="chat-realtime-message">{{ chat.realtimeMessage }}</p>
         <PjButton
+          v-if="chat.realtimeStatus !== 'connected'"
           type="button"
           variant="text"
           @click="chat.restartRealtime(accessContext)"
         >
           重新建立实时连接
         </PjButton>
-      </template>
-    </PjStatusNotice>
+      </section>
 
-    <PjStatusNotice
-      v-if="chat.operationPhase !== 'idle' && chat.operationMessage"
-      :tone="operationTone(chat.operationPhase)"
-      :title="operationTitle(chat.operationPhase)"
-      :assertive="chat.operationPhase === 'rejected'"
-    >
-      <p>{{ chat.operationMessage }}</p>
-      <p v-if="chat.pendingOperation">
-        待确认操作：{{ chat.pendingOperation.kind === "claim" ? "认领" : "关闭" }}；
-        会话 <code>{{ chat.pendingOperation.conversationId }}</code>。
-      </p>
-      <template #actions>
-        <PjActionGroup>
-          <PjButton
-            v-if="chat.canRetryOperation"
-            type="button"
-            :loading="
-              chat.claimingConversationId !== null
-                || chat.closingConversationId !== null
-            "
-            @click="chat.retryPendingOperation(accessContext)"
-          >
-            对同一会话安全重试
-          </PjButton>
-          <PjButton
-            v-if="!chat.pendingOperation"
-            type="button"
-            variant="text"
-            @click="chat.resetOperationNotice"
-          >
-            关闭提示
-          </PjButton>
-        </PjActionGroup>
-      </template>
-    </PjStatusNotice>
+      <dl class="chat-scope-facts">
+        <div><dt>访问权限</dt><dd>ADMIN / OPERATOR</dd></div>
+        <div><dt>当前队列</dt><dd>{{ chat.conversations.length }} 条</dd></div>
+        <div><dt>正文权限</dt><dd>认领后读取</dd></div>
+      </dl>
 
-    <PjStatusNotice
-      v-if="chat.error"
-      tone="danger"
-      title="Chat 事实读取未完成"
-      assertive
-    >
-      <p>{{ chat.error }}</p>
-      <p v-if="chat.conversations.length > 0">
-        页面保留已经确认的队列事实，没有把读取失败伪装成空队列。
-      </p>
-    </PjStatusNotice>
-
-    <div class="chat-workspace">
-      <PjSurface
-        as="aside"
-        tone="plain"
-        padding="none"
-        class="chat-queue"
+      <PjStatusNotice
+        v-if="chat.operationPhase !== 'idle' && chat.operationMessage"
+        :tone="operationTone(chat.operationPhase)"
+        :title="operationTitle(chat.operationPhase)"
+        :assertive="chat.operationPhase === 'rejected'"
       >
+        <p>{{ chat.operationMessage }}</p>
+        <p v-if="chat.pendingOperation">
+          待确认操作：{{ chat.pendingOperation.kind === "claim" ? "认领" : "关闭" }}；
+          会话 <code>{{ chat.pendingOperation.conversationId }}</code>。
+        </p>
+        <template #actions>
+          <PjActionGroup>
+            <PjButton
+              v-if="chat.canRetryOperation"
+              type="button"
+              :loading="
+                chat.claimingConversationId !== null
+                  || chat.closingConversationId !== null
+              "
+              @click="chat.retryPendingOperation(accessContext)"
+            >
+              对同一会话安全重试
+            </PjButton>
+            <PjButton
+              v-if="!chat.pendingOperation"
+              type="button"
+              variant="text"
+              @click="chat.resetOperationNotice"
+            >
+              关闭提示
+            </PjButton>
+          </PjActionGroup>
+        </template>
+      </PjStatusNotice>
+
+      <PjStatusNotice
+        v-if="chat.error"
+        tone="danger"
+        title="Chat 事实读取未完成"
+        assertive
+      >
+        <p>{{ chat.error }}</p>
+        <p v-if="chat.conversations.length > 0">
+          页面保留已经确认的队列事实，没有把读取失败伪装成空队列。
+        </p>
+      </PjStatusNotice>
+    </aside>
+
+    <aside class="chat-queue" aria-labelledby="chat-queue-title">
         <header class="chat-panel-header">
           <div>
             <p class="eyebrow">OPEN 队列</p>
-            <h2>等待与已认领会话</h2>
+            <h2 id="chat-queue-title">等待与已认领会话</h2>
           </div>
           <PjButton
             type="button"
@@ -321,19 +320,17 @@ onBeforeUnmount(() => {
             </span>
           </RouterLink>
         </nav>
-      </PjSurface>
+    </aside>
 
-      <PjSurface
-        v-if="chat.activeConversation"
-        as="section"
-        tone="plain"
-        padding="none"
-        class="chat-thread"
-      >
+    <section
+      v-if="chat.activeConversation"
+      class="chat-thread"
+      aria-labelledby="chat-thread-title"
+    >
         <header class="chat-panel-header chat-thread__header">
           <div>
             <p class="eyebrow">{{ chat.activeConversation.conversationNo }}</p>
-            <h2>{{ chat.activeConversation.subject }}</h2>
+            <h2 id="chat-thread-title">{{ chat.activeConversation.subject }}</h2>
           </div>
           <div class="chat-thread__status">
             <span class="status-label">{{ chat.activeConversation.status }}</span>
@@ -376,10 +373,8 @@ onBeforeUnmount(() => {
           </div>
         </dl>
 
-        <PjSurface
+        <section
           v-if="!chat.activeConversation.assignedAgentId"
-          tone="soft"
-          padding="large"
           class="chat-claim"
         >
           <div>
@@ -400,7 +395,7 @@ onBeforeUnmount(() => {
           >
             认领并读取会话
           </PjButton>
-        </PjSurface>
+        </section>
 
         <PjStatusNotice
           v-else-if="chat.assignedToOther"
@@ -577,70 +572,141 @@ onBeforeUnmount(() => {
             </template>
           </PjStatusNotice>
         </template>
-      </PjSurface>
+    </section>
 
-      <PjSurface
-        v-else
-        as="section"
-        tone="soft"
-        padding="large"
-        class="chat-thread chat-thread--empty"
-      >
+    <section
+      v-else
+      class="chat-thread chat-thread--empty"
+      aria-labelledby="chat-empty-title"
+    >
         <p class="eyebrow">选择会话</p>
-        <h2>队列摘要与私聊正文保持分离。</h2>
+        <h2 id="chat-empty-title">队列摘要与私聊正文保持分离。</h2>
         <p>
           选择一条会话查看成员状态。未认领时页面不会提前请求消息正文；
           已关闭但仍属于当前员工的会话可通过原 URL 读取只读历史。
         </p>
-      </PjSurface>
-    </div>
-  </PjPageContainer>
+    </section>
+  </section>
 </template>
 
 <style scoped>
-.chat-page {
+.chat-workbench {
+  --pj-focus-ring: var(--pj-brand-primary);
+  --pj-color-focus: var(--pj-focus-ring);
+
   min-width: 0;
+  min-height: calc(100vh - var(--admin-shell-header-height));
   display: grid;
-  gap: var(--pj-space-7);
-  padding-block: var(--pj-space-7) var(--pj-space-8);
+  grid-template-columns:
+    clamp(15rem, 20vw, 18rem)
+    minmax(19rem, 0.7fr)
+    minmax(30rem, 1.3fr);
+  background: var(--pj-surface-default);
 }
 
-.chat-hero,
+.chat-scope-pane,
+.chat-queue,
+.chat-thread {
+  min-width: 0;
+  padding: clamp(1rem, 2vw, 1.75rem);
+}
+
+.chat-scope-pane,
+.chat-queue {
+  border-right: 1px solid var(--pj-border-subtle);
+}
+
+.chat-scope-pane {
+  display: grid;
+  align-content: start;
+  gap: var(--pj-space-6);
+}
+
 .chat-panel-header,
 .chat-thread__status,
 .chat-history-toolbar,
 .chat-message > header,
-.chat-claim {
+.chat-claim,
+.chat-reliability-summary__heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--pj-space-5);
 }
 
-.chat-hero {
-  align-items: flex-end;
-}
-
-.chat-hero h1,
+.chat-scope-pane__header h1,
+.chat-reliability-summary h2,
 .chat-panel-header h2,
 .chat-claim h3,
 .chat-thread--empty h2 {
   margin: 0;
 }
 
-.chat-hero h1 {
-  font-size: var(--pj-font-size-xl);
+.chat-scope-pane__header h1 {
+  font-size: clamp(1.7rem, 2.8vw, 2.45rem);
   font-weight: 520;
-  letter-spacing: var(--pj-letter-spacing-page-title);
+  letter-spacing: 0.035em;
 }
 
-.chat-hero p:last-child,
+.chat-scope-pane__header > p:last-child,
+.chat-reliability-summary > p,
+.chat-realtime-message,
 .chat-claim p:last-child,
 .chat-thread--empty p:last-child {
-  max-width: var(--pj-layout-reading);
   margin-bottom: 0;
-  color: var(--pj-color-muted);
+  color: var(--pj-text-secondary);
   line-height: var(--pj-line-height-relaxed);
+}
+
+.chat-reliability-summary,
+.chat-scope-facts {
+  padding-top: var(--pj-space-5);
+  border-top: 1px solid var(--pj-border-subtle);
+}
+
+.chat-reliability-summary {
+  display: grid;
+  gap: var(--pj-space-3);
+}
+
+.chat-reliability-summary h2 {
+  font-size: var(--pj-font-size-md);
+}
+
+.chat-scope-facts {
+  display: grid;
+  gap: var(--pj-space-3);
+  margin: 0;
+}
+
+.chat-scope-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--pj-space-3);
+}
+
+.chat-scope-facts dt {
+  color: var(--pj-text-secondary);
+  font-size: var(--pj-font-size-xs);
+  white-space: nowrap;
+}
+
+.chat-scope-facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+.chat-scope-pane :deep(.pj-status-notice),
+.chat-scope-pane :deep(.pj-status-notice__body),
+.chat-scope-pane :deep(.pj-status-notice__content) {
+  min-width: 0;
+}
+
+.chat-scope-pane :deep(.pj-status-notice),
+.chat-scope-pane :deep(.pj-status-notice__actions),
+.chat-scope-pane :deep(.pj-action-group) {
+  align-items: stretch;
+  flex-direction: column;
 }
 
 .chat-realtime {
@@ -656,23 +722,6 @@ onBeforeUnmount(() => {
   color: var(--pj-status-success-text);
 }
 
-.chat-workspace {
-  min-width: 0;
-  min-height: 44rem;
-  display: grid;
-  grid-template-columns: minmax(20rem, 0.34fr) minmax(0, 1fr);
-  border-block: 1px solid var(--pj-color-line);
-}
-
-.chat-queue,
-.chat-thread {
-  min-width: 0;
-}
-
-.chat-queue {
-  border-right: 1px solid var(--pj-color-line);
-}
-
 .chat-panel-header,
 .chat-facts,
 .chat-claim,
@@ -681,11 +730,12 @@ onBeforeUnmount(() => {
 .chat-composer,
 .chat-closed,
 .chat-thread > .pj-status-notice {
-  margin-inline: var(--pj-space-6);
+  margin-inline: 0;
 }
 
 .chat-panel-header {
-  padding-block: var(--pj-space-6);
+  padding-bottom: var(--pj-space-5);
+  border-bottom: 1px solid var(--pj-border-subtle);
 }
 
 .chat-panel-header h2,
@@ -705,24 +755,25 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--pj-space-4);
-  padding: var(--pj-space-4) var(--pj-space-6);
-  border-top: 1px solid var(--pj-color-line);
+  padding: var(--pj-space-4) 0;
+  border-top: 1px solid var(--pj-border-subtle);
   color: inherit;
   text-decoration: none;
 }
 
 .chat-list a:last-child {
-  border-bottom: 1px solid var(--pj-color-line);
+  border-bottom: 1px solid var(--pj-border-subtle);
 }
 
 .chat-list a:hover {
-  background: var(--pj-color-surface-soft);
+  background: var(--pj-surface-soft);
 }
 
 .chat-list a.router-link-active {
-  box-shadow: inset 0.2rem 0 0 var(--pj-color-accent);
-  background: var(--pj-color-surface-soft);
-  color: var(--pj-color-accent-strong);
+  padding-inline: var(--pj-space-3);
+  background: color-mix(in srgb, var(--pj-brand-primary) 7%, transparent);
+  box-shadow: inset 0.2rem 0 var(--pj-brand-primary);
+  color: var(--pj-text-primary);
 }
 
 .chat-list a > span {
@@ -734,7 +785,7 @@ onBeforeUnmount(() => {
 .chat-list a > span:last-child {
   flex: 0 0 auto;
   justify-items: end;
-  color: var(--pj-color-muted);
+  color: var(--pj-text-secondary);
   font-size: var(--pj-font-size-sm);
   text-align: right;
 }
@@ -752,7 +803,7 @@ onBeforeUnmount(() => {
 .chat-message footer,
 .chat-history-toolbar,
 .chat-composer__boundary {
-  color: var(--pj-color-muted);
+  color: var(--pj-text-secondary);
   font-size: var(--pj-font-size-sm);
 }
 
@@ -761,7 +812,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   padding: var(--pj-space-5);
-  color: var(--pj-color-muted);
+  color: var(--pj-text-secondary);
   text-align: center;
 }
 
@@ -771,7 +822,7 @@ onBeforeUnmount(() => {
 }
 
 .chat-thread__header {
-  border-bottom: 1px solid var(--pj-color-line);
+  border-bottom: 1px solid var(--pj-border-subtle);
 }
 
 .chat-thread__header > div:first-child {
@@ -793,7 +844,7 @@ onBeforeUnmount(() => {
   gap: var(--pj-space-4);
   margin-block: 0;
   padding-block: var(--pj-space-5);
-  border-bottom: 1px solid var(--pj-color-line);
+  border-bottom: 1px solid var(--pj-border-subtle);
 }
 
 .chat-facts div {
@@ -801,7 +852,7 @@ onBeforeUnmount(() => {
 }
 
 .chat-facts dt {
-  color: var(--pj-color-muted);
+  color: var(--pj-text-secondary);
   font-size: var(--pj-font-size-xs);
 }
 
@@ -812,16 +863,23 @@ onBeforeUnmount(() => {
 .chat-claim {
   align-items: center;
   margin-block: var(--pj-space-6);
+  padding-block: var(--pj-space-5);
+  border-block: 1px solid var(--pj-border-subtle);
 }
 
 .chat-claim > div {
   min-width: 0;
 }
 
+.chat-claim > .pj-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .chat-history-toolbar {
   align-items: center;
   padding-block: var(--pj-space-3);
-  border-bottom: 1px solid var(--pj-color-line);
+  border-bottom: 1px solid var(--pj-border-subtle);
 }
 
 .chat-log {
@@ -836,7 +894,7 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--pj-space-2);
   padding: var(--pj-space-4);
-  border-top: 1px solid var(--pj-color-line);
+  border-top: 1px solid var(--pj-border-subtle);
 }
 
 .chat-message:first-of-type {
@@ -845,18 +903,18 @@ onBeforeUnmount(() => {
 
 .chat-message--self {
   margin-left: auto;
-  border-left: 0.2rem solid var(--pj-color-accent);
-  background: var(--pj-color-surface-soft);
+  border-left: 0.2rem solid var(--pj-brand-primary);
+  background: var(--pj-surface-soft);
 }
 
 .chat-message > header {
   gap: var(--pj-space-4);
-  color: var(--pj-color-muted);
+  color: var(--pj-text-secondary);
   font-size: var(--pj-font-size-sm);
 }
 
 .chat-message > header strong {
-  color: var(--pj-color-text);
+  color: var(--pj-text-primary);
 }
 
 .chat-message p,
@@ -882,12 +940,12 @@ onBeforeUnmount(() => {
   gap: var(--pj-space-1);
   padding: var(--pj-space-3);
   border-left: 0.2rem solid var(--pj-status-warning-line);
-  background: var(--pj-color-surface);
+  background: var(--pj-surface-default);
 }
 
 .chat-attachments span,
 .chat-attachments small {
-  color: var(--pj-color-muted);
+  color: var(--pj-text-secondary);
 }
 
 .chat-composer {
@@ -895,7 +953,7 @@ onBeforeUnmount(() => {
   gap: var(--pj-space-4);
   margin-top: auto;
   padding-block: var(--pj-space-5);
-  border-top: 1px solid var(--pj-color-line);
+  border-top: 1px solid var(--pj-border-subtle);
 }
 
 .chat-composer textarea {
@@ -909,8 +967,8 @@ onBeforeUnmount(() => {
 
 .chat-closed {
   padding-block: var(--pj-space-5);
-  border-top: 1px solid var(--pj-color-line);
-  color: var(--pj-color-muted);
+  border-top: 1px solid var(--pj-border-subtle);
+  color: var(--pj-text-secondary);
 }
 
 .chat-thread > .pj-status-notice {
@@ -918,31 +976,54 @@ onBeforeUnmount(() => {
 }
 
 .chat-thread--empty {
+  align-content: center;
   justify-content: center;
   padding: var(--pj-space-7);
 }
 
-@media (max-width: 64rem) {
-  .chat-workspace {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 72rem) {
+  .chat-workbench {
+    grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
   }
 
   .chat-queue {
     border-right: 0;
-    border-bottom: 1px solid var(--pj-color-line);
+  }
+
+  .chat-thread {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--pj-border-subtle);
   }
 
   .chat-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 var(--pj-space-4);
   }
 
   .chat-list a:nth-child(2) {
-    border-top: 1px solid var(--pj-color-line);
+    border-top: 1px solid var(--pj-border-subtle);
   }
 }
 
 @media (max-width: 48rem) {
-  .chat-hero,
+  .chat-workbench {
+    min-height: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chat-scope-pane,
+  .chat-queue,
+  .chat-thread {
+    grid-column: auto;
+    padding: var(--pj-space-5);
+    border-right: 0;
+  }
+
+  .chat-queue,
+  .chat-thread {
+    border-top: 1px solid var(--pj-border-subtle);
+  }
+
   .chat-panel-header,
   .chat-claim,
   .chat-history-toolbar {
@@ -960,34 +1041,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 32rem) {
-  .chat-page {
-    gap: var(--pj-space-6);
-    padding-block: var(--pj-space-6);
-  }
-
-  .chat-panel-header,
-  .chat-facts,
-  .chat-claim,
-  .chat-history-toolbar,
-  .chat-log,
-  .chat-composer,
-  .chat-closed,
-  .chat-thread > .pj-status-notice {
-    margin-inline: var(--pj-space-4);
-  }
-
-  .chat-list a {
-    padding-inline: var(--pj-space-4);
-  }
-
   .chat-thread__status,
   .chat-message > header {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .chat-facts {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .chat-thread--empty {

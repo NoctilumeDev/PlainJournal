@@ -83,13 +83,18 @@ test("shared admin shell contains dense navigation without page overflow at 320p
   await page.getByRole("button", { name: "登录工作区 →" }).click();
   await page.getByRole("link", {
     name: "履约与退货",
-    exact: true,
   }).click();
 
   await expect(page.getByRole("heading", { name: "履约与退货" })).toBeVisible();
   await expect(page.locator("main")).toHaveCount(1);
   await expectNoPageOverflow(page);
-  expect(await page.locator(".admin-nav").evaluate((element) =>
-    element.scrollWidth > element.clientWidth)).toBe(true);
+  const workspaceSwitcher = page.locator(".admin-workspace-switcher");
+  await expect(workspaceSwitcher.locator("summary")).toBeVisible();
+  await workspaceSwitcher.locator("summary").click();
+  await expect(
+    workspaceSwitcher.getByRole("navigation", { name: "管理工作区切换" }),
+  ).toBeVisible();
+  await expect(workspaceSwitcher.getByRole("link", { name: "补偿与对账" })).toBeVisible();
+  await expectNoPageOverflow(page);
   await expectNoSeriousAccessibilityViolations(page);
 });
