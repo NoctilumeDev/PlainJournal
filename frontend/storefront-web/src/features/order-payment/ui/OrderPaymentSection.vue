@@ -281,6 +281,10 @@ watch(paymentMayBeInFlight, publishBoundaryState);
 
 <style scoped>
 .payment-section {
+  --pj-status-processing-text: var(--pj-brand-primary-hover);
+  --pj-status-processing-line: var(--pj-brand-primary-hover);
+  --pj-status-processing-surface: var(--pj-surface-soft);
+
   display: grid;
   gap: var(--pj-space-5);
 }

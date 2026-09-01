@@ -177,6 +177,10 @@ function confirmRemoval() {
   gap: var(--pj-space-2);
 }
 
+.account-cart-row__selection input {
+  accent-color: var(--pj-action-primary);
+}
+
 .account-cart-row__aside {
   display: flex;
   flex-direction: column;

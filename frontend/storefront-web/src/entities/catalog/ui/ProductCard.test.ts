@@ -55,6 +55,7 @@ describe("ProductCard", () => {
     });
     expect(wrapper.get("h3").text()).toBe("帆布通勤袋");
     expect(wrapper.text()).toContain("¥189.00");
+    expect(wrapper.get("article").classes()).toContain("product-card--portrait");
   });
 
   it("uses the page-provided heading level without changing the product route", async () => {

@@ -80,6 +80,8 @@ describe("SearchPage", () => {
     await flushPromises();
 
     expect(wrapper.get<HTMLInputElement>("#site-search").element.value).toBe("通勤");
+    expect(wrapper.get(".search-canvas").classes())
+      .toContain("search-canvas--has-query");
     expect(wrapper.text()).toContain("查找范围暂时收窄");
     expect(wrapper.get(".search-degraded").attributes("data-search-source"))
       .toBe("MYSQL_FALLBACK");
@@ -127,6 +129,8 @@ describe("SearchPage", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain("从用途开始");
+    expect(wrapper.get(".search-canvas").classes())
+      .not.toContain("search-canvas--has-query");
     expect(wrapper.find(".search-results").exists()).toBe(false);
   });
 });

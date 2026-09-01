@@ -181,6 +181,27 @@ const benefit = {
   validUntil: "2026-07-30T00:00:00Z",
   regions: [],
 };
+const customerNotifications = [{
+  id: "2079000000000006001",
+  templateCode: "SHIPMENT_DISPATCHED",
+  referenceType: "ORDER",
+  referenceNo: "ORD2079000000000007001",
+  title: "订单已经发货",
+  content: "订单商品已经交给承运方。",
+  status: "UNREAD",
+  readAt: null,
+  createdAt: "2026-07-22T08:30:00Z",
+}, {
+  id: "2079000000000006002",
+  templateCode: "PAYMENT_SUCCEEDED",
+  referenceType: "ORDER",
+  referenceNo: "ORD2079000000000008001",
+  title: "订单支付成功",
+  content: "支付事实已经由 Payment 确认。",
+  status: "READ",
+  readAt: "2026-07-30T12:05:00Z",
+  createdAt: "2026-07-30T12:04:00Z",
+}];
 const afterSale = {
   afterSaleNo: "AS2079000000000003001",
   orderNo: "ORD2079000000000003002",
@@ -625,12 +646,20 @@ const paymentOrder = {
   orderNo: "ORD2079000000000008001",
   status: "PENDING_PAYMENT",
   totalAmount: "398.00",
+  priceSnapshot: {
+    ...reviewOrder.priceSnapshot,
+    originalAmount: "398.00",
+    payableAmount: "398.00",
+    pricingVersion: 2,
+    marketingLockNo: "MKT-PAYMENT-001",
+  },
   paymentDeadline: "2026-07-30T12:15:00Z",
   version: 1,
   createdAt: "2026-07-30T12:00:00Z",
   updatedAt: "2026-07-30T12:00:01Z",
   items: [{
     ...reviewOrder.items[0],
+    unitPrice: "199.00",
     quantity: 2,
     lineAmount: "398.00",
     payableAmount: "398.00",
@@ -658,6 +687,12 @@ const paymentExceptionPayment = {
 };
 let paymentOrderPayment = null;
 let paymentOrderIdempotencyKey = null;
+const checkoutOrders = [];
+const checkoutOrderSubmissions = new Map();
+const checkoutPayments = new Map();
+const checkoutPaymentSubmissions = new Map();
+let nextCheckoutOrderNo = 2079000000000010001n;
+let nextCheckoutPaymentNo = 2079000000000010002n;
 const reviewFulfillment = {
   fulfillmentNo: "FUL2079000000000007002",
   orderNo: reviewOrder.orderNo,
@@ -1034,6 +1069,140 @@ function resetAddressFixture() {
   nextGeneratedAddressId = 2079000000000000889n;
 }
 
+function resetCheckoutFixture() {
+  checkoutOrders.splice(0, checkoutOrders.length);
+  checkoutOrderSubmissions.clear();
+  checkoutPayments.clear();
+  checkoutPaymentSubmissions.clear();
+  nextCheckoutOrderNo = 2079000000000010001n;
+  nextCheckoutPaymentNo = 2079000000000010002n;
+  resetCartFixture();
+}
+
+function moneyFromCents(value) {
+  return (value / 100).toFixed(2);
+}
+
+function canonicalOrderInput(input) {
+  return JSON.stringify({
+    addressId: String(input.addressId ?? ""),
+    benefitNos: Array.isArray(input.benefitNos)
+      ? input.benefitNos.map(String).sort()
+      : [],
+    items: Array.isArray(input.items)
+      ? input.items
+        .map((item) => ({
+          productId: String(item.productId ?? ""),
+          skuId: String(item.skuId ?? ""),
+          quantity: Number(item.quantity),
+        }))
+        .sort((left, right) => left.skuId.localeCompare(right.skuId))
+      : [],
+  });
+}
+
+function createCheckoutOrder(input, ownerAddresses) {
+  const address = ownerAddresses.find((candidate) =>
+    candidate.id === String(input.addressId ?? ""));
+  const requestedItems = Array.isArray(input.items) ? input.items : [];
+  const requestedBenefitNos = Array.isArray(input.benefitNos)
+    ? input.benefitNos.map(String)
+    : [];
+  if (!address || requestedItems.length === 0) {
+    return null;
+  }
+  if (requestedBenefitNos.some((benefitNo) => benefitNo !== benefit.benefitNo)) {
+    return null;
+  }
+
+  const items = [];
+  let originalCents = 0;
+  for (const [index, requested] of requestedItems.entries()) {
+    const product = catalogProducts.find((candidate) =>
+      candidate.id === String(requested.productId ?? ""));
+    const sku = product?.skus.find((candidate) =>
+      candidate.id === String(requested.skuId ?? ""));
+    const quantity = Number(requested.quantity);
+    if (!product || !sku || !Number.isInteger(quantity) || quantity < 1) {
+      return null;
+    }
+    const lineCents = Math.round(Number(sku.salePrice) * 100) * quantity;
+    originalCents += lineCents;
+    items.push({
+      lineNo: index + 1,
+      productId: product.id,
+      skuId: sku.id,
+      productTitle: product.title,
+      skuCode: sku.skuCode,
+      skuName: sku.name,
+      specJson: sku.specJson,
+      imageObjectKey: product.media[0]?.objectKey ?? null,
+      unitPrice: sku.salePrice,
+      quantity,
+      lineAmount: moneyFromCents(lineCents),
+      discountAmount: "0.00",
+      payableAmount: moneyFromCents(lineCents),
+    });
+  }
+
+  const appliesBenefit = requestedBenefitNos.includes(benefit.benefitNo)
+    && originalCents >= Math.round(Number(benefit.thresholdAmount) * 100);
+  const discountCents = appliesBenefit
+    ? Math.round(Number(benefit.discountAmount) * 100)
+    : 0;
+  if (discountCents > 0 && items[0]) {
+    items[0].discountAmount = moneyFromCents(discountCents);
+    items[0].payableAmount = moneyFromCents(
+      Math.round(Number(items[0].lineAmount) * 100) - discountCents,
+    );
+  }
+  const payableCents = originalCents - discountCents;
+  const orderNo = `ORD${nextCheckoutOrderNo}`;
+  nextCheckoutOrderNo += 1n;
+  return {
+    orderNo,
+    status: "PENDING_PAYMENT",
+    totalAmount: moneyFromCents(payableCents),
+    priceSnapshot: {
+      originalAmount: moneyFromCents(originalCents),
+      couponDiscount: moneyFromCents(discountCents),
+      redPacketDiscount: "0.00",
+      subsidyDiscount: "0.00",
+      discountAmount: moneyFromCents(discountCents),
+      payableAmount: moneyFromCents(payableCents),
+      pricingVersion: "checkout-fixture-v1",
+      marketingLockNo: appliesBenefit ? "MKT-CHECKOUT-001" : "MKT-CHECKOUT-NONE",
+      allocations: appliesBenefit ? [{
+        lineNo: items[0].lineNo,
+        skuId: items[0].skuId,
+        benefitNo: benefit.benefitNo,
+        ruleCode: benefit.ruleCode,
+        benefitType: benefit.benefitType,
+        discountAmount: moneyFromCents(discountCents),
+      }] : [],
+    },
+    paymentDeadline: "2026-08-31T08:15:00Z",
+    closeReason: null,
+    deliveryAddress: {
+      sourceAddressId: address.id,
+      recipientName: address.recipientName,
+      phone: address.phone,
+      province: address.province,
+      provinceCode: address.provinceCode,
+      city: address.city,
+      cityCode: address.cityCode,
+      district: address.district,
+      districtCode: address.districtCode,
+      detailAddress: address.detailAddress,
+      postalCode: address.postalCode,
+    },
+    items,
+    version: 1,
+    createdAt: "2026-08-31T08:00:00Z",
+    updatedAt: "2026-08-31T08:00:01Z",
+  };
+}
+
 function resetGovernanceFixture(mode = "audit-confirmed") {
   governanceFixtureMode = mode === "retry-required"
     ? "retry-required"
@@ -1200,6 +1369,14 @@ createServer(async (request, response) => {
   ) {
     paymentOrderPayment = null;
     paymentOrderIdempotencyKey = null;
+    respond(response, 200, { reset: true });
+    return;
+  }
+  if (
+    method === "POST"
+    && url.pathname === "/__test__/fixtures/checkout/reset"
+  ) {
+    resetCheckoutFixture();
     respond(response, 200, { reset: true });
     return;
   }
@@ -1820,12 +1997,69 @@ createServer(async (request, response) => {
     respond(response, 200, result);
     return;
   }
+  if (method === "POST" && url.pathname === "/api/v1/trade/orders") {
+    const actor = identityActor(request);
+    if (actor.id !== customer.id) {
+      respond(response, 403, null, "FORBIDDEN", "Customer owner required");
+      return;
+    }
+    const idempotencyKey = String(request.headers["idempotency-key"] ?? "");
+    const input = await body(request);
+    const canonical = canonicalOrderInput(input);
+    const requestIdentity = `${actor.id}:${idempotencyKey}`;
+    const previous = checkoutOrderSubmissions.get(requestIdentity);
+    if (!idempotencyKey) {
+      respond(response, 400, null, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency key required");
+      return;
+    }
+    if (previous && previous.canonical !== canonical) {
+      respond(
+        response,
+        409,
+        null,
+        "IDEMPOTENCY_CONFLICT",
+        "Order key payload conflict",
+      );
+      return;
+    }
+    if (previous) {
+      respond(response, 200, previous.order);
+      return;
+    }
+    const order = createCheckoutOrder(input, addressBook(request));
+    if (!order) {
+      respond(response, 400, null, "INVALID_ORDER", "Order request is invalid");
+      return;
+    }
+    checkoutOrders.unshift(order);
+    checkoutOrderSubmissions.set(requestIdentity, { canonical, order });
+    respond(response, 200, order);
+    return;
+  }
+  if (
+    method === "GET"
+    && url.pathname.startsWith("/api/v1/trade/orders/by-idempotency-key/")
+  ) {
+    const actor = identityActor(request);
+    const key = decodeURIComponent(
+      url.pathname.slice("/api/v1/trade/orders/by-idempotency-key/".length),
+    );
+    const submission = checkoutOrderSubmissions.get(`${actor.id}:${key}`);
+    if (!submission || actor.id !== customer.id) {
+      respond(response, 404, null, "ORDER_NOT_FOUND", "Order not found");
+      return;
+    }
+    respond(response, 200, submission.order);
+    return;
+  }
   if (
     method === "GET"
     && url.pathname === "/api/v1/trade/orders/page"
   ) {
     const actor = identityActor(request);
-    const items = actor.id === customer.id ? [paymentOrder, reviewOrder] : [];
+    const items = actor.id === customer.id
+      ? [...checkoutOrders, paymentOrder, reviewOrder]
+      : [];
     respond(response, 200, {
       items,
       page: 1,
@@ -1833,6 +2067,19 @@ createServer(async (request, response) => {
       total: items.length,
     });
     return;
+  }
+  const checkoutOrderMatch = /^\/api\/v1\/trade\/orders\/([^/]+)$/.exec(url.pathname);
+  if (method === "GET" && checkoutOrderMatch?.[1]) {
+    const order = checkoutOrders.find((candidate) =>
+      candidate.orderNo === decodeURIComponent(checkoutOrderMatch[1]));
+    if (order) {
+      if (identityActor(request).id !== customer.id) {
+        respond(response, 404, null, "ORDER_NOT_FOUND", "Order not found");
+        return;
+      }
+      respond(response, 200, order);
+      return;
+    }
   }
   if (
     method === "GET"
@@ -1855,6 +2102,21 @@ createServer(async (request, response) => {
     }
     respond(response, 200, paymentExceptionOrder);
     return;
+  }
+  const checkoutPaymentByOrderMatch =
+    /^\/api\/v1\/payment\/payments\/by-order\/([^/]+)$/.exec(url.pathname);
+  if (method === "GET" && checkoutPaymentByOrderMatch?.[1]) {
+    const orderNo = decodeURIComponent(checkoutPaymentByOrderMatch[1]);
+    const order = checkoutOrders.find((candidate) => candidate.orderNo === orderNo);
+    if (order) {
+      const payment = checkoutPayments.get(orderNo);
+      if (!payment || identityActor(request).id !== customer.id) {
+        respond(response, 404, null, "RESOURCE_NOT_FOUND", "Payment not found");
+        return;
+      }
+      respond(response, 200, payment);
+      return;
+    }
   }
   if (
     method === "GET"
@@ -1884,6 +2146,56 @@ createServer(async (request, response) => {
       return;
     }
     const input = await body(request);
+    const checkoutOrder = checkoutOrders.find((candidate) =>
+      candidate.orderNo === String(input.orderNo ?? ""));
+    if (checkoutOrder) {
+      const idempotencyKey = String(request.headers["idempotency-key"] ?? "");
+      const canonical = JSON.stringify({ orderNo: checkoutOrder.orderNo });
+      const requestIdentity = `${customer.id}:${idempotencyKey}`;
+      const previous = checkoutPaymentSubmissions.get(requestIdentity);
+      if (!idempotencyKey) {
+        respond(
+          response,
+          400,
+          null,
+          "IDEMPOTENCY_KEY_REQUIRED",
+          "Idempotency key required",
+        );
+        return;
+      }
+      if (previous && previous.canonical !== canonical) {
+        respond(
+          response,
+          409,
+          null,
+          "IDEMPOTENCY_CONFLICT",
+          "Payment key payload conflict",
+        );
+        return;
+      }
+      if (previous) {
+        respond(response, 200, previous.payment);
+        return;
+      }
+      const payment = checkoutPayments.get(checkoutOrder.orderNo) ?? {
+        paymentNo: `PAY${nextCheckoutPaymentNo}`,
+        orderNo: checkoutOrder.orderNo,
+        channel: "MOCK",
+        status: "PROCESSING",
+        amount: checkoutOrder.totalAmount,
+        channelTransactionNo: null,
+        paidAt: null,
+        createdAt: "2026-08-31T08:01:00Z",
+        updatedAt: "2026-08-31T08:01:00Z",
+      };
+      if (!checkoutPayments.has(checkoutOrder.orderNo)) {
+        nextCheckoutPaymentNo += 1n;
+        checkoutPayments.set(checkoutOrder.orderNo, payment);
+      }
+      checkoutPaymentSubmissions.set(requestIdentity, { canonical, payment });
+      respond(response, 200, payment);
+      return;
+    }
     if (input.orderNo !== paymentOrder.orderNo) {
       respond(response, 404, null, "ORDER_NOT_FOUND", "Order not found");
       return;
@@ -1910,6 +2222,11 @@ createServer(async (request, response) => {
     const key = decodeURIComponent(
       url.pathname.slice("/api/v1/payment/payments/by-idempotency-key/".length),
     );
+    const checkoutSubmission = checkoutPaymentSubmissions.get(`${customer.id}:${key}`);
+    if (checkoutSubmission && identityActor(request).id === customer.id) {
+      respond(response, 200, checkoutSubmission.payment);
+      return;
+    }
     if (
       !paymentOrderPayment
       || key !== paymentOrderIdempotencyKey
@@ -1920,6 +2237,22 @@ createServer(async (request, response) => {
     }
     respond(response, 200, paymentOrderPayment);
     return;
+  }
+  const checkoutPaymentMatch = /^\/api\/v1\/payment\/payments\/([^/]+)$/.exec(
+    url.pathname,
+  );
+  if (method === "GET" && checkoutPaymentMatch?.[1]) {
+    const paymentNo = decodeURIComponent(checkoutPaymentMatch[1]);
+    const payment = [...checkoutPayments.values()].find((candidate) =>
+      candidate.paymentNo === paymentNo);
+    if (payment) {
+      if (identityActor(request).id !== customer.id) {
+        respond(response, 404, null, "RESOURCE_NOT_FOUND", "Payment not found");
+        return;
+      }
+      respond(response, 200, payment);
+      return;
+    }
   }
   if (
     method === "GET"
@@ -2600,6 +2933,37 @@ createServer(async (request, response) => {
   }
   if (method === "GET" && url.pathname === "/api/v1/marketing/benefits") {
     respond(response, 200, [benefit]);
+    return;
+  }
+  if (
+    method === "GET"
+    && url.pathname === "/api/v1/notifications/unread-count"
+  ) {
+    respond(response, 200, {
+      count: customerNotifications.filter((item) => item.status === "UNREAD").length,
+    });
+    return;
+  }
+  if (method === "GET" && url.pathname === "/api/v1/notifications") {
+    respond(response, 200, {
+      items: customerNotifications,
+      nextCursor: null,
+      hasMore: false,
+    });
+    return;
+  }
+  const notificationReadMatch =
+    /^\/api\/v1\/notifications\/([^/]+)\/read$/u.exec(url.pathname);
+  if (method === "POST" && notificationReadMatch?.[1]) {
+    const notification = customerNotifications.find((item) =>
+      item.id === decodeURIComponent(notificationReadMatch[1]));
+    if (!notification) {
+      respond(response, 404, null, "RESOURCE_NOT_FOUND", "Notification not found");
+      return;
+    }
+    notification.status = "READ";
+    notification.readAt ??= now;
+    respond(response, 200, null);
     return;
   }
   if (

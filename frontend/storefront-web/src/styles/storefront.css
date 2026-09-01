@@ -31,7 +31,7 @@
   max-width: 14ch;
   font-size: var(--pj-font-size-xl);
   font-weight: 520;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--pj-letter-spacing-page-title);
   line-height: 1.08;
 }
 

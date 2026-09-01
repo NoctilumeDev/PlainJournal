@@ -10,13 +10,15 @@ import {
 withDefaults(defineProps<{
   product: ProductSummary;
   headingLevel?: 2 | 3;
+  mediaAspect?: "portrait" | "square" | "landscape";
 }>(), {
   headingLevel: 3,
+  mediaAspect: "portrait",
 });
 </script>
 
 <template>
-  <article class="product-card">
+  <article class="product-card" :class="`product-card--${mediaAspect}`">
     <RouterLink
       class="product-card__link"
       :to="{ name: 'product-detail', params: { productId: product.id } }"
@@ -69,6 +71,14 @@ withDefaults(defineProps<{
     background-color var(--pj-duration-normal) var(--pj-ease-standard),
     color 220ms var(--pj-ease-standard),
     border-color 220ms var(--pj-ease-standard);
+}
+
+.product-card--square .product-card__media {
+  aspect-ratio: 1;
+}
+
+.product-card--landscape .product-card__media {
+  aspect-ratio: 4 / 3;
 }
 
 .product-card__media img {

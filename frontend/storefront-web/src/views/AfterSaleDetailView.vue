@@ -62,7 +62,7 @@ const access = computed<AfterSaleAccessContext>(() => ({
   margin: 0;
   font-size: var(--pj-font-size-xl);
   font-weight: 520;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--pj-letter-spacing-page-title);
 }
 
 @media (max-width: 48rem) {
