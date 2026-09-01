@@ -23,6 +23,20 @@ export function validateReleaseStatus(status, requestedTag) {
   return violations;
 }
 
+export function activeReleaseFromBaseline(baseline) {
+  const pending = baseline.pendingRelease;
+  if (pending !== undefined) {
+    return {
+      targetRelease: pending.targetRelease,
+      status: pending.status,
+    };
+  }
+  return {
+    targetRelease: baseline.targetRelease,
+    status: baseline.status,
+  };
+}
+
 export function validateFrontendVersionStatement(source, targetRelease, status) {
   const violations = [];
   const releasedStatement = `\`${targetRelease}\` 正式发布`;
@@ -87,18 +101,19 @@ export async function validateReleaseVersion(repositoryRoot, requestedTag) {
   const violations = [];
   const baselinePath = path.join(repositoryRoot, ".github", "verification-baseline.json");
   const baseline = JSON.parse(await fs.readFile(baselinePath, "utf8"));
+  const activeRelease = activeReleaseFromBaseline(baseline);
   let releaseVersion;
   try {
-    releaseVersion = versionFromReleaseTag(baseline.targetRelease);
+    releaseVersion = versionFromReleaseTag(activeRelease.targetRelease);
   } catch (error) {
     violations.push(error.message);
     return violations;
   }
 
-  violations.push(...validateReleaseStatus(baseline.status, requestedTag));
-  if (requestedTag && requestedTag !== baseline.targetRelease) {
+  violations.push(...validateReleaseStatus(activeRelease.status, requestedTag));
+  if (requestedTag && requestedTag !== activeRelease.targetRelease) {
     violations.push(
-      `Release tag ${requestedTag} does not match verification baseline ${baseline.targetRelease}`,
+      `Release tag ${requestedTag} does not match verification baseline ${activeRelease.targetRelease}`,
     );
   }
 
@@ -147,7 +162,7 @@ export async function validateReleaseVersion(repositoryRoot, requestedTag) {
     repositoryRoot,
     ".github",
     "release-notes",
-    `${baseline.targetRelease}.md`,
+    `${activeRelease.targetRelease}.md`,
   );
   try {
     await fs.access(releaseNotesPath);
@@ -157,7 +172,11 @@ export async function validateReleaseVersion(repositoryRoot, requestedTag) {
 
   const frontendReadme = await fs.readFile(path.join(frontendRoot, "README.md"), "utf8");
   violations.push(
-    ...validateFrontendVersionStatement(frontendReadme, baseline.targetRelease, baseline.status),
+    ...validateFrontendVersionStatement(
+      frontendReadme,
+      activeRelease.targetRelease,
+      activeRelease.status,
+    ),
   );
 
   return violations;

@@ -15,6 +15,7 @@
 | 门禁对象提交 | `52f7de692d26e760661c4d3172746f1ac517952c` |
 | 门禁数字来源 | `52f7de692d26e760661c4d3172746f1ac517952c:.github/verification-baseline.json`；blob `4ac8d553009c432be454e00baf22263312fcebae` |
 | 代码门禁验证日期 | 2026-08-28 |
+| 下一候选 | `v1.1.0`（`release-candidate`） |
 
 ## `v1.0.10` 发布对象代码门禁
 
@@ -32,6 +33,26 @@
 
 GitHub Actions 运行后，外部访问者可在仓库 Actions 页面复核同一套后端、前端、
 架构、文档和安全门禁。
+
+
+## `v1.1.0` 候选代码门禁
+
+| 项目 | 当前值 |
+| --- | --- |
+| 候选状态 | `release-candidate` |
+| 已验证代码对象 | `1937f4136a16dc2ec27d618c35e50739ed5aed0d` |
+| 候选数字来源 | `1937f4136a16dc2ec27d618c35e50739ed5aed0d:docs/frontend-layout-restructure-plan.md`；blob `54fa06e94d5f8da54a6b36a1aeb316bee1c675e0` |
+| 验证日期 | 2026-09-01 |
+| 前端单元/契约 | 327 / 327 |
+| 前端聚合行覆盖率 | 73.9%（门禁 ≥ 70%） |
+| 开发态 Playwright | 61 / 61 |
+| 生产构建 Playwright | 3 / 3 |
+| 前端分层规则 | 28 条 |
+| 真实运行证据 | `UNCHANGED / NOT REVALIDATED` |
+
+该候选只新增前端代码与视觉门禁事实；后端、真实中间件、容量、三实例和故障恢复仍沿用
+下方已经冻结的历史边界，不表述为本轮重新执行。
+
 
 ## 历史冻结运行证据
 

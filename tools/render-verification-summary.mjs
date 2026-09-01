@@ -91,8 +91,11 @@ export function validateVerificationBaseline(baseline) {
     "historicalRuntimeEvidence",
     "freshRevalidation",
     "deferred32GiBValidation",
+    "pendingRelease",
   ], "baseline");
-  requireExact(baseline.schemaVersion, 2, "schemaVersion");
+  if (![2, 3].includes(baseline.schemaVersion)) {
+    invalid("schemaVersion must be 2 or 3.");
+  }
 
   const targetRelease = requireString(baseline, "targetRelease", "baseline");
   if (!STABLE_RELEASE.test(targetRelease)) {
@@ -119,6 +122,54 @@ export function validateVerificationBaseline(baseline) {
   requireSha(gates, "sourceBlob", "codeGateEvidence");
   if (releaseStatus === "released" && gateRef !== `refs/tags/${targetRelease}`) {
     invalid("released codeGateEvidence.objectRef must name targetRelease's tag.");
+  }
+
+  const pending = baseline.pendingRelease;
+  if (pending !== undefined) {
+    requireExact(baseline.schemaVersion, 3, "schemaVersion with pendingRelease");
+    const pendingRecord = requireRecord(pending, "pendingRelease");
+    requireOnlyKeys(pendingRecord, [
+      "targetRelease", "status", "verifiedOn", "objectCommit", "sourcePath",
+      "sourceBlob", "runtimeEvidence", "frontend",
+    ], "pendingRelease");
+    const pendingTarget = requireString(pendingRecord, "targetRelease", "pendingRelease");
+    if (!STABLE_RELEASE.test(pendingTarget) || pendingTarget === targetRelease) {
+      invalid("pendingRelease.targetRelease must name a different stable release.");
+    }
+    const pendingStatus = requireString(pendingRecord, "status", "pendingRelease");
+    if (!["release-candidate", "released"].includes(pendingStatus)) {
+      invalid("pendingRelease.status must be release-candidate or released.");
+    }
+    const pendingVerifiedOn = requireDate(pendingRecord, "verifiedOn", "pendingRelease");
+    if (pendingVerifiedOn < gateVerifiedOn) {
+      invalid("pendingRelease must not predate the frozen released baseline.");
+    }
+    requireSha(pendingRecord, "objectCommit", "pendingRelease");
+    requireExact(
+      requireString(pendingRecord, "sourcePath", "pendingRelease"),
+      "docs/frontend-layout-restructure-plan.md",
+      "pendingRelease.sourcePath",
+    );
+    requireSha(pendingRecord, "sourceBlob", "pendingRelease");
+    requireExact(
+      requireString(pendingRecord, "runtimeEvidence", "pendingRelease"),
+      "UNCHANGED / NOT REVALIDATED",
+      "pendingRelease.runtimeEvidence",
+    );
+    const pendingFrontend = requireRecord(pendingRecord.frontend, "pendingRelease.frontend");
+    requireOnlyKeys(pendingFrontend, [
+      "unitAndContractTests", "developmentE2E", "productionE2E", "layerRules",
+      "lineCoverage", "lineCoverageMinimum",
+    ], "pendingRelease.frontend");
+    requireMetricRecord(pendingFrontend, [
+      "unitAndContractTests", "developmentE2E", "productionE2E", "layerRules",
+      "lineCoverage", "lineCoverageMinimum",
+    ], "pendingRelease.frontend");
+    if (pendingFrontend.lineCoverage < pendingFrontend.lineCoverageMinimum) {
+      invalid("pendingRelease frontend coverage cannot be below its recorded minimum.");
+    }
+  } else if (baseline.schemaVersion === 3) {
+    invalid("schemaVersion 3 requires pendingRelease.");
   }
 
   const backend = requireRecord(gates.backend, "codeGateEvidence.backend");
@@ -284,6 +335,26 @@ export function renderVerificationSummary(baseline) {
   const historical = baseline.historicalRuntimeEvidence;
   const fresh = baseline.freshRevalidation;
   const deferred = baseline.deferred32GiBValidation;
+  const pending = baseline.pendingRelease;
+  const pendingSummary = pending ? `
+## \`${pending.targetRelease}\` 候选代码门禁
+
+| 项目 | 当前值 |
+| --- | --- |
+| 候选状态 | \`${pending.status}\` |
+| 已验证代码对象 | \`${pending.objectCommit}\` |
+| 候选数字来源 | \`${pending.objectCommit}:${pending.sourcePath}\`；blob \`${pending.sourceBlob}\` |
+| 验证日期 | ${pending.verifiedOn} |
+| 前端单元/契约 | ${pending.frontend.unitAndContractTests} / ${pending.frontend.unitAndContractTests} |
+| 前端聚合行覆盖率 | ${pending.frontend.lineCoverage}%（门禁 ≥ ${pending.frontend.lineCoverageMinimum}%） |
+| 开发态 Playwright | ${pending.frontend.developmentE2E} / ${pending.frontend.developmentE2E} |
+| 生产构建 Playwright | ${pending.frontend.productionE2E} / ${pending.frontend.productionE2E} |
+| 前端分层规则 | ${pending.frontend.layerRules} 条 |
+| 真实运行证据 | \`${pending.runtimeEvidence}\` |
+
+该候选只新增前端代码与视觉门禁事实；后端、真实中间件、容量、三实例和故障恢复仍沿用
+下方已经冻结的历史边界，不表述为本轮重新执行。
+` : "";
   const historicalSources = historical.sourceSnapshots
     .map((source) => (
       `- [${path.basename(source.path, ".md")}](${source.path.replace(/^docs\//u, "")})`
@@ -308,6 +379,7 @@ export function renderVerificationSummary(baseline) {
 | 门禁对象提交 | \`${gates.objectCommit}\` |
 | 门禁数字来源 | \`${gates.objectCommit}:${gates.sourcePath}\`；blob \`${gates.sourceBlob}\` |
 | 代码门禁验证日期 | ${gates.verifiedOn} |
+${pending ? `| 下一候选 | \`${pending.targetRelease}\`（\`${pending.status}\`） |` : ""}
 
 ## \`${baseline.targetRelease}\` 发布对象代码门禁
 
@@ -325,6 +397,8 @@ export function renderVerificationSummary(baseline) {
 
 GitHub Actions 运行后，外部访问者可在仓库 Actions 页面复核同一套后端、前端、
 架构、文档和安全门禁。
+
+${pendingSummary}
 
 ## 历史冻结运行证据
 

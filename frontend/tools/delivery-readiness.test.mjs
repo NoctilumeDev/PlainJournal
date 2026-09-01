@@ -42,7 +42,7 @@ test("detects delivery-only labels without rejecting normal product language", (
   assert.ok(RETIRED_SELECTORS.includes("form-actions"));
 });
 
-test("keeps the current frontend source inside the V7 delivery baseline", async () => {
+test("keeps the current frontend source inside the active release boundary", async () => {
   const frontendRoot = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     "..",
