@@ -32,8 +32,10 @@
 - 第一轮前端代码对象 `1937f4136a16dc2ec27d618c35e50739ed5aed0d` 的 CI、Security 和
   Online Preview 已通过；跨批次 `pnpm check` 通过 28 条分层边界、327 项单元与契约
   测试、61 项开发态 E2E、3 项生产构建 E2E 和 73.9% 聚合行覆盖率；
-- 候选 PR、候选合并提交、正式发布提交、Security、CodeQL、Online Preview 和 Release
-  资产仍须按发布阶段分别回读，不在候选中提前宣称；
+- 候选 PR 提交 `7ab4075f9f50127a9a2a4bfdcf67f2da6cebf6cc` 与候选合并提交
+  `aee901172e6224814177800eb0b90fb3bc80ed67` 的 CI、Security、CodeQL 和 Online
+  Preview 也已通过；候选记录现提升为 `released`，正式发布提交与 Release 资产仍须
+  按发布阶段分别回读；
 - `v1.0.10` 已冻结证据保持不可变。本轮未重新执行真实中间件、容量、三实例、故障恢复
   或 32 GiB 延期协议，也不把尚未定义的第 34 个目标页写成已完成。
 

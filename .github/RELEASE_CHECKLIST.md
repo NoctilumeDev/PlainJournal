@@ -165,6 +165,8 @@ Workflow 只在已存在标签时打包，并且仅在 GitHub Release 尚不存�
 - [x] `v1.0.10` 发布对象与历史运行证据保持不可变；本轮不声称重新执行真实中间件、
   容量、三实例、故障恢复或 32 GiB 延期协议。
 - [x] 后端、前端、候选记录、Changelog 和 Release Notes 已统一为 `1.1.0` 候选。
-- [ ] 候选 PR 与候选合并提交的 CI、Security、CodeQL 和 Online Preview 全部通过。
+- [x] 候选 PR 提交 `7ab4075f9f50127a9a2a4bfdcf67f2da6cebf6cc` 与候选合并提交
+  `aee901172e6224814177800eb0b90fb3bc80ed67` 的 CI、Security、CodeQL 和 Online
+  Preview 全部通过。
 - [ ] 候选记录提升为 `released`，且正式发布提交重新通过远端门禁。
 - [ ] `v1.1.0` 注解标签、Release、ZIP、SHA-256、manifest 和 SPDX SBOM 回读一致。
