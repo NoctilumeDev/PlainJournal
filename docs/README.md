@@ -21,6 +21,8 @@
 ### 产品与架构
 
 - [产品范围](01-product-scope.md)
+- [前端轻量化重构计划](frontend-layout-restructure-plan.md)：旧前端计划冻结、跨市场参考原则、页面家族、布局器与逐页迁移闭环
+- [前端页面注册表与视觉基线](frontend-page-registry.md)：33 条真实路由、未决第 34 页、事实所有者、关键状态与桌面/移动基线
 - [服务架构](02-service-architecture.md)
 - [系统架构图](visuals/system-architecture.html)：使用者、网关、十个事实所有者与运行底座
 - [功能模块图](visuals/functional-modules.html)：两个产品入口、六个任务域与十六个功能模块

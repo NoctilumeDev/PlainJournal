@@ -35,6 +35,8 @@ jobs:
           node tools/check-visual-docs.mjs
           node tools/check-documentation-structure.mjs
           node tools/check-markdown-links.mjs
+          node tools/check-frontend-page-registry.mjs
+          node tools/check-frontend-baseline.mjs
           node tools/check-release-version.mjs
           node tools/render-verification-summary.mjs --check
       - name: Parse Compose configurations
