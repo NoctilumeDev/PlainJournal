@@ -446,7 +446,7 @@ onMounted(() => {
   margin: 0;
   font-size: clamp(2.2rem, 6vw, 4.8rem);
   font-weight: 500;
-  letter-spacing: -0.055em;
+  letter-spacing: var(--pj-letter-spacing-page-title);
 }
 
 .operations-hero p:last-child,
