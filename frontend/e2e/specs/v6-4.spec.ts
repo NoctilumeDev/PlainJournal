@@ -611,6 +611,7 @@ test("V6.4 Governance keeps lost Payment responses unknown until audit authority
   )
     .toBeVisible();
 
+  await page.getByRole("tab", { name: "异常支付退款" }).click();
   const exceptionPanel = page.locator("article").filter({
     has: page.getByRole("heading", { name: "全额原路退款" }),
   });
@@ -761,10 +762,8 @@ test("V6.4 Fulfillment keeps a lost logistics command unknown and retries the ex
   await expect(
     page.getByRole("heading", { name: "履约与退货", level: 1 }),
   ).toBeVisible();
-  const order = page.locator("article").filter({
-    has: page.getByRole("heading", {
-      name: "订单 ORD2079000000000004002",
-    }),
+  const order = page.locator("article.fulfillment-detail").filter({
+    hasText: "ORD2079000000000004002",
   });
   await expect(order).toContainText("SHIPPED");
   await order.getByLabel("地点").fill("杭州分拨中心");
@@ -841,10 +840,8 @@ test("V6.4 Fulfillment does not attribute recovered state to an unobservable exc
   });
 
   await loginAdminAt(page, "/fulfillment");
-  const order = page.locator("article").filter({
-    has: page.getByRole("heading", {
-      name: "订单 ORD2079000000000004002",
-    }),
+  const order = page.locator("article.fulfillment-detail").filter({
+    hasText: "ORD2079000000000004002",
   });
   await expect(order).toContainText("EXCEPTION");
   await order.getByLabel("管理员复核说明")
@@ -1235,20 +1232,25 @@ test("V6.4 Catalog keeps the admin view as a public projection with images, filt
   await expect(
     page.getByRole("heading", { name: "商品目录", level: 1 }),
   ).toBeVisible();
-  await expect(page.getByText("2 条当前投影")).toBeVisible();
-  await expect(page.locator(".catalog-product")).toHaveCount(2);
-  await expect(page.getByAltText("帆布通勤袋 商品图")).toBeVisible();
-  await expect(page.getByAltText("青灰随行本 商品图")).toBeVisible();
+  await expect(page.getByText(/2 条 · 读取于/u)).toBeVisible();
+  await expect(page.locator(".catalog-list > li")).toHaveCount(2);
+  await expect(
+    page.locator(".catalog-list").getByAltText("帆布通勤袋 商品图"),
+  ).toBeVisible();
+  await expect(
+    page.locator(".catalog-list").getByAltText("青灰随行本 商品图"),
+  ).toBeVisible();
   await expect(
     page.locator(".catalog-pagination")
-      .getByText(/显示 1–2，\s*第 1 \/ 1 页/u),
+      .getByText(/显示 1–2 · 第 1 \/ 1 页/u),
   ).toBeVisible();
 
-  await page.getByLabel("分类").selectOption("2079000000000000101");
+  await page.getByLabel("分类", { exact: true })
+    .selectOption("2079000000000000101");
   await page.getByRole("button", { name: "应用筛选" }).click();
-  await expect(page.getByText("1 条当前投影")).toBeVisible();
-  await expect(page.locator(".catalog-product")).toHaveCount(1);
-  await expect(page.getByRole("heading", { name: "帆布通勤袋", level: 3 }))
+  await expect(page.getByText(/1 条 · 读取于/u)).toBeVisible();
+  await expect(page.locator(".catalog-list > li")).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "帆布通勤袋", level: 2 }))
     .toBeVisible();
   expect(productRequests.at(-1)).toBe(
     "?page=1&size=20&categoryId=2079000000000000101",
@@ -1292,22 +1294,22 @@ test("V6.4 Catalog preserves known products when a public projection refresh ret
   });
 
   await loginAdminAt(page, "/catalog");
-  await expect(page.locator(".catalog-product")).toHaveCount(2);
+  await expect(page.locator(".catalog-list > li")).toHaveCount(2);
   failNext = true;
   await page.getByRole("button", { name: "重新读取" }).click();
   await expect(
     page.locator(".pj-status-notice--danger")
       .filter({ hasText: "商品投影读取未完成" }),
   ).toBeVisible();
-  await expect(page.locator(".catalog-product")).toHaveCount(2);
-  await expect(page.getByText("页面保留上一次已显示的商品事实")).toBeVisible();
+  await expect(page.locator(".catalog-list > li")).toHaveCount(2);
+  await expect(page.getByText(/保留上一次已显示的商品事实/u)).toBeVisible();
 
   await page.getByRole("button", { name: "重新读取" }).click();
   await expect(
     page.locator(".pj-status-notice--danger")
       .filter({ hasText: "商品投影读取未完成" }),
   ).toHaveCount(0);
-  await expect(page.locator(".catalog-product")).toHaveCount(2);
+  await expect(page.locator(".catalog-list > li")).toHaveCount(2);
   expect(diagnostics.pageErrors).toEqual([]);
   expect(diagnostics.consoleWarnings).toEqual([]);
   expect(unexpectedFailedResponses(diagnostics.failedResponses)).toEqual([]);
@@ -1338,26 +1340,29 @@ test("V6.4 After-sale presents one continuous Trade fact and accepts only the ma
   await expect(
     page.getByRole("heading", { name: "售后审核", level: 1 }),
   ).toBeVisible();
-  await expect(page.locator(".after-sale-record")).toHaveCount(1);
-  await expect(page.getByText("Trade 管理审核")).toBeVisible();
-  await expect(page.getByText("不可变退款快照")).toBeVisible();
-  await expect(page.getByText("¥20.00")).toBeVisible();
-  await expect(page.getByText("2079000000000000011")).toBeVisible();
+  await expect(page.locator(".after-sale-queue__list > li")).toHaveCount(1);
+  const detail = page.locator("article.after-sale-detail");
+  await expect(detail).toContainText("Trade 管理审核");
+  await expect(detail).toContainText("不可变退款快照");
+  await expect(detail).toContainText("¥20.00");
+  await expect(detail).toContainText("2079000000000000011");
 
-  await page.getByLabel("售后状态").selectOption("CANCELED");
-  await expect(page.getByText("当前筛选下没有售后单。")).toBeVisible();
-  await page.getByLabel("售后状态").selectOption("");
-  await expect(page.locator(".after-sale-record")).toHaveCount(1);
+  const statusFilter = page.getByRole("navigation", { name: "售后状态筛选" });
+  await statusFilter.getByRole("button", { name: "顾客已撤销" }).click();
+  await expect(page.getByText("当前筛选下没有售后单", { exact: true }))
+    .toBeVisible();
+  await statusFilter.getByRole("button", { name: "全部售后" }).click();
+  await expect(page.locator(".after-sale-queue__list > li")).toHaveCount(1);
 
   const reason = "浏览器验证：核对整单金额与商品行快照后同意退货退款";
   await page.getByLabel("审核原因").fill(reason);
-  await page.getByRole("button", { name: "提交审核决定" }).click();
+  await page.getByRole("button", { name: "批准退款" }).click();
 
   await expect(
     page.locator(".after-sale-command-notice.pj-status-notice--success"),
   ).toContainText("当前状态为 WAIT_RETURN");
-  await expect(page.getByText("等待寄回", { exact: true })).toBeVisible();
-  await expect(page.getByText(reason)).toBeVisible();
+  await expect(detail).toContainText("等待寄回");
+  await expect(detail).toContainText(reason);
   expect(posted).toEqual([{ approved: true, reason }]);
 
   const authority = await adminAfterSaleDiagnostics(request);
@@ -1404,12 +1409,12 @@ test("V6.4 After-sale confirms a committed lost review through matching Trade au
   await loginAdminAt(page, "/after-sales");
   const reason = "浏览器验证：提交已落库但审核响应丢失";
   await page.getByLabel("审核原因").fill(reason);
-  await page.getByRole("button", { name: "提交审核决定" }).click();
+  await page.getByRole("button", { name: "批准退款" }).click();
 
   const unknown = page.locator(
     ".after-sale-command-notice.pj-status-notice--unknown",
   );
-  await expect(unknown).toContainText("审核结果未知");
+  await expect(unknown).toContainText("当前结论尚不能确认");
   await expect(page.getByLabel("审核原因")).toHaveAttribute("readonly", "");
   await expect(
     unknown.getByRole("button", { name: "使用原审核载荷重试" }),
@@ -1466,7 +1471,7 @@ test("V6.4 After-sale retries the frozen review payload only after Trade still r
   await loginAdminAt(page, "/after-sales");
   const reason = "浏览器验证：权威仍待审核后沿用原载荷重试";
   await page.getByLabel("审核原因").fill(reason);
-  await page.getByRole("button", { name: "提交审核决定" }).click();
+  await page.getByRole("button", { name: "批准退款" }).click();
 
   const unknown = page.locator(
     ".after-sale-command-notice.pj-status-notice--unknown",
@@ -1535,12 +1540,13 @@ test("V6.4 Review replays a committed lost platform reply with the exact command
   await expect(
     page.getByRole("heading", { name: "评价治理", level: 1 }),
   ).toBeVisible();
-  await expect(page.locator(".review-record")).toHaveCount(1);
-  await expect(page.getByText(fixture.reportId)).toBeVisible();
-  await expect(page.getByText(fixture.reviewId)).toBeVisible();
-  await expect(page.getByText(fixture.productId)).toBeVisible();
+  await expect(page.locator(".review-queue__list > li")).toHaveCount(1);
+  const reviewDetail = page.locator("article.review-detail");
+  await expect(reviewDetail).toContainText(fixture.reportId);
+  await expect(reviewDetail).toContainText(fixture.reviewId);
+  await expect(reviewDetail).toContainText(fixture.productId);
 
-  const replyPanel = page.locator("section.review-action").filter({
+  const replyPanel = page.locator("form.review-action").filter({
     has: page.getByRole("heading", {
       name: "补充可核实事实",
       level: 3,
@@ -1645,7 +1651,7 @@ test("V6.4 Review accepts moderation only from the exact audit replay and keeps 
   });
 
   await loginAdminAt(page, "/reviews");
-  const moderationPanel = page.locator("section.review-action").filter({
+  const moderationPanel = page.locator("form.review-action").filter({
     has: page.getByRole("heading", {
       name: "记录举报结论",
       level: 3,
@@ -1667,7 +1673,7 @@ test("V6.4 Review accepts moderation only from the exact audit replay and keeps 
   await expect(unknown).toContainText(commandId);
   await expect(moderationPanel.getByLabel("审核说明"))
     .toHaveAttribute("readonly", "");
-  await expect(page.locator(".review-record")).toHaveCount(1);
+  await expect(page.locator(".review-queue__list > li")).toHaveCount(1);
   await expect(
     page.locator(".review-command-notice.pj-status-notice--success"),
   ).toHaveCount(0);
@@ -1683,7 +1689,7 @@ test("V6.4 Review accepts moderation only from the exact audit replay and keeps 
   await expect(accepted).toContainText("PUBLISHED");
   await expect(accepted).toContainText("HIDDEN");
   await expect(accepted).toContainText("评分汇总扣回一次");
-  await expect(page.locator(".review-record")).toHaveCount(0);
+  await expect(page.locator(".review-queue__list > li")).toHaveCount(0);
   expect(posted).toEqual([
     {
       commandId,
@@ -1729,10 +1735,12 @@ test("V6.4 Review accepts moderation only from the exact audit replay and keeps 
     averageRating: 0,
   });
 
-  await page.getByLabel("举报状态").selectOption("RESOLVED");
-  await expect(page.locator(".review-record")).toHaveCount(1);
+  await page.getByRole("navigation", { name: "评价举报状态筛选" })
+    .getByRole("button", { name: "已完成审核" })
+    .click();
+  await expect(page.locator(".review-queue__list > li")).toHaveCount(1);
   await expect(page.getByText("UPHELD", { exact: true })).toBeVisible();
-  await expect(page.getByText("审核完成", { exact: true })).toBeVisible();
+  await expect(page.locator(".review-queue__list > li")).toContainText("审核完成");
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await expectNoRootOverflow(page);

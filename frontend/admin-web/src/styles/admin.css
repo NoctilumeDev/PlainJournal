@@ -1,24 +1,32 @@
 #app,
 .admin-shell {
+  --admin-shell-header-height: 4rem;
+  --pj-status-processing-text: var(--pj-brand-primary-hover);
+  --pj-status-processing-line: var(--pj-brand-primary-soft);
+  --pj-status-processing-surface: var(--pj-brand-accent-mist);
+  --pj-status-unknown-text: var(--pj-text-secondary);
+  --pj-status-unknown-line: var(--pj-border-strong);
+  --pj-status-unknown-surface: var(--pj-surface-soft);
+
   min-height: 100vh;
+  background: var(--pj-surface-default);
 }
 
 .admin-header {
+  position: relative;
+  z-index: 20;
+  min-height: var(--admin-shell-header-height);
+  background: color-mix(in srgb, var(--pj-surface-default) 96%, transparent);
   border-bottom: 1px solid var(--pj-border-subtle);
 }
 
 .admin-header__inner {
-  min-height: 4.5rem;
-  display: flex;
+  min-height: var(--admin-shell-header-height);
+  display: grid;
+  grid-template-columns: auto minmax(15rem, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--pj-space-5);
-}
-
-.admin-header > p {
-  margin: 0;
-  color: var(--pj-color-muted);
-  font-size: var(--pj-font-size-sm);
+  gap: var(--pj-space-7);
+  padding-inline: var(--pj-layout-gutter);
 }
 
 .admin-session {
@@ -52,41 +60,57 @@
 
 .admin-brand small {
   color: var(--pj-color-muted);
+  font-size: var(--pj-font-size-2xs);
+  letter-spacing: 0.14em;
 }
 
-.admin-layout {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 14rem minmax(0, 1fr);
-  min-height: calc(100vh - 4.5rem);
+.admin-workspace-switcher {
+  position: relative;
+  width: fit-content;
 }
 
-.admin-layout > main {
-  min-width: 0;
-}
-
-.admin-nav {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+.admin-workspace-switcher summary {
+  min-height: 2.5rem;
+  display: inline-flex;
+  align-items: baseline;
   gap: var(--pj-space-2);
-  padding: var(--pj-space-6) var(--pj-space-5);
-  border-right: 1px solid var(--pj-color-line);
+  color: var(--pj-color-muted);
+  cursor: pointer;
+  font-size: var(--pj-font-size-sm);
+  list-style-position: outside;
 }
 
-.admin-nav a,
-.admin-nav span {
-  padding-block: var(--pj-space-2);
+.admin-workspace-switcher summary strong {
+  color: var(--pj-color-text);
+  font-weight: 650;
+}
+
+.admin-workspace-switcher nav {
+  position: absolute;
+  top: calc(100% + var(--pj-space-2));
+  left: 0;
+  width: min(20rem, calc(100vw - (2 * var(--pj-layout-gutter))));
+  display: grid;
+  padding: var(--pj-space-2);
+  border: 1px solid var(--pj-border-subtle);
+  background: var(--pj-surface-default);
+  box-shadow: var(--pj-shadow-raised);
+}
+
+.admin-workspace-switcher nav a {
+  padding: var(--pj-space-2) var(--pj-space-3);
+  color: var(--pj-color-muted);
   text-decoration: none;
 }
 
-.admin-nav a.router-link-exact-active {
-  color: var(--pj-color-accent-strong);
-  font-weight: 700;
+.admin-workspace-switcher nav a:hover,
+.admin-workspace-switcher nav a.router-link-exact-active {
+  background: var(--pj-color-surface-soft);
+  color: var(--pj-color-text);
 }
 
-.admin-nav span {
-  color: var(--pj-color-muted);
+.admin-main {
+  min-height: calc(100vh - var(--admin-shell-header-height));
 }
 
 .admin-page {
@@ -239,30 +263,6 @@
     white-space: normal;
   }
 
-  .admin-layout {
-    width: 100%;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .admin-nav {
-    max-width: 100%;
-    flex-direction: row;
-    overflow-x: auto;
-    scrollbar-width: none;
-    border-right: 0;
-    border-bottom: 1px solid var(--pj-color-line);
-    white-space: nowrap;
-  }
-
-  .admin-nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .admin-nav span {
-    display: none;
-  }
-
   .admin-page__header {
     align-items: flex-start;
     flex-direction: column;
@@ -278,5 +278,34 @@
 
   .admin-session small {
     display: none;
+  }
+
+  .admin-header__inner {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--pj-space-3);
+  }
+
+  .admin-workspace-switcher summary span {
+    display: none;
+  }
+
+  .admin-session > span {
+    display: none;
+  }
+}
+
+@media (max-width: 32rem) {
+  .admin-brand small {
+    display: none;
+  }
+
+  .admin-workspace-switcher summary {
+    max-width: 10rem;
+  }
+
+  .admin-workspace-switcher summary strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }

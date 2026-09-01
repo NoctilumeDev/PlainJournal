@@ -10,9 +10,7 @@ import {
   PjActionGroup,
   PjButton,
   PjField,
-  PjPageContainer,
   PjStatusNotice,
-  PjSurface,
 } from "@plain-journal/ui";
 
 const session = useStaffSessionStore();
@@ -65,73 +63,70 @@ watch(accessContext, (context) => {
 </script>
 
 <template>
-  <PjPageContainer as="section" size="wide" class="marketing-page">
-    <header class="marketing-hero">
-      <div>
+  <section class="marketing-workbench" aria-label="营销权益并列命令工作区">
+    <aside class="marketing-scope-pane">
+      <header class="marketing-scope-pane__header">
         <p class="eyebrow">Marketing 所有者域</p>
         <h1>营销权益</h1>
-        <p>
-          规则定义优惠事实，发放命令把权益交给指定顾客。页面保留每次高风险命令的完整身份，
-          但不会把响应丢失解释为成功。
+        <p>规则定义优惠事实，发放命令把一条既有规则交给指定顾客。</p>
+      </header>
+
+      <section class="marketing-boundary-summary" aria-labelledby="marketing-boundary-title">
+        <p class="eyebrow">恢复边界</p>
+        <h2 id="marketing-boundary-title">两类命令，两种恢复方式</h2>
+        <p>规则创建没有安全重试键；权益发放由原顾客、原规则与原 grantKey 幂等裁决。</p>
+      </section>
+
+      <dl class="marketing-scope-facts">
+        <div><dt>当前权限</dt><dd>ADMIN / OPERATOR</dd></div>
+        <div><dt>规则创建</dt><dd>不可盲目重试</dd></div>
+        <div><dt>权益发放</dt><dd>沿用原 grantKey</dd></div>
+      </dl>
+
+      <PjStatusNotice
+        v-if="marketing.commandPhase !== 'idle'"
+        class="marketing-command-notice"
+        :tone="noticeTone(marketing.commandPhase)"
+        :title="noticeTitle(marketing.commandPhase)"
+        :assertive="marketing.commandPhase === 'rejected'"
+      >
+        <p>{{ marketing.commandMessage }}</p>
+        <p v-if="marketing.pendingReferenceNo">
+          待确认业务：<code>{{ marketing.pendingReferenceNo }}</code>
+          · {{ marketing.pendingCommandLabel }}
         </p>
-      </div>
-      <span class="status-label">ADMIN / OPERATOR</span>
-    </header>
+        <template #actions>
+          <PjActionGroup :stack-on-compact="true">
+            <PjButton
+              v-if="marketing.canRetryPending"
+              variant="text"
+              :loading="marketing.submitting"
+              @click="marketing.retryPending(accessContext)"
+            >
+              使用原 grantKey 重试
+            </PjButton>
+            <PjButton
+              v-if="['accepted', 'rejected'].includes(marketing.commandPhase)"
+              variant="text"
+              @click="marketing.resetCommandNotice"
+            >
+              收起结果
+            </PjButton>
+          </PjActionGroup>
+        </template>
+      </PjStatusNotice>
+    </aside>
 
-    <PjStatusNotice tone="neutral" title="两类命令，两种恢复边界">
-      <p>
-        规则创建没有幂等键，也没有管理端规则查询；权益发放则由
-        <code>userId + grantKey</code> 幂等裁决。只有后者允许沿用原身份重试。
-      </p>
-    </PjStatusNotice>
-
-    <PjStatusNotice
-      v-if="marketing.commandPhase !== 'idle'"
-      class="marketing-command-notice"
-      :tone="noticeTone(marketing.commandPhase)"
-      :title="noticeTitle(marketing.commandPhase)"
-      :assertive="marketing.commandPhase === 'rejected'"
-    >
-      <p>{{ marketing.commandMessage }}</p>
-      <p v-if="marketing.pendingReferenceNo">
-        待确认业务：<code>{{ marketing.pendingReferenceNo }}</code>
-        · {{ marketing.pendingCommandLabel }}
-      </p>
-      <template #actions>
-        <PjActionGroup :stack-on-compact="true">
-          <PjButton
-            v-if="marketing.canRetryPending"
-            variant="text"
-            :loading="marketing.submitting"
-            @click="marketing.retryPending(accessContext)"
-          >
-            使用原 grantKey 重试
-          </PjButton>
-          <PjButton
-            v-if="['accepted', 'rejected'].includes(marketing.commandPhase)"
-            variant="text"
-            @click="marketing.resetCommandNotice"
-          >
-            收起结果
-          </PjButton>
-        </PjActionGroup>
-      </template>
-    </PjStatusNotice>
-
-    <section class="marketing-section" aria-labelledby="marketing-rule-title">
+    <section class="marketing-section marketing-rule-pane" aria-labelledby="marketing-rule-title">
       <header class="marketing-section__header">
         <div>
           <p class="eyebrow">规则事实</p>
           <h2 id="marketing-rule-title">创建优惠规则</h2>
         </div>
-        <span>提交前冻结完整规则载荷</span>
+        <small>提交前冻结完整规则载荷</small>
       </header>
 
-      <PjSurface tone="raised" padding="large">
-        <form
-          class="marketing-form marketing-form--rule"
-          @submit.prevent="marketing.createRule(accessContext)"
-        >
+      <form class="marketing-form marketing-form--rule" @submit.prevent="marketing.createRule(accessContext)">
           <PjField
             v-slot="{ describedBy }"
             label="规则代码"
@@ -310,20 +305,12 @@ watch(accessContext, (context) => {
           <PjButton type="submit" :disabled="marketing.commandBlocked">
             提交规则创建
           </PjButton>
-        </form>
-        <p class="marketing-boundary">
-          如果提交已进入 MySQL 但响应丢失，页面会保留代码、金额、时间和地区载荷，
-          不会把随后出现的重复代码冲突归因为原命令成功。
-        </p>
-      </PjSurface>
+      </form>
+      <p class="marketing-boundary">
+        如果提交进入 MySQL 后响应丢失，页面保留完整载荷，但不会通过重复 POST 猜测成功。
+      </p>
 
-      <PjSurface
-        v-if="marketing.createdRule"
-        as="article"
-        tone="plain"
-        padding="large"
-        class="marketing-fact"
-      >
+      <article v-if="marketing.createdRule" class="marketing-fact">
         <header>
           <div>
             <p class="eyebrow">本次权威返回</p>
@@ -339,23 +326,19 @@ watch(accessContext, (context) => {
           <div><dt>叠加顺序</dt><dd>{{ marketing.createdRule.stackOrder }}</dd></div>
           <div><dt>版本</dt><dd>{{ marketing.createdRule.version }}</dd></div>
         </dl>
-      </PjSurface>
+      </article>
     </section>
 
-    <section class="marketing-section" aria-labelledby="marketing-grant-title">
+    <section class="marketing-section marketing-grant-pane" aria-labelledby="marketing-grant-title">
       <header class="marketing-section__header">
         <div>
           <p class="eyebrow">幂等发放</p>
           <h2 id="marketing-grant-title">向顾客发放权益</h2>
         </div>
-        <span>同顾客、同 grantKey、同规则</span>
+        <small>同顾客、同 grantKey、同规则</small>
       </header>
 
-      <PjSurface tone="soft" padding="large">
-        <form
-          class="marketing-form marketing-form--grant"
-          @submit.prevent="marketing.grantBenefit(accessContext)"
-        >
+      <form class="marketing-form marketing-form--grant" @submit.prevent="marketing.grantBenefit(accessContext)">
           <PjField
             v-slot="{ describedBy }"
             label="顾客 ID"
@@ -410,20 +393,12 @@ watch(accessContext, (context) => {
           <PjButton type="submit" :disabled="marketing.commandBlocked">
             提交权益发放
           </PjButton>
-        </form>
-        <p class="marketing-boundary">
-          Marketing 以 <code>userId + grantKey</code> 唯一约束裁决发放。
-          同键换规则会被明确拒绝；响应丢失后只能重放原顾客、原规则和原键。
-        </p>
-      </PjSurface>
+      </form>
+      <p class="marketing-boundary">
+        <code>userId + grantKey</code> 唯一约束裁决发放；响应丢失后只能重放原顾客、原规则和原键。
+      </p>
 
-      <PjSurface
-        v-if="marketing.grantedBenefit"
-        as="article"
-        tone="plain"
-        padding="large"
-        class="marketing-fact"
-      >
+      <article v-if="marketing.grantedBenefit" class="marketing-fact">
         <header>
           <div>
             <p class="eyebrow">本次权威返回</p>
@@ -439,44 +414,107 @@ watch(accessContext, (context) => {
           <div><dt>优惠金额</dt><dd>¥{{ marketing.grantedBenefit.discountAmount }}</dd></div>
           <div><dt>锁定订单</dt><dd>{{ marketing.grantedBenefit.lockedOrderNo ?? "无" }}</dd></div>
         </dl>
-      </PjSurface>
+      </article>
     </section>
-  </PjPageContainer>
+  </section>
 </template>
 
 <style scoped>
-.marketing-page {
+.marketing-workbench {
+  --pj-focus-ring: var(--pj-brand-primary);
+  --pj-color-focus: var(--pj-focus-ring);
+
   min-width: 0;
+  min-height: calc(100vh - var(--admin-shell-header-height));
   display: grid;
-  gap: var(--pj-space-7);
-  padding-block: var(--pj-space-7) var(--pj-space-8);
+  grid-template-columns:
+    clamp(15rem, 20vw, 18rem)
+    minmax(28rem, 1.15fr)
+    minmax(23rem, 0.85fr);
+  background: var(--pj-surface-default);
 }
 
-.marketing-hero,
-.marketing-section__header,
-.marketing-fact > header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--pj-space-5);
+.marketing-scope-pane,
+.marketing-section {
+  min-width: 0;
+  padding: clamp(1rem, 2vw, 1.75rem);
 }
 
-.marketing-hero h1,
+.marketing-scope-pane,
+.marketing-section {
+  display: grid;
+  align-content: start;
+  gap: var(--pj-space-6);
+}
+
+.marketing-scope-pane,
+.marketing-rule-pane {
+  border-right: 1px solid var(--pj-border-subtle);
+}
+
+.marketing-scope-pane__header h1,
+.marketing-boundary-summary h2,
 .marketing-section__header h2,
 .marketing-fact h3 {
   margin: 0;
 }
 
-.marketing-hero h1 {
-  font-size: var(--pj-font-size-xl);
+.marketing-scope-pane__header h1 {
+  font-size: clamp(1.7rem, 2.8vw, 2.45rem);
   font-weight: 520;
-  letter-spacing: var(--pj-letter-spacing-page-title);
+  letter-spacing: 0.035em;
 }
 
-.marketing-hero p:last-child {
-  max-width: var(--pj-layout-reading);
-  margin-bottom: 0;
+.marketing-scope-pane__header > p:last-child,
+.marketing-boundary-summary p:last-child,
+.marketing-section__header small,
+.marketing-boundary {
   color: var(--pj-text-secondary);
+}
+
+.marketing-scope-pane__header > p:last-child {
+  margin-bottom: 0;
+}
+
+.marketing-boundary-summary,
+.marketing-scope-facts,
+.marketing-boundary,
+.marketing-fact {
+  padding-top: var(--pj-space-5);
+  border-top: 1px solid var(--pj-border-subtle);
+}
+
+.marketing-boundary-summary {
+  display: grid;
+  gap: var(--pj-space-3);
+}
+
+.marketing-boundary-summary h2 {
+  font-size: var(--pj-font-size-md);
+}
+
+.marketing-scope-facts {
+  display: grid;
+  gap: var(--pj-space-3);
+  margin: 0;
+}
+
+.marketing-scope-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--pj-space-3);
+}
+
+.marketing-scope-facts dt {
+  color: var(--pj-text-secondary);
+  font-size: var(--pj-font-size-xs);
+  white-space: nowrap;
+}
+
+.marketing-scope-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .marketing-command-notice,
@@ -485,22 +523,33 @@ watch(accessContext, (context) => {
   min-width: 0;
 }
 
+.marketing-command-notice {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.marketing-command-notice :deep(.pj-status-notice__actions) {
+  width: 100%;
+}
+
 .marketing-command-notice code,
 .marketing-command-id,
 .marketing-facts dd {
   overflow-wrap: anywhere;
 }
 
-.marketing-section {
-  min-width: 0;
-  display: grid;
-  gap: var(--pj-space-5);
+.marketing-section__header,
+.marketing-fact > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--pj-space-4);
 }
 
-.marketing-section__header > span,
-.marketing-boundary {
-  color: var(--pj-text-secondary);
-  font-size: var(--pj-font-size-sm);
+.marketing-section__header h2 {
+  font-size: var(--pj-font-size-lg);
+  font-weight: 560;
+  letter-spacing: 0.025em;
 }
 
 .marketing-form {
@@ -511,15 +560,18 @@ watch(accessContext, (context) => {
 }
 
 .marketing-form--rule {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .marketing-form--grant {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .marketing-boundary {
-  margin: var(--pj-space-5) 0 0;
+  margin: 0;
+  padding-bottom: var(--pj-space-5);
+  border-bottom: 1px solid var(--pj-border-subtle);
+  font-size: var(--pj-font-size-sm);
 }
 
 .marketing-command-id {
@@ -529,7 +581,6 @@ watch(accessContext, (context) => {
 
 .marketing-fact {
   min-width: 0;
-  border-left: 0.2rem solid var(--pj-brand-primary);
 }
 
 .marketing-fact > header {
@@ -542,15 +593,18 @@ watch(accessContext, (context) => {
 
 .marketing-facts {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--pj-space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: var(--pj-space-5) 0 0;
+  border-block: 1px solid var(--pj-border-subtle);
 }
 
 .marketing-facts div {
   min-width: 0;
-  padding-top: var(--pj-space-3);
-  border-top: 1px solid var(--pj-border-subtle);
+  padding: var(--pj-space-4);
+}
+
+.marketing-facts div:nth-child(even) {
+  border-left: 1px solid var(--pj-border-subtle);
 }
 
 .marketing-facts dt {
@@ -559,43 +613,64 @@ watch(accessContext, (context) => {
 }
 
 .marketing-facts dd {
-  margin: var(--pj-space-1) 0 0;
+  margin: var(--pj-space-2) 0 0;
 }
 
-@media (max-width: 64rem) {
-  .marketing-form--rule,
-  .marketing-facts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 72rem) {
+  .marketing-workbench {
+    grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
   }
 
-  .marketing-form--grant {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .marketing-rule-pane {
+    border-right: 0;
+  }
+
+  .marketing-grant-pane {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--pj-border-subtle);
   }
 }
 
 @media (max-width: 48rem) {
-  .marketing-hero,
+  .marketing-workbench {
+    min-height: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .marketing-scope-pane,
+  .marketing-section {
+    padding: var(--pj-space-5);
+    border-right: 0;
+  }
+
+  .marketing-rule-pane,
+  .marketing-grant-pane {
+    grid-column: auto;
+    border-top: 1px solid var(--pj-border-subtle);
+  }
+
   .marketing-section__header,
   .marketing-fact > header {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .marketing-form--rule,
-  .marketing-form--grant,
-  .marketing-facts {
+  .marketing-form--rule {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 32rem) {
-  .marketing-page {
-    gap: var(--pj-space-6);
-    padding-block: var(--pj-space-6);
+  .marketing-facts {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .marketing-section > .pj-surface {
-    padding: var(--pj-space-5);
+  .marketing-facts div:nth-child(even) {
+    border-left: 0;
+  }
+
+  .marketing-facts div + div {
+    border-top: 1px solid var(--pj-border-subtle);
   }
 }
 </style>
