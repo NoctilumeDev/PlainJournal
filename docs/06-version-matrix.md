@@ -98,7 +98,7 @@ RocketMQ Spring Starter 2.3.6 可以完成收发，但在 Spring Boot 3.5 下会
 | 请求层 | 原生 `fetch` + 自有类型化 API 客户端 | 不引入 Axios 双实现 |
 | UI | 自有设计令牌与语义组件 | 不引入 Element Plus，不继承旧项目视觉 |
 
-Playwright 自动化 E2E 已纳入 `pnpm check`，当前覆盖顾客主题/权益/售后/退货事实、管理端角色/履约/对账工作区，以及顾客/客服 Chat 工作区的幂等恢复和实时状态；并使用 axe-core 检查关键页面。Payment 创建响应丢失、Fulfillment 确认收货响应丢失和 Chat 真实 WebSocket/中间件闭环仍由专用真实故障脚本验证；Mock 浏览器夹具和真实中间件脚本是不同证据，不能互相替代。商城和管理端均以《素简记商城平台设计与实施计划书》为视觉与交互基线。
+Playwright 自动化 E2E 已纳入 `pnpm check`，当前覆盖顾客主题/权益/售后/退货事实、管理端角色/履约/对账工作区，以及顾客/客服 Chat 工作区的幂等恢复和实时状态；并使用 axe-core 检查关键页面。Payment 创建响应丢失、Fulfillment 确认收货响应丢失和 Chat 真实 WebSocket/中间件闭环仍由专用真实故障脚本验证；Mock 浏览器夹具和真实中间件脚本是不同证据，不能互相替代。现行前端视觉、布局、组件与迁移基线改由[《素简记前端轻量化重构计划》](frontend-layout-restructure-plan.md)维护；旧《素简记商城平台设计与实施计划书》只保留历史记录，不再指导前端实现。
 
 ## 5. 精确版本冻结结果
 
