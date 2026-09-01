@@ -631,7 +631,7 @@ onBeforeUnmount(() => {
 .chat-hero h1 {
   font-size: var(--pj-font-size-xl);
   font-weight: 520;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--pj-letter-spacing-page-title);
 }
 
 .chat-hero p:last-child,
@@ -660,7 +660,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 44rem;
   display: grid;
-  grid-template-columns: minmax(18rem, 0.34fr) minmax(0, 1fr);
+  grid-template-columns: minmax(20rem, 0.34fr) minmax(0, 1fr);
   border-block: 1px solid var(--pj-color-line);
 }
 

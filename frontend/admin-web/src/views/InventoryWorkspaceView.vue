@@ -445,7 +445,7 @@ onMounted(() => {
 .inventory-hero h1 {
   font-size: var(--pj-font-size-xl);
   font-weight: 520;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--pj-letter-spacing-page-title);
 }
 
 .inventory-hero p:last-child {
