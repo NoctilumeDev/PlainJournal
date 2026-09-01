@@ -52,7 +52,7 @@ test("keeps the current frontend source inside the V7 delivery baseline", async 
   assert.deepEqual(result.violations, []);
   assert.equal(result.routePaths.storefront.length, 20);
   assert.equal(result.routePaths.admin.length, 13);
-  assert.equal(result.productionVueFiles, 52);
+  assert.equal(result.productionVueFiles, 53);
   assert.equal(result.assets.length, 21);
   assert.equal(result.originalAssets.length, 3);
   assert.equal(result.optimizedAssets.length, 18);
