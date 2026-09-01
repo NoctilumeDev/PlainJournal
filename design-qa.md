@@ -580,3 +580,24 @@ final result: passed
 Severity: P0 none; P1 none; P2 none; P3 none.
 
 final result: passed
+
+## 2026-09-01 Admin Special Pages
+
+- The staff login, forbidden and unknown-route states were inspected in the real in-app browser at
+  `1440 x 1000` and `390 x 844` rather than inferred from their templates.
+- Login and forbidden already use the approved low-density special-page grammar: one controlled
+  text column, one explicit explanation and one primary action. They required no structural or
+  visual override.
+- The unknown-route page was the remaining historical fragment. It now states what happened, what
+  remains true about role-scoped access, and offers one safe return. It reuses the existing
+  borderless special-page foundation instead of adding a third page shell or nested card.
+- Before/after and unchanged-route evidence is preserved in
+  `docs/assets/frontend-audit/2026-09-01-special-pages/`. The mobile 404 and forbidden documents
+  report no root horizontal overflow.
+- `NotFoundView.test.ts` locks the message hierarchy and the single safe return action.
+- The completed batch passed `17 / 17` V6.4 E2E scenarios, `24` admin test files / `97` tests,
+  `28` layer-boundary checks, typecheck, production build and `git diff --check`.
+
+Severity: P0 none; P1 none; P2 none; P3 none.
+
+final result: passed
