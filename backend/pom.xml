@@ -30,7 +30,7 @@
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <shardingsphere.version>5.5.3</shardingsphere.version>
         <minio.version>9.0.3</minio.version>
-        <rocketmq-client.version>5.2.1</rocketmq-client.version>
+        <rocketmq-client.version>5.2.2</rocketmq-client.version>
         <jacoco.version>0.8.15</jacoco.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
