@@ -89,7 +89,7 @@
   },
   "pendingRelease": {
     "targetRelease": "v1.1.0",
-    "status": "release-candidate",
+    "status": "released",
     "verifiedOn": "2026-09-01",
     "objectCommit": "1937f4136a16dc2ec27d618c35e50739ed5aed0d",
     "sourcePath": "docs/frontend-layout-restructure-plan.md",
