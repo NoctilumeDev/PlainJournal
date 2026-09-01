@@ -516,6 +516,7 @@ function authorityLine(skuId: BusinessId) {
 
 .transaction-choice > input {
   margin-top: 0.25rem;
+  accent-color: var(--pj-action-primary);
 }
 
 .transaction-choice > span,

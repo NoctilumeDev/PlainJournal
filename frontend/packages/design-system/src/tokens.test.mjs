@@ -33,6 +33,10 @@ test("keeps raw palette values inside the design-system token source", () => {
   assert.match(source, /--pj-action-primary:/u);
 });
 
+test("keeps page-title tracking open without becoming decorative", () => {
+  assert.match(source, /--pj-letter-spacing-page-title:\s*0\.025em;/u);
+});
+
 test("keeps risk and lifecycle status semantics outside theme overrides", () => {
   for (const status of [
     "success",

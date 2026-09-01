@@ -108,7 +108,11 @@ watch(() => route.fullPath, search);
 </script>
 
 <template>
-  <PjPageContainer as="section" class="search-canvas">
+  <PjPageContainer
+    as="section"
+    class="search-canvas"
+    :class="{ 'search-canvas--has-query': query }"
+  >
     <header class="search-intro">
       <p>查找</p>
       <h1>你正在寻找什么？</h1>
@@ -222,7 +226,7 @@ watch(() => route.fullPath, search);
   max-width: 12ch;
   font-size: clamp(2.6rem, 6vw, 6rem);
   font-weight: 520;
-  letter-spacing: -0.055em;
+  letter-spacing: var(--pj-letter-spacing-page-title);
   line-height: 0.98;
 }
 
@@ -231,6 +235,28 @@ watch(() => route.fullPath, search);
   margin: var(--pj-space-5) 0 0;
   color: var(--pj-text-secondary);
   font-size: var(--pj-font-size-md);
+}
+
+.search-canvas--has-query {
+  padding-top: var(--pj-space-5);
+}
+
+.search-canvas--has-query .search-intro {
+  max-width: none;
+  padding-block: var(--pj-space-3) var(--pj-space-5);
+}
+
+.search-canvas--has-query .search-intro h1 {
+  max-width: none;
+  font-size: clamp(2.25rem, 4vw, 4rem);
+}
+
+.search-canvas--has-query .search-intro > p:last-child {
+  margin-top: var(--pj-space-3);
+}
+
+.search-canvas--has-query .search-form {
+  margin-bottom: var(--pj-space-6);
 }
 
 .search-form {
@@ -332,6 +358,10 @@ watch(() => route.fullPath, search);
 }
 
 @media (max-width: 32rem) {
+  .search-canvas--has-query .search-intro h1 {
+    font-size: 2.25rem;
+  }
+
   .search-form__control {
     grid-template-columns: 1fr;
     padding-bottom: var(--pj-space-3);

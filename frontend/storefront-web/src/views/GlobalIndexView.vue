@@ -78,7 +78,7 @@ const bag = useBagStore();
   margin: 0;
   font-size: clamp(2.7rem, 6vw, 6rem);
   font-weight: 520;
-  letter-spacing: -0.055em;
+  letter-spacing: var(--pj-letter-spacing-page-title);
   line-height: 0.98;
 }
 

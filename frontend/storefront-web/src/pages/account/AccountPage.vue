@@ -81,7 +81,7 @@ async function clearLocal() {
 </script>
 
 <template>
-  <PjPageContainer as="section" size="wide" class="account-page">
+  <PjPageContainer as="section" size="reading" class="account-page">
     <PjSurface as="section" tone="plain" padding="medium" class="account-profile">
       <header class="account-header">
         <div>
@@ -246,7 +246,7 @@ async function clearLocal() {
   margin: 0;
   font-size: var(--pj-font-size-xl);
   font-weight: 520;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--pj-letter-spacing-page-title);
   line-height: var(--pj-line-height-tight);
 }
 

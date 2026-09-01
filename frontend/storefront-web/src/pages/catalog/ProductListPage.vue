@@ -171,7 +171,7 @@ watch(() => route.fullPath, load);
   margin: 0;
   font-size: clamp(2.4rem, 5vw, 5rem);
   font-weight: 520;
-  letter-spacing: -0.055em;
+  letter-spacing: var(--pj-letter-spacing-page-title);
   line-height: 0.98;
 }
 

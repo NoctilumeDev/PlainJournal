@@ -340,7 +340,7 @@ watch(() => route.params.productId, load);
   margin: 0;
   font-size: clamp(2.25rem, 4.4vw, 4.4rem);
   font-weight: 520;
-  letter-spacing: -0.05em;
+  letter-spacing: var(--pj-letter-spacing-page-title);
   line-height: 1.02;
 }
 

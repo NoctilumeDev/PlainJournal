@@ -466,7 +466,7 @@ async function remove(addressId: BusinessId) {
   margin: 0;
   font-size: var(--pj-font-size-xl);
   font-weight: 520;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--pj-letter-spacing-page-title);
   line-height: var(--pj-line-height-tight);
 }
 
