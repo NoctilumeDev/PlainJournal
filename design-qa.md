@@ -601,3 +601,27 @@ final result: passed
 Severity: P0 none; P1 none; P2 none; P3 none.
 
 final result: passed
+
+## 2026-09-01 First-pass Frontend Release Regression
+
+- The customer, management and special-page batches were rechecked together after their separate
+  commits. The release pass did not reopen page structure or introduce cross-page overrides.
+- Four legacy end-to-end selectors were aligned with the current semantic DOM: the management
+  workspace switcher, Fulfillment task modes, Review detail evidence and Catalog list media. The
+  business assertions and command journeys remain intact.
+- The 320px management-shell regression exposed one real defect: the open workspace switcher was
+  positioned from its trigger and extended the document from `320px` to `368px`. The compact-only
+  rule now anchors that overlay to the viewport gutters; desktop positioning remains unchanged.
+- The fix was then inspected in the real in-app browser at `320 x 800`: the usable document width
+  and scroll width both report `305px`, while the open overlay stays between `16px` and `288.67px`.
+  Evidence is preserved in
+  `docs/assets/frontend-audit/2026-09-01-first-pass-release/01-admin-mobile-workspace-switcher.png`.
+- Delivery readiness was updated from `53` to `55` production Vue files for the two intentional,
+  business-free layout components (`ListWorkbench` and `SplitWorkbench`).
+- `pnpm check` passed end to end: 28 layer-boundary tests, delivery/deployment/release readiness,
+  all workspace typechecks, 327 unit tests, 73.9% aggregate line coverage, both production builds,
+  61 development E2E scenarios and 3 production-build E2E scenarios.
+
+Severity: P0 none; P1 none; P2 none; P3 none.
+
+final result: passed

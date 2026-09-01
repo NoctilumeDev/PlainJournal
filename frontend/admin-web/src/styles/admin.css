@@ -299,6 +299,14 @@
     display: none;
   }
 
+  .admin-workspace-switcher nav {
+    position: fixed;
+    top: var(--admin-shell-header-height);
+    right: var(--pj-layout-gutter);
+    left: var(--pj-layout-gutter);
+    width: auto;
+  }
+
   .admin-workspace-switcher summary {
     max-width: 10rem;
   }

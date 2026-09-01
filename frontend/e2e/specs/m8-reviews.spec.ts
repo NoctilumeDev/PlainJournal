@@ -83,7 +83,7 @@ test("operator replies and upheld moderation removes review from public score", 
   await page.goto("http://127.0.0.1:18201/reviews");
 
   await expect(page.getByRole("heading", { name: "评价治理" })).toBeVisible();
-  await expect(page.getByText(seededReview)).toBeVisible();
+  await expect(page.locator("article.review-detail")).toContainText(seededReview);
   await page.getByLabel("平台公开回复").fill("平台已核对商品规格与订单快照。");
   await page.getByRole("button", { name: "保存平台回复" }).click();
   await expect(

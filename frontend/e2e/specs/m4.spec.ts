@@ -770,34 +770,31 @@ test("admin role gate exposes only real owner-domain workspaces", async ({ page 
 
   await page.getByRole("link", {
     name: "履约与退货",
-    exact: true,
   }).click();
   await expect(page.getByRole("heading", { name: "履约与退货" })).toBeVisible();
-  await expect(page.getByText(
-    "MySQL 保存物流与退货事实；Redis GEO 仅是可重建投影。",
-    { exact: false },
-  )).toBeVisible();
+  await expect(page.getByRole("heading", { name: "MySQL 记录最终事实" })).toBeVisible();
+  await page.getByRole("button", { name: /附近物流/u }).click();
   await page.getByRole("button", { name: "查询范围内位置" }).click();
   const geoResult = page.getByRole("article").filter({
     has: page.getByRole("heading", { name: "杭州市" }),
   });
   await expect(geoResult).toContainText("FUL2079000000000004001");
   await expect(geoResult).toContainText("0 m");
-  await page.getByRole("button", { name: "从 MySQL 重建 Redis GEO" }).click();
+  await page.getByRole("button", { name: "从 MySQL 重建投影" }).click();
   await expect(page.getByText("Redis GEO 已从 MySQL 投影重建 1/1 条位置。"))
     .toBeVisible();
+  await page.getByRole("button", { name: /正向履约/u }).click();
   await page.getByRole("button", { name: "开始拣货" }).click();
   await expect(
-    page.locator(".fulfillment-record .status-label").filter({ hasText: "PICKING" }),
+    page.locator(".fulfillment-detail__header .fulfillment-status").filter({ hasText: "PICKING" }),
   ).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 
-  await page.getByRole("link", { name: "补偿与对账" }).click();
+  const workspaceSwitcher = page.locator(".admin-workspace-switcher");
+  await workspaceSwitcher.locator("summary").click();
+  await workspaceSwitcher.getByRole("link", { name: "补偿与对账" }).click();
   await expect(page.getByRole("heading", { name: "补偿与对账" })).toBeVisible();
-  await expect(page.getByText(
-    "四域对账保持只读；补偿命令只推进合法状态机。",
-    { exact: false },
-  )).toBeVisible();
+  await expect(page.getByRole("heading", { name: "只读对账，受控补偿" })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 
   expect(pageErrors).toEqual([]);
