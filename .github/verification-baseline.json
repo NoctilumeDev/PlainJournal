@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "targetRelease": "v1.0.10",
   "status": "released",
   "codeGateEvidence": {
@@ -86,5 +86,22 @@
   },
   "deferred32GiBValidation": {
     "executed": false
+  },
+  "pendingRelease": {
+    "targetRelease": "v1.1.0",
+    "status": "release-candidate",
+    "verifiedOn": "2026-09-01",
+    "objectCommit": "1937f4136a16dc2ec27d618c35e50739ed5aed0d",
+    "sourcePath": "docs/frontend-layout-restructure-plan.md",
+    "sourceBlob": "54fa06e94d5f8da54a6b36a1aeb316bee1c675e0",
+    "runtimeEvidence": "UNCHANGED / NOT REVALIDATED",
+    "frontend": {
+      "unitAndContractTests": 327,
+      "developmentE2E": 61,
+      "productionE2E": 3,
+      "layerRules": 28,
+      "lineCoverage": 73.9,
+      "lineCoverageMinimum": 70
+    }
   }
 }

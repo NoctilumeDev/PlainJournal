@@ -2,12 +2,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  activeReleaseFromBaseline,
   parentVersionFromPom,
   projectVersionFromPom,
   validateFrontendVersionStatement,
   validateReleaseStatus,
   versionFromReleaseTag,
 } from "./check-release-version.mjs";
+
+test("uses a pending release without rewriting the frozen released baseline", () => {
+  assert.deepEqual(activeReleaseFromBaseline({
+    targetRelease: "v1.0.10",
+    status: "released",
+    pendingRelease: {
+      targetRelease: "v1.1.0",
+      status: "release-candidate",
+    },
+  }), {
+    targetRelease: "v1.1.0",
+    status: "release-candidate",
+  });
+});
 
 test("accepts only stable vMAJOR.MINOR.PATCH release tags", () => {
   assert.equal(versionFromReleaseTag("v1.0.3"), "1.0.3");

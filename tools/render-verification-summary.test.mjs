@@ -189,6 +189,24 @@ function git(...args) {
   }).trim();
 }
 
+function resolveMainlineRef() {
+  const candidates = [
+    "refs/remotes/origin/main",
+    "refs/heads/main",
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      git("rev-parse", "--verify", "--quiet", `${candidate}^{commit}`);
+      return candidate;
+    } catch {
+      // GitHub pull-request checkouts expose origin/main without a local main branch.
+    }
+  }
+
+  throw new Error("Unable to resolve the repository mainline from origin/main or main");
+}
+
 async function readRepositoryBaseline() {
   return JSON.parse(await fs.readFile(
     path.join(repositoryRoot, ".github", "verification-baseline.json"),
@@ -210,6 +228,34 @@ test("renders versioned evidence without inventing a complete validation", () =>
   assert.match(output, /8\/9 个业务端口/u);
   assert.match(output, /证据坐标/u);
   assert.doesNotMatch(output, /最近完整验证日期/u);
+});
+
+test("renders an additive pending release without rewriting the released baseline", () => {
+  const baseline = fixture();
+  baseline.schemaVersion = 3;
+  baseline.pendingRelease = {
+    targetRelease: "v1.1.0",
+    status: "release-candidate",
+    verifiedOn: "2026-09-01",
+    objectCommit: "9".repeat(40),
+    sourcePath: "docs/frontend-layout-restructure-plan.md",
+    sourceBlob: "a".repeat(40),
+    runtimeEvidence: "UNCHANGED / NOT REVALIDATED",
+    frontend: {
+      unitAndContractTests: 327,
+      developmentE2E: 61,
+      productionE2E: 3,
+      layerRules: 28,
+      lineCoverage: 73.9,
+      lineCoverageMinimum: 70,
+    },
+  };
+
+  const output = renderVerificationSummary(baseline);
+  assert.match(output, /v1\.0\.10.*released/su);
+  assert.match(output, /v1\.1\.0.*release-candidate/su);
+  assert.match(output, /327 \/ 327/u);
+  assert.match(output, /UNCHANGED \/ NOT REVALIDATED/u);
 });
 
 test("rejects schema drift and contradictory evidence states", async (t) => {
@@ -372,6 +418,29 @@ test("binds the repository baseline to reachable immutable Git objects", async (
   assert.equal(gates.verifiedOn, gateSource.verifiedOn);
   assert.deepEqual(gates.backend, gateSource.backend);
   assert.deepEqual(gates.frontend, gateSource.frontend);
+
+  const pending = baseline.pendingRelease;
+  assert.equal(baseline.schemaVersion, 3);
+  assert.ok(pending);
+  assert.equal(git("rev-parse", `${pending.objectCommit}^{commit}`), pending.objectCommit);
+  assert.doesNotThrow(() => git(
+    "merge-base",
+    "--is-ancestor",
+    pending.objectCommit,
+    resolveMainlineRef(),
+  ));
+  assert.equal(
+    git("rev-parse", `${pending.objectCommit}:${pending.sourcePath}`),
+    pending.sourceBlob,
+  );
+  const pendingSource = git("show", `${pending.objectCommit}:${pending.sourcePath}`);
+  assert.match(
+    pendingSource,
+    new RegExp(pending.targetRelease.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+  );
+  assert.match(pendingSource, /327 条单元测试/u);
+  assert.match(pendingSource, /61 条开发 E2E/u);
+  assert.match(pendingSource, /73\.9%/u);
 
   const historicalSources = [];
   for (const snapshot of baseline.historicalRuntimeEvidence.sourceSnapshots) {
