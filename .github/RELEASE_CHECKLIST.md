@@ -168,5 +168,8 @@ Workflow 只在已存在标签时打包，并且仅在 GitHub Release 尚不存�
 - [x] 候选 PR 提交 `7ab4075f9f50127a9a2a4bfdcf67f2da6cebf6cc` 与候选合并提交
   `aee901172e6224814177800eb0b90fb3bc80ed67` 的 CI、Security、CodeQL 和 Online
   Preview 全部通过。
-- [ ] 候选记录提升为 `released`，且正式发布提交重新通过远端门禁。
-- [ ] `v1.1.0` 注解标签、Release、ZIP、SHA-256、manifest 和 SPDX SBOM 回读一致。
+- [x] 正式发布提交 `69b66a6` 在打标签前重新通过 CI、Security、CodeQL 和
+  Online Preview，候选记录处于 `released`。
+- [x] `v1.1.0` 注解标签对象 `d07d994` 解析到 `69b66a6`；Release、ZIP、SHA-256、
+  manifest 和 SPDX 2.3 SBOM 已回读一致，ZIP SHA-256 为
+  `9318686d5528ff73ad5e9629f1dab989cd9e6bbe20e80b3a37e7592ceaa19ca4`。
