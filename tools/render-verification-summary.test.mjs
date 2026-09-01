@@ -189,6 +189,24 @@ function git(...args) {
   }).trim();
 }
 
+function resolveMainlineRef() {
+  const candidates = [
+    "refs/remotes/origin/main",
+    "refs/heads/main",
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      git("rev-parse", "--verify", "--quiet", `${candidate}^{commit}`);
+      return candidate;
+    } catch {
+      // GitHub pull-request checkouts expose origin/main without a local main branch.
+    }
+  }
+
+  throw new Error("Unable to resolve the repository mainline from origin/main or main");
+}
+
 async function readRepositoryBaseline() {
   return JSON.parse(await fs.readFile(
     path.join(repositoryRoot, ".github", "verification-baseline.json"),
@@ -409,7 +427,7 @@ test("binds the repository baseline to reachable immutable Git objects", async (
     "merge-base",
     "--is-ancestor",
     pending.objectCommit,
-    "main",
+    resolveMainlineRef(),
   ));
   assert.equal(
     git("rev-parse", `${pending.objectCommit}:${pending.sourcePath}`),
