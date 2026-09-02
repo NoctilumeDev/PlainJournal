@@ -11,24 +11,26 @@ PlainJournal 是一个单经营主体、自营 B2C 分布式电商项目。它�
 JDK 17 和 Vue 3，围绕数据所有权、交易一致性、结果未知恢复、多实例竞争和故障治理
 建立可运行实现，而不是用服务数量代替工程证据。
 
-当前仓库保存的是在 16GB Windows 单机、分组与串行条件下已经闭环的 M0-M8 历史参考
-基线，不是等待平台化补齐的 Basic 版。2026-08-28 的 fresh 全拓扑复验因宿主只余约
-0.46 GiB 可用物理内存而停止，没有重新取得 Core Smoke PASS；历史证据、本轮边界与未来
-32 GiB 协议分别记录，不能压成同一次“完整验证”。`v1.0.x` 只修复明确缺陷和工程边界；前端后续可单独进行视觉重构，但
-不能改变所有者事实和交易状态机。多商户、平台账本、结算和 Java/Go 异构协作进入
+当前仓库同时保存 16GB Windows 单机、分组与串行条件下已经闭环的 M0-M8 后端历史参考
+基线，以及 `v1.1.0` 完成的顾客端、管理端与特殊页面第一轮轻量化重构。前端版本只调整
+页面分层、响应式布局和视觉治理，不改变所有者事实、公开 API 或交易状态机。2026-08-28
+的 fresh 全拓扑复验因宿主只余约 0.46 GiB 可用物理内存而停止，没有重新取得 Core Smoke
+PASS；这一真实中间件容量边界与 `v1.1.0` 已通过的前端门禁分别记录，不能压成同一次
+“完整验证”。多商户、平台账本、结算和 Java/Go 异构协作进入
 独立仓库 [PlainJournalPro](https://github.com/NoctilumeDev/PlainJournalPro)，完整
 边界见[参考基线与 Pro 边界](docs/reference-baseline-and-pro-boundary.md)。
 
 ## 成品预览
 
-[在线预览](https://noctilumedev.github.io/PlainJournal/) 使用 GitHub Pages 展示当前
-成品和运行边界，不冒充真实后端环境。
+[在线预览](https://noctilumedev.github.io/PlainJournal/) 使用 GitHub Pages 展示
+`v1.1.0` 的当前页面、响应式布局和运行边界，不冒充真实后端环境。下面三张截图分别
+覆盖顾客端入口组织、交易记录和管理端工作区，均来自现行页面注册表对应的浏览器基线。
 
-![素简记顾客端首页](docs/assets/v7-4/storefront-home.jpg)
+![素简记顾客端全局索引](docs/assets/frontend-audit/2026-09-01-storefront-closure/after/global-index-desktop.png)
 
-![素简记商品详情](docs/assets/v7-4/storefront-product.jpg)
+![素简记顾客端订单记录](docs/assets/frontend-audit/2026-09-01-storefront-closure/after/orders-desktop.png)
 
-![素简记补偿与对账工作区](docs/assets/v7-4/admin-governance.jpg)
+![素简记管理端工作区](docs/assets/frontend-audit/2026-09-01-admin-first-pass/after/02-home-desktop.png)
 
 ### 架构导览
 
@@ -158,9 +160,11 @@ Windows `cmd.exe` 可使用 `mvnw.cmd`。真实中间件准备见
 
 ## 当前验证
 
-`v1.0.10` 发布对象代码门禁、历史运行证据、本轮 fresh 宿主边界和未来 32 GiB 协议的单一索引是
-[验证摘要](docs/verification-summary.md)。该索引按时间、对象和宿主条件分层；发布后的每次
-变更都必须同步更新并通过生成门禁。
+[`v1.1.0`](https://github.com/NoctilumeDev/PlainJournal/releases/tag/v1.1.0) 已发布顾客端
+20 条、管理端 13 条真实路由的第一轮重构，并附带源码包、SHA-256、manifest 与 SPDX
+SBOM。前端门禁、`v1.0.10` 冻结的真实中间件证据、2026-08-28 fresh 宿主边界和未来
+32 GiB 协议的单一索引是[验证摘要](docs/verification-summary.md)。该索引按时间、对象和
+宿主条件分层；发布后的每次变更都必须同步更新并通过生成门禁。
 
 GitHub Actions 公开复跑后端、前端、架构、文档和安全门禁。真实 MySQL、Redis、
 Nacos、RocketMQ、MinIO、ClamAV、OpenSearch、故障与容量实验继续由专项脚本证明，
