@@ -23,6 +23,11 @@ test("keeps GitHub release materials complete", async () => {
     `${baseline.targetRelease}.md`,
   );
   assert.match(result.releaseDate, /^\d{4}-\d{2}-\d{2}$/u);
+  assert.ok(
+    result.screenshots.every(({ path: screenshotPath }) =>
+      !screenshotPath.includes(`${path.sep}v7-4${path.sep}`)),
+    "the public showcase must use the governed v1.1.0 browser baselines",
+  );
 });
 
 test("keeps the Apache-2.0 license explicit and complete", async () => {

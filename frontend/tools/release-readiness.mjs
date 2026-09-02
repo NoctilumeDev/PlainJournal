@@ -58,26 +58,32 @@ export async function inspectReleaseReadiness(frontendRoot) {
     ),
     verificationBaseline: verificationBaselinePath,
     license: path.join(repositoryRoot, "LICENSE"),
-    storefrontHome: path.join(
+    storefrontIndex: path.join(
       repositoryRoot,
       "docs",
       "assets",
-      "v7-4",
-      "storefront-home.jpg",
+      "frontend-audit",
+      "2026-09-01-storefront-closure",
+      "after",
+      "global-index-desktop.png",
     ),
-    storefrontProduct: path.join(
+    storefrontOrders: path.join(
       repositoryRoot,
       "docs",
       "assets",
-      "v7-4",
-      "storefront-product.jpg",
+      "frontend-audit",
+      "2026-09-01-storefront-closure",
+      "after",
+      "orders-desktop.png",
     ),
-    adminGovernance: path.join(
+    adminHome: path.join(
       repositoryRoot,
       "docs",
       "assets",
-      "v7-4",
-      "admin-governance.jpg",
+      "frontend-audit",
+      "2026-09-01-admin-first-pass",
+      "after",
+      "02-home-desktop.png",
     ),
   };
 
@@ -98,9 +104,9 @@ export async function inspectReleaseReadiness(frontendRoot) {
   ]);
 
   for (const marker of [
-    "docs/assets/v7-4/storefront-home.jpg",
-    "docs/assets/v7-4/storefront-product.jpg",
-    "docs/assets/v7-4/admin-governance.jpg",
+    "docs/assets/frontend-audit/2026-09-01-storefront-closure/after/global-index-desktop.png",
+    "docs/assets/frontend-audit/2026-09-01-storefront-closure/after/orders-desktop.png",
+    "docs/assets/frontend-audit/2026-09-01-admin-first-pass/after/02-home-desktop.png",
     "pnpm demo:start",
     "reader@example.com",
     "admin@example.com",
@@ -149,9 +155,9 @@ export async function inspectReleaseReadiness(frontendRoot) {
 
   const screenshots = [];
   for (const [name, screenshotPath] of Object.entries({
-    storefrontHome: paths.storefrontHome,
-    storefrontProduct: paths.storefrontProduct,
-    adminGovernance: paths.adminGovernance,
+    storefrontIndex: paths.storefrontIndex,
+    storefrontOrders: paths.storefrontOrders,
+    adminHome: paths.adminHome,
   })) {
     const stat = await fs.stat(screenshotPath);
     screenshots.push({
