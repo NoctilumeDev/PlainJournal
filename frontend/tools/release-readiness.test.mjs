@@ -23,10 +23,16 @@ test("keeps GitHub release materials complete", async () => {
     `${baseline.targetRelease}.md`,
   );
   assert.match(result.releaseDate, /^\d{4}-\d{2}-\d{2}$/u);
+  const showcaseRelease =
+    baseline.pendingRelease?.status === "released"
+      ? baseline.pendingRelease.targetRelease
+      : baseline.targetRelease;
   assert.ok(
     result.screenshots.every(({ path: screenshotPath }) =>
-      !screenshotPath.includes(`${path.sep}v7-4${path.sep}`)),
-    "the public showcase must use the governed v1.1.0 browser baselines",
+      screenshotPath.includes(
+        `${path.sep}docs${path.sep}assets${path.sep}showcase${path.sep}${showcaseRelease}${path.sep}`,
+      )),
+    "the public showcase must use versioned presentation assets instead of browser baselines",
   );
 });
 
