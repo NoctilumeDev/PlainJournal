@@ -24,13 +24,14 @@ PASS；这一真实中间件容量边界与 `v1.1.0` 已通过的前端门禁分
 
 [在线预览](https://noctilumedev.github.io/PlainJournal/) 使用 GitHub Pages 展示
 `v1.1.0` 的当前页面、响应式布局和运行边界，不冒充真实后端环境。下面三张截图分别
-覆盖顾客端入口组织、交易记录和管理端工作区，均来自现行页面注册表对应的浏览器基线。
+覆盖商品选择、结算事实核对和管理端售后工作台，均由现行演示夹具在真实浏览器中截取；
+验收基线继续独立保留，不与展示素材混用。
 
-![素简记顾客端全局索引](docs/assets/frontend-audit/2026-09-01-storefront-closure/after/global-index-desktop.png)
+![素简记商品详情](docs/assets/showcase/v1.1.0/storefront-product-detail.png)
 
-![素简记顾客端订单记录](docs/assets/frontend-audit/2026-09-01-storefront-closure/after/orders-desktop.png)
+![素简记订单确认](docs/assets/showcase/v1.1.0/storefront-checkout.png)
 
-![素简记管理端工作区](docs/assets/frontend-audit/2026-09-01-admin-first-pass/after/02-home-desktop.png)
+![素简记管理端售后审核](docs/assets/showcase/v1.1.0/admin-after-sales.png)
 
 ### 架构导览
 
