@@ -126,6 +126,24 @@ pnpm demo:start
 | Core Smoke | 验证真实核心交易链和清理 | `cd backend && ./tools/verify-core-smoke.ps1` |
 | Full Lab | 多实例、故障、容量、分片、Chat、搜索与观测 | [验证索引](docs/verification-index.md) |
 
+### 可复现业务数据
+
+仓库不提交真实 MySQL 数据、数据库文件或真实数据导出。需要在新电脑上使用真实
+MySQL 开发时，先按 [Docker 说明](deploy/docker/README.md) 创建本地资源并运行一次
+Core Smoke，让各服务以自己的 Flyway 迁移建立结构；随后使用仓库内的确定性合成
+数据：
+
+```powershell
+cd backend
+./tools/prepare-local-demo-data.ps1 -Action Seed
+./tools/prepare-local-demo-data.ps1 -Action Verify
+```
+
+该数据集只使用保留 ID、`plainjournal.local` 身份和固定测试凭据，
+不会复制任何真实用户、地址、订单或支付历史。完成实验后可运行
+`./tools/prepare-local-demo-data.ps1 -Action Remove` 精确删除它拥有的数据。真实业务
+数据只能进入仓库外的私有备份，并应完成校验和隔离恢复演练。
+
 后端基础构建使用 Maven Wrapper：
 
 ```bash

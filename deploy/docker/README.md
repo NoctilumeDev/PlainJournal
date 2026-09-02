@@ -274,6 +274,40 @@ The local `.env` file contains development credentials and is ignored by Git. Co
 
 The bootstrap script does not print generated secret values. Keep Compose inspection quiet and treat raw Nacos startup logs as sensitive diagnostics: the upstream `v3.2.2` image enables shell tracing in its entrypoint and may echo environment-derived values.
 
+## Reproducible local business data
+
+Do not commit a real MySQL dump or the contents of `MIDDLEWARE_DATA_ROOT`.
+Those files can contain personal data and business history, and they are not a
+portable schema migration mechanism. Keep exact recovery backups outside Git,
+record their checksums, and prove them by restoring into an isolated empty
+MySQL instance.
+
+For a fresh development clone, start the core middleware with the commands
+above and run Core Smoke once so every owner service applies its Flyway
+migrations. After Core Smoke cleans its temporary facts, create the small,
+deterministic repository fixture:
+
+```powershell
+cd ../../backend
+./tools/prepare-local-demo-data.ps1 -Action Seed
+./tools/prepare-local-demo-data.ps1 -Action Verify
+```
+
+The wrapper delegates to the existing owner-aware M5 fixture generator instead
+of introducing a second cross-schema SQL dump. It creates 12 products, 24
+SKUs, four synthetic customers, eight cart lines, 12 historical orders, and
+matching inventory facts under reserved IDs. Repeating `Seed` replaces only
+that fixture; it does not truncate owner schemas. Remove it explicitly when it
+is no longer needed:
+
+```powershell
+./tools/prepare-local-demo-data.ps1 -Action Remove
+```
+
+The generated manifest is ignored under `backend/.run/local-demo-data.json`.
+The fixture login password is `M5-PlainJournal-2026!`; it is local test data,
+not a production credential.
+
 `APP_ENV` is part of every application-owned Redis key. Local keys therefore use
 the `ecommerce:local:*` prefix and cannot collide with test or production data.
 Identifiers such as email addresses and client IPs are SHA-256 hashed before

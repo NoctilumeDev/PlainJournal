@@ -474,6 +474,8 @@ test.describe.configure({ mode: "serial" });
 test("V6.4 Operations home preserves string identities and known projection facts across a failed refresh", async ({
   page,
 }) => {
+  // Keep the rolling 30-day query deterministic without changing production date logic.
+  await page.clock.setFixedTime(new Date("2026-08-15T12:00:00Z"));
   const diagnostics = observeDiagnostics(page);
   const analyticsRequests: Array<{
     authorization: string | undefined;
