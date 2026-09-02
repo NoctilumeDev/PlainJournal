@@ -41,6 +41,10 @@ export async function inspectReleaseReadiness(frontendRoot) {
     await fs.readFile(verificationBaselinePath, "utf8"),
   );
   const releaseVersion = verificationBaseline.targetRelease.replace(/^v/u, "");
+  const showcaseRelease =
+    verificationBaseline.pendingRelease?.status === "released"
+      ? verificationBaseline.pendingRelease.targetRelease
+      : verificationBaseline.targetRelease;
   const paths = {
     readme: path.join(repositoryRoot, "README.md"),
     changelog: path.join(repositoryRoot, "CHANGELOG.md"),
@@ -58,32 +62,29 @@ export async function inspectReleaseReadiness(frontendRoot) {
     ),
     verificationBaseline: verificationBaselinePath,
     license: path.join(repositoryRoot, "LICENSE"),
-    storefrontIndex: path.join(
+    storefrontProductDetail: path.join(
       repositoryRoot,
       "docs",
       "assets",
-      "frontend-audit",
-      "2026-09-01-storefront-closure",
-      "after",
-      "global-index-desktop.png",
+      "showcase",
+      showcaseRelease,
+      "storefront-product-detail.png",
     ),
-    storefrontOrders: path.join(
+    storefrontCheckout: path.join(
       repositoryRoot,
       "docs",
       "assets",
-      "frontend-audit",
-      "2026-09-01-storefront-closure",
-      "after",
-      "orders-desktop.png",
+      "showcase",
+      showcaseRelease,
+      "storefront-checkout.png",
     ),
-    adminHome: path.join(
+    adminAfterSales: path.join(
       repositoryRoot,
       "docs",
       "assets",
-      "frontend-audit",
-      "2026-09-01-admin-first-pass",
-      "after",
-      "02-home-desktop.png",
+      "showcase",
+      showcaseRelease,
+      "admin-after-sales.png",
     ),
   };
 
@@ -104,9 +105,9 @@ export async function inspectReleaseReadiness(frontendRoot) {
   ]);
 
   for (const marker of [
-    "docs/assets/frontend-audit/2026-09-01-storefront-closure/after/global-index-desktop.png",
-    "docs/assets/frontend-audit/2026-09-01-storefront-closure/after/orders-desktop.png",
-    "docs/assets/frontend-audit/2026-09-01-admin-first-pass/after/02-home-desktop.png",
+    `docs/assets/showcase/${showcaseRelease}/storefront-product-detail.png`,
+    `docs/assets/showcase/${showcaseRelease}/storefront-checkout.png`,
+    `docs/assets/showcase/${showcaseRelease}/admin-after-sales.png`,
     "pnpm demo:start",
     "reader@example.com",
     "admin@example.com",
@@ -155,9 +156,9 @@ export async function inspectReleaseReadiness(frontendRoot) {
 
   const screenshots = [];
   for (const [name, screenshotPath] of Object.entries({
-    storefrontIndex: paths.storefrontIndex,
-    storefrontOrders: paths.storefrontOrders,
-    adminHome: paths.adminHome,
+    storefrontProductDetail: paths.storefrontProductDetail,
+    storefrontCheckout: paths.storefrontCheckout,
+    adminAfterSales: paths.adminAfterSales,
   })) {
     const stat = await fs.stat(screenshotPath);
     screenshots.push({
