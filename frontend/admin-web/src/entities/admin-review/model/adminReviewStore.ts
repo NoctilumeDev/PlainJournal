@@ -3,7 +3,6 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createCatalogApi,
   secureRandomUUID,
   type BusinessId,
@@ -14,8 +13,8 @@ import {
   type ReviewReply,
   type ReviewReport,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const PENDING_STORAGE_PREFIX =
   "plain-journal:admin-review:pending-command:v1:";
 
@@ -93,11 +92,7 @@ function isActiveContext(
 }
 
 function createApi(accessToken: string): CatalogApi {
-  return createCatalogApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 10000,
-    tokenProvider: () => accessToken,
-  }));
+  return createCatalogApi(createAuthenticatedApiClient(accessToken, 10000));
 }
 
 function newCommandId(prefix: string): string {

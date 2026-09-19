@@ -15,7 +15,7 @@ const router = useRouter();
 const checkoutAccess = computed<CheckoutAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 
 async function openOrder(orderNo: string) {

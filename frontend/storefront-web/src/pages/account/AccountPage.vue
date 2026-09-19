@@ -75,7 +75,7 @@ async function logout() {
 }
 
 async function clearLocal() {
-  session.clearLocalOnly();
+  await session.clearLocalOnly();
   await router.replace("/");
 }
 </script>

@@ -3,15 +3,13 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createIdentityApi,
   type Address,
   type AddressInput,
   type BusinessId,
   type IdentityApi,
 } from "@plain-journal/foundation";
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
 export type AddressErrorTone = "danger" | "unknown" | "attention";
 
@@ -47,11 +45,7 @@ function isActiveContext(context: AddressAccessContext): context is {
 }
 
 function identityApi(accessToken: string): IdentityApi {
-  return createIdentityApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 8000,
-    tokenProvider: () => accessToken,
-  }));
+  return createIdentityApi(createAuthenticatedApiClient(accessToken));
 }
 
 export const useAddressStore = defineStore("customer-addresses", () => {

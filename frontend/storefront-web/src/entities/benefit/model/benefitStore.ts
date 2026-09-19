@@ -2,14 +2,12 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
 import {
-  createApiClient,
   createMarketingApi,
   type Benefit,
   type BusinessId,
   type MarketingApi,
 } from "@plain-journal/foundation";
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
 export interface BenefitAccessContext {
   authenticated: boolean;
@@ -50,11 +48,7 @@ function isActiveContext(context: BenefitAccessContext): context is {
 }
 
 function marketingApi(accessToken: string): MarketingApi {
-  return createMarketingApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 8000,
-    tokenProvider: () => accessToken,
-  }));
+  return createMarketingApi(createAuthenticatedApiClient(accessToken));
 }
 
 export const useBenefitsStore = defineStore("customer-benefits", () => {

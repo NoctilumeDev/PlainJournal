@@ -40,7 +40,7 @@ const added = ref(false);
 const reviewAccess = computed<ReviewAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 
 const activeSkus = computed(() => product.value?.skus.filter(

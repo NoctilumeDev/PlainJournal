@@ -27,7 +27,7 @@ const feedback = ref<string | null>(null);
 const accessContext = computed<AddressAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 const addressErrorTitle = computed(() => {
   if (addresses.errorTone === "unknown") {

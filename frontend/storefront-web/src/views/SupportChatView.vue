@@ -35,7 +35,7 @@ const messageLog = ref<HTMLElement | null>(null);
 const accessContext = computed<ChatAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 const active = computed(() => chat.activeConversation);
 const realtimePresentation = computed(() => ({

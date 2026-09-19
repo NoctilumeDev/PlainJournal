@@ -50,7 +50,7 @@ const orderNo = computed(() => String(route.params.orderNo ?? ""));
 const orderAccess = computed<OrderAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 const paymentAccess = computed<PaymentAccessContext>(() => orderAccess.value);
 const fulfillmentAccess = computed<FulfillmentAccessContext>(() => orderAccess.value);

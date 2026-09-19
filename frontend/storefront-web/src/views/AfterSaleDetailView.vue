@@ -14,7 +14,7 @@ const afterSaleNo = computed(() => String(route.params.afterSaleNo ?? ""));
 const access = computed<AfterSaleAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 </script>
 

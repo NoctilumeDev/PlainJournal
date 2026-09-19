@@ -11,4 +11,5 @@ export * from "./marketing";
 export * from "./notification";
 export * from "./payment";
 export * from "./random";
+export * from "./session-coordination";
 export * from "./trade";

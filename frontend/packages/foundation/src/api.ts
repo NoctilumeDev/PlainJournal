@@ -51,7 +51,21 @@ export interface ApiClientOptions {
   baseUrl?: string;
   timeoutMs?: number;
   tokenProvider?: () => string | null;
+  requestAuthorityProvider?: () => string | null;
+  onUnauthorized?: UnauthorizedHandler;
 }
+
+export interface UnauthorizedRequestContext {
+  path: string;
+  method: string;
+  accessToken: string | null;
+  requestAuthority: string | null;
+  retryAttempted: boolean;
+}
+
+export type UnauthorizedHandler = (
+  context: UnauthorizedRequestContext,
+) => Promise<"retry" | "reject">;
 
 export interface ApiRequestOptions extends RequestInit {
   timeoutMs?: number;
@@ -71,87 +85,123 @@ function isEnvelope(value: unknown): value is ApiEnvelope<unknown> {
   );
 }
 
+function hasReplayableBody(body: BodyInit | null | undefined): boolean {
+  return body == null
+    || typeof ReadableStream === "undefined"
+    || !(body instanceof ReadableStream);
+}
+
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const baseUrl = options.baseUrl?.replace(/\/$/, "") ?? "";
   const defaultTimeoutMs = options.timeoutMs ?? 8000;
 
   return {
     async request<T>(path: string, requestOptions: ApiRequestOptions = {}): Promise<T> {
-      const controller = new AbortController();
       const timeoutMs = requestOptions.timeoutMs ?? defaultTimeoutMs;
-      const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
-      const headers = new Headers(requestOptions.headers);
-      headers.set("Accept", "application/json");
-      if (requestOptions.body && !headers.has("Content-Type")) {
-        headers.set("Content-Type", "application/json");
-      }
-      const token = options.tokenProvider?.();
-      if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
-      }
+      const method = requestOptions.method?.toUpperCase() ?? "GET";
+      const requestAuthority = options.requestAuthorityProvider?.() ?? null;
+      let retryAttempted = false;
 
-      try {
-        const response = await fetch(`${baseUrl}${path}`, {
-          ...requestOptions,
-          headers,
-          signal: controller.signal,
-        });
-        const payload: unknown = await response.json().catch((cause: unknown) => {
-          throw new ApiError(
-            "invalid-response",
-            "INVALID_RESPONSE",
-            "服务返回了无法识别的响应。",
-            response.status,
-            { cause },
-          );
-        });
-        if (!isEnvelope(payload)) {
-          throw new ApiError(
-            "invalid-response",
-            "INVALID_RESPONSE",
-            "服务响应缺少统一结果结构。",
-            response.status,
-          );
+      while (true) {
+        const controller = new AbortController();
+        const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+        const headers = new Headers(requestOptions.headers);
+        headers.set("Accept", "application/json");
+        if (requestOptions.body && !headers.has("Content-Type")) {
+          headers.set("Content-Type", "application/json");
         }
-        if (!response.ok) {
-          throw new ApiError(
-            "http",
-            payload.code || `HTTP_${response.status}`,
-            payload.message || "请求未完成。",
-            response.status,
-          );
+        const token = options.tokenProvider?.() ?? null;
+        if (token) {
+          headers.set("Authorization", `Bearer ${token}`);
+        } else if (options.tokenProvider) {
+          headers.delete("Authorization");
         }
-        if (payload.code !== "OK") {
+
+        try {
+          const response = await fetch(`${baseUrl}${path}`, {
+            ...requestOptions,
+            headers,
+            signal: controller.signal,
+          });
+          const payload: unknown = await response.json().catch((cause: unknown) => {
+            throw new ApiError(
+              "invalid-response",
+              "INVALID_RESPONSE",
+              "服务返回了无法识别的响应。",
+              response.status,
+              { cause },
+            );
+          });
+          if (!isEnvelope(payload)) {
+            throw new ApiError(
+              "invalid-response",
+              "INVALID_RESPONSE",
+              "服务响应缺少统一结果结构。",
+              response.status,
+            );
+          }
+          if (!response.ok) {
+            const error = new ApiError(
+              "http",
+              payload.code || `HTTP_${response.status}`,
+              payload.message || "请求未完成。",
+              response.status,
+            );
+            if (
+              response.status === 401
+              && payload.code === "UNAUTHORIZED"
+              && options.onUnauthorized
+            ) {
+              const action = await options.onUnauthorized({
+                path,
+                method,
+                accessToken: token,
+                requestAuthority,
+                retryAttempted,
+              });
+              if (
+                action === "retry"
+                && !retryAttempted
+                && hasReplayableBody(requestOptions.body)
+              ) {
+                retryAttempted = true;
+                continue;
+              }
+            }
+            throw error;
+          }
+          if (payload.code !== "OK") {
+            throw new ApiError(
+              "business",
+              payload.code,
+              payload.message || "业务状态不允许执行当前操作。",
+              response.status,
+            );
+          }
+          return payload.data as T;
+        } catch (error) {
+          if (error instanceof ApiError) {
+            throw error;
+          }
+          if (error instanceof DOMException && error.name === "AbortError") {
+            throw new ApiError(
+              "timeout",
+              "REQUEST_TIMEOUT",
+              "请求等待时间过长，请稍后重试。",
+              undefined,
+              { cause: error },
+            );
+          }
           throw new ApiError(
-            "business",
-            payload.code,
-            payload.message || "业务状态不允许执行当前操作。",
-            response.status,
-          );
-        }
-        return payload.data as T;
-      } catch (error) {
-        if (error instanceof ApiError) {
-          throw error;
-        }
-        if (error instanceof DOMException && error.name === "AbortError") {
-          throw new ApiError(
-            "timeout",
-            "REQUEST_TIMEOUT",
-            "请求等待时间过长，请稍后重试。",
+            "network",
+            "NETWORK_UNAVAILABLE",
+            "暂时无法连接服务。你的操作没有被标记为成功。",
             undefined,
             { cause: error },
           );
+        } finally {
+          globalThis.clearTimeout(timeout);
         }
-        throw new ApiError(
-          "network",
-          "NETWORK_UNAVAILABLE",
-          "暂时无法连接服务。你的操作没有被标记为成功。",
-          undefined,
-          { cause: error },
-        );
-      } finally {
-        globalThis.clearTimeout(timeout);
       }
     },
   };

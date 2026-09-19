@@ -27,7 +27,7 @@ const accessContext = computed(() => ({
     && roles.value.some((role) => ["ADMIN", "WAREHOUSE"].includes(role)),
   ),
   operatorId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 const selectedWarehouse = computed<Warehouse | null>(() =>
   inventory.warehouses.find((warehouse) => warehouse.id === selectedWarehouseId.value)

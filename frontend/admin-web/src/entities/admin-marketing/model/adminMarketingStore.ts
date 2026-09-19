@@ -3,7 +3,6 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createMarketingApi,
   secureRandomUUID,
   type Benefit,
@@ -14,8 +13,8 @@ import {
   type MarketingRule,
   type RegionRestriction,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const PENDING_STORAGE_PREFIX =
   "plain-journal:admin-marketing:pending-command:v1:";
 
@@ -79,11 +78,7 @@ function isActiveContext(
 }
 
 function createApi(accessToken: string): MarketingApi {
-  return createMarketingApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 10000,
-    tokenProvider: () => accessToken,
-  }));
+  return createMarketingApi(createAuthenticatedApiClient(accessToken, 10000));
 }
 
 function newGrantKey(): string {

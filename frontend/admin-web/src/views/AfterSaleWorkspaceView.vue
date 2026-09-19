@@ -26,7 +26,7 @@ const accessContext = computed(() => ({
     && roles.value.includes("ADMIN"),
   ),
   operatorId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 
 const statusOptions = [

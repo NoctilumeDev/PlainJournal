@@ -35,7 +35,7 @@ const removed = ref<GuestBagItem | null>(null);
 const accountAccess = computed<AccountCartAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 const visibleItemCount = computed(() => (
   session.authenticated ? accountCart.itemCount : bag.itemCount
@@ -91,7 +91,7 @@ watch(
   () => [
     session.authenticated,
     session.profile?.id ?? null,
-    session.accessToken,
+    session.requestAuthority,
   ] as const,
   async () => {
     removed.value = null;

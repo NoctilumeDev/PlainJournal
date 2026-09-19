@@ -3,7 +3,6 @@ import { defineStore } from "pinia";
 
 import {
   createAnalyticsApi,
-  createApiClient,
   type AnalyticsApi,
   type AnalyticsDashboard,
   type AnalyticsDailySummary,
@@ -12,8 +11,8 @@ import {
   type AnalyticsProjectionFreshness,
   type BusinessId,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const PRODUCT_LIMIT = 8;
 const MAXIMUM_RANGE_DAYS = 366;
 const DAY_MILLISECONDS = 86_400_000;
@@ -239,11 +238,7 @@ function isActiveContext(
 }
 
 function createApi(accessToken: string): AnalyticsApi {
-  return createAnalyticsApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 10000,
-    tokenProvider: () => accessToken,
-  }));
+  return createAnalyticsApi(createAuthenticatedApiClient(accessToken, 10000));
 }
 
 function errorMessage(cause: unknown): string {

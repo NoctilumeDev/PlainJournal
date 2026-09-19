@@ -3,7 +3,6 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createFulfillmentApi,
   secureRandomUUID,
   type AddLogisticsTraceInput,
@@ -13,8 +12,8 @@ import {
   type NearbyShipmentPosition,
   type ReturnReceipt,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const PENDING_STORAGE_PREFIX =
   "plain-journal:admin-fulfillment:pending-command:v1:";
 
@@ -135,11 +134,7 @@ function isActiveContext(
 }
 
 function createApi(accessToken: string): FulfillmentApi {
-  return createFulfillmentApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 10000,
-    tokenProvider: () => accessToken,
-  }));
+  return createFulfillmentApi(createAuthenticatedApiClient(accessToken, 10000));
 }
 
 function newIdentity(prefix: string): string {

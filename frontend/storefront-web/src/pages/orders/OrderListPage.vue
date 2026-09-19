@@ -21,7 +21,7 @@ const session = useSessionStore();
 const orderAccess = computed<OrderAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 
 watch(orderAccess, (access) => orders.load(access), {

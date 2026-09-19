@@ -3,15 +3,14 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createTradeApi,
   secureRandomUUID,
   type AfterSale,
   type BusinessId,
   type TradeApi,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const LEGACY_PENDING_AFTER_SALE_KEY = "plain-journal:pending-after-sale:v1";
 const PENDING_AFTER_SALE_KEY_PREFIX = "plain-journal:pending-after-sale:v2:";
 
@@ -111,11 +110,7 @@ function applicationKey(): string {
 }
 
 function tradeApi(accessToken: string): TradeApi {
-  return createTradeApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 8000,
-    tokenProvider: () => accessToken,
-  }));
+  return createTradeApi(createAuthenticatedApiClient(accessToken));
 }
 
 function isUncertain(cause: unknown): boolean {
