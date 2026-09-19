@@ -7,7 +7,7 @@ import {
 import { defineStore } from "pinia";
 
 import {
-  createChatWorkspaceApi,
+  createChatApi,
   createChatWorkspaceController,
   createChatWorkspaceState,
   type BusinessId,
@@ -21,6 +21,7 @@ import {
   type ChatWorkspaceController,
   type ChatWorkspaceState,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const PENDING_SEND_STORAGE_PREFIX =
@@ -301,7 +302,7 @@ function guardedApi(
   accessToken: string,
   operatorId: BusinessId,
 ): ChatApi {
-  const raw = createChatWorkspaceApi(() => accessToken, apiBaseUrl);
+  const raw = createChatApi(createAuthenticatedApiClient(accessToken, 10000));
   return {
     async createConversation(input) {
       return validateConversation(await raw.createConversation(input));

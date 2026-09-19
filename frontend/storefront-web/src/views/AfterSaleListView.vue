@@ -21,7 +21,7 @@ const session = useSessionStore();
 const access = computed<AfterSaleAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 
 function formatTimestamp(value: string): string {

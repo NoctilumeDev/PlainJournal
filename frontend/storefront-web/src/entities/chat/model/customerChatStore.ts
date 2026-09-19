@@ -6,7 +6,7 @@ import {
 import { defineStore } from "pinia";
 
 import {
-  createChatWorkspaceApi,
+  createChatApi,
   createChatWorkspaceController,
   createChatWorkspaceState,
   type BusinessId,
@@ -20,6 +20,7 @@ import {
   type PendingChatConversation,
   type PendingChatSend,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const PENDING_SEND_KEY = "plain-journal:customer-chat-pending-send:v1";
@@ -136,7 +137,7 @@ function ownedCustomerApi(
   ownerId: BusinessId,
   accessToken: string,
 ): ChatApi {
-  const api = createChatWorkspaceApi(() => accessToken, apiBaseUrl);
+  const api = createChatApi(createAuthenticatedApiClient(accessToken));
   return {
     async createConversation(input) {
       return validateConversation(await api.createConversation(input), ownerId);

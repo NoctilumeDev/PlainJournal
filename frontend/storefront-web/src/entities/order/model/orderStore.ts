@@ -3,14 +3,13 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createTradeApi,
   type BusinessId,
   type Order,
   type TradeApi,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const LEGACY_PENDING_CANCELLATION_KEY = "plain-journal:pending-order-cancellation:v1";
 const PENDING_CANCELLATION_KEY_PREFIX = "plain-journal:pending-order-cancellation:v2:";
 const ORDER_PAGE_SIZE = 20;
@@ -105,11 +104,7 @@ function loadPendingCancellation(ownerId: BusinessId): PendingOrderCancellation 
 }
 
 function tradeApi(accessToken: string): TradeApi {
-  return createTradeApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 8000,
-    tokenProvider: () => accessToken,
-  }));
+  return createTradeApi(createAuthenticatedApiClient(accessToken));
 }
 
 function isUncertainCancellationFailure(cause: unknown): boolean {

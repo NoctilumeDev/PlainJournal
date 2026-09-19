@@ -3,14 +3,12 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createPaymentApi,
   type BusinessId,
   type PaymentApi,
   type Refund,
 } from "@plain-journal/foundation";
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
 export interface RefundAccessContext {
   authenticated: boolean;
@@ -44,11 +42,7 @@ function isActiveContext(context: RefundAccessContext): context is {
 }
 
 function paymentApi(accessToken: string): PaymentApi {
-  return createPaymentApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 8000,
-    tokenProvider: () => accessToken,
-  }));
+  return createPaymentApi(createAuthenticatedApiClient(accessToken));
 }
 
 export const useRefundsStore = defineStore("customer-refunds", () => {

@@ -24,7 +24,7 @@ const session = useSessionStore();
 const accessContext = computed<BenefitAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 
 function typeLabel(value: string): string {

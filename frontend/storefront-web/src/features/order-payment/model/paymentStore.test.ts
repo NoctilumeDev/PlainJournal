@@ -333,4 +333,5 @@ describe("customer payments", () => {
     expect(value?.status).toBe("SUCCESS");
     expect(paths).toEqual([`/api/v1/payment/payments/${PAYMENT_NO}`]);
   });
+
 });

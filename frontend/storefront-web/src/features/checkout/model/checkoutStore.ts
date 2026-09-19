@@ -3,7 +3,6 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createCatalogApi,
   createInventoryApi,
   createMarketingApi,
@@ -17,6 +16,7 @@ import {
   type Order,
   type PricingPreview,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
 import {
   type AddressAccessContext,
@@ -27,7 +27,6 @@ import {
   useAccountCartStore,
 } from "../../../entities/account-cart";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const LEGACY_PENDING_ORDER_KEY = "plain-journal:pending-order:v1";
 const PENDING_ORDER_KEY_PREFIX = "plain-journal:pending-order:v2:";
 const AUTHORITY_TTL_MS = 60_000;
@@ -271,11 +270,7 @@ export const useCheckoutStore = defineStore("checkout-draft", () => {
   }
 
   function clientFor(access: ActiveCheckoutAccess) {
-    return createApiClient({
-      baseUrl: apiBaseUrl,
-      timeoutMs: 8000,
-      tokenProvider: () => access.accessToken,
-    });
+    return createAuthenticatedApiClient(access.accessToken);
   }
 
   function currentDraftFingerprint(): string {

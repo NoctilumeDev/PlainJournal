@@ -3,7 +3,6 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createGovernanceApi,
   createPaymentApi,
   secureRandomUUID,
@@ -17,8 +16,8 @@ import {
   type Refund,
   type RefundDispatchRetryAudit,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const REFUND_RETRY_STORAGE_PREFIX =
   "plain-journal:admin-governance:refund-retry:v1:";
 const PAYMENT_EXCEPTION_STORAGE_PREFIX =
@@ -99,11 +98,7 @@ function isActiveContext(context: GovernanceAccessContext): context is {
 }
 
 function createApis(accessToken: string) {
-  const client = createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 10000,
-    tokenProvider: () => accessToken,
-  });
+  const client = createAuthenticatedApiClient(accessToken, 10000);
   return {
     governanceApi: createGovernanceApi(client),
     paymentApi: createPaymentApi(client),

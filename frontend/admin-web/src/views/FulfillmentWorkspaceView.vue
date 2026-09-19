@@ -26,7 +26,7 @@ const accessContext = computed(() => ({
     && roles.value.some((role) => ["ADMIN", "WAREHOUSE"].includes(role)),
   ),
   operatorId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 
 const modeOptions: Array<{ value: WorkbenchMode; label: string; hint: string }> = [

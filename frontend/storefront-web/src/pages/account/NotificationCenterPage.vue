@@ -22,7 +22,7 @@ const feedback = ref<string | null>(null);
 const accessContext = computed<NotificationAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 
 function formatTimestamp(value: string): string {

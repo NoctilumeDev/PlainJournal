@@ -30,7 +30,7 @@ const accessContext = computed(() => ({
     && roles.value.some((role) => ["ADMIN", "OPERATOR"].includes(role)),
   ),
   operatorId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 
 const selectedProduct = computed<ProductSummary | null>(() =>

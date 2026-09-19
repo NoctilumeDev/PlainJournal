@@ -16,7 +16,7 @@ const accountCart = useAccountCartStore();
 const accountAccess = computed<AccountCartAccessContext>(() => ({
   authenticated: session.authenticated,
   ownerId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 const visibleBagCount = computed(() => session.authenticated
   ? accountCart.itemCount
@@ -29,7 +29,7 @@ watch(
   () => [
     session.authenticated,
     session.profile?.id ?? null,
-    session.accessToken,
+    session.requestAuthority,
     session.bagMergeStatus,
   ] as const,
   async ([authenticated, , , mergeStatus]) => {

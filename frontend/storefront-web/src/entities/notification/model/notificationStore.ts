@@ -3,14 +3,12 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createNotificationApi,
   type BusinessId,
   type InAppNotification,
   type NotificationApi,
 } from "@plain-journal/foundation";
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
 export interface NotificationAccessContext {
   authenticated: boolean;
@@ -58,11 +56,7 @@ function isActiveContext(context: NotificationAccessContext): context is {
 }
 
 function notificationApi(accessToken: string): NotificationApi {
-  return createNotificationApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 8000,
-    tokenProvider: () => accessToken,
-  }));
+  return createNotificationApi(createAuthenticatedApiClient(accessToken));
 }
 
 function validateNotification(

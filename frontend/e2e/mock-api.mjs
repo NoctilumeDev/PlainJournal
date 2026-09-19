@@ -931,6 +931,78 @@ function identityActor(request) {
     : customer;
 }
 
+let sessionFixtureMode = "normal";
+let sessionFixtureTarget = null;
+let sessionFixtureRefreshOutcome = "success";
+let sessionFixtureUnknownRefreshesRemaining = 0;
+let sessionFixtureDelayMs = 0;
+let sessionFixtureSequence = 0;
+const sessionFixtureRequests = [];
+const sessionFixturePendingUnauthorized = [];
+
+function resetSessionFixture(input = {}) {
+  sessionFixtureMode = String(input.mode ?? "normal");
+  sessionFixtureTarget = input.path
+    ? {
+        method: String(input.method ?? "GET").toUpperCase(),
+        path: String(input.path),
+      }
+    : null;
+  sessionFixtureRefreshOutcome = String(input.refreshOutcome ?? "success");
+  sessionFixtureUnknownRefreshesRemaining = sessionFixtureRefreshOutcome === "unknown"
+    ? 2
+    : 0;
+  sessionFixtureDelayMs = Number(input.delayMs ?? 0);
+  sessionFixtureSequence = 0;
+  sessionFixtureRequests.length = 0;
+}
+
+function sessionTokenLabel(request) {
+  const authorization = String(request.headers.authorization ?? "");
+  if (!authorization) {
+    return null;
+  }
+  if (authorization.includes("rotated")) {
+    return authorization.includes("admin") ? "admin-g2" : "customer-g2";
+  }
+  return authorization.includes("admin") ? "admin-g1" : "customer-g1";
+}
+
+function observeSessionRequest(request, response, method, path) {
+  if (!path.startsWith("/api/v1/")) {
+    return;
+  }
+  const observed = {
+    sequence: ++sessionFixtureSequence,
+    method,
+    path,
+    token: sessionTokenLabel(request),
+    idempotencyKey: request.headers["idempotency-key"] ?? null,
+    status: null,
+  };
+  sessionFixtureRequests.push(observed);
+  response.once("finish", () => {
+    observed.status = response.statusCode;
+  });
+  response.once("close", () => {
+    if (observed.status === null) {
+      observed.status = "connection-dropped";
+    }
+  });
+}
+
+function shouldRejectExpiredAccess(request, method, path) {
+  if (
+    !["expire-access", "delay-expired-access"].includes(sessionFixtureMode)
+    || !sessionFixtureTarget
+  ) {
+    return false;
+  }
+  return sessionFixtureTarget.method === method
+    && sessionFixtureTarget.path === path
+    && sessionTokenLabel(request)?.endsWith("-g1");
+}
+
 function addressBook(request) {
   return identityActor(request).id === alternateCustomer.id
     ? alternateAddresses
@@ -1275,8 +1347,72 @@ createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
   const method = request.method ?? "GET";
 
+  observeSessionRequest(request, response, method, url.pathname);
+
   if (method === "OPTIONS") {
     respond(response, 204, null);
+    return;
+  }
+  if (
+    method === "POST"
+    && url.pathname === "/__test__/fixtures/session/reset"
+  ) {
+    const input = await body(request);
+    resetSessionFixture(input);
+    respond(response, 200, {
+      reset: true,
+      mode: sessionFixtureMode,
+      target: sessionFixtureTarget,
+      refreshOutcome: sessionFixtureRefreshOutcome,
+      delayMs: sessionFixtureDelayMs,
+    });
+    return;
+  }
+  if (
+    method === "GET"
+    && url.pathname === "/__test__/fixtures/session/diagnostics"
+  ) {
+    respond(response, 200, {
+      mode: sessionFixtureMode,
+      target: sessionFixtureTarget,
+      refreshOutcome: sessionFixtureRefreshOutcome,
+      delayMs: sessionFixtureDelayMs,
+      pendingUnauthorized: sessionFixturePendingUnauthorized.length,
+      requests: sessionFixtureRequests,
+    });
+    return;
+  }
+  if (
+    method === "POST"
+    && url.pathname === "/__test__/fixtures/session/release"
+  ) {
+    const pending = sessionFixturePendingUnauthorized.splice(
+      0,
+      sessionFixturePendingUnauthorized.length,
+    );
+    for (const release of pending) {
+      release();
+    }
+    respond(response, 200, { released: pending.length });
+    return;
+  }
+  if (shouldRejectExpiredAccess(request, method, url.pathname)) {
+    if (sessionFixtureMode === "delay-expired-access") {
+      if (sessionFixtureDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, sessionFixtureDelayMs));
+      } else {
+        await new Promise((resolve) => {
+          sessionFixturePendingUnauthorized.push(resolve);
+        });
+      }
+    }
+    respond(
+      response,
+      401,
+      null,
+      "UNAUTHORIZED",
+      "The access token is expired",
+    );
     return;
   }
   if (
@@ -1554,7 +1690,18 @@ createServer(async (request, response) => {
   }
   if (method === "POST" && url.pathname === "/api/v1/identity/auth/refresh") {
     const input = await body(request);
-    if (input.refreshToken === "expired-customer-refresh-token") {
+    if (
+      sessionFixtureRefreshOutcome === "unknown"
+      && sessionFixtureUnknownRefreshesRemaining > 0
+    ) {
+      sessionFixtureUnknownRefreshesRemaining -= 1;
+      response.destroy();
+      return;
+    }
+    if (
+      sessionFixtureRefreshOutcome === "invalid"
+      || input.refreshToken === "expired-customer-refresh-token"
+    ) {
       respond(
         response,
         401,

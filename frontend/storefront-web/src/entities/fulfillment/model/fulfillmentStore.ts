@@ -3,15 +3,13 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createFulfillmentApi,
   type BusinessId,
   type Fulfillment,
   type FulfillmentApi,
   type ShipmentPosition,
 } from "@plain-journal/foundation";
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
 export interface FulfillmentAccessContext {
   authenticated: boolean;
@@ -52,11 +50,7 @@ function isActiveContext(context: FulfillmentAccessContext): context is {
 }
 
 function fulfillmentApi(accessToken: string): FulfillmentApi {
-  return createFulfillmentApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 8000,
-    tokenProvider: () => accessToken,
-  }));
+  return createFulfillmentApi(createAuthenticatedApiClient(accessToken));
 }
 
 export const useFulfillmentsStore = defineStore("customer-fulfillments", () => {

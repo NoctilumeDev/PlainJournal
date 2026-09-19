@@ -3,7 +3,6 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createTradeApi,
   multiplyMoney,
   sumMoney,
@@ -12,8 +11,7 @@ import {
   type PutCartItemInput,
   type TradeApi,
 } from "@plain-journal/foundation";
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
 export interface AccountCartAccessContext {
   authenticated: boolean;
@@ -68,11 +66,7 @@ function isActiveContext(context: AccountCartAccessContext): context is {
 }
 
 function tradeApi(accessToken: string): TradeApi {
-  return createTradeApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 8000,
-    tokenProvider: () => accessToken,
-  }));
+  return createTradeApi(createAuthenticatedApiClient(accessToken));
 }
 
 function resultMayBeUnknown(cause: unknown): boolean {

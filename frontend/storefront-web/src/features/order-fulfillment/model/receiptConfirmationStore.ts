@@ -3,12 +3,12 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createFulfillmentApi,
   type BusinessId,
   type Fulfillment,
   type FulfillmentApi,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
 import {
   FulfillmentAccessChangedError,
@@ -17,7 +17,6 @@ import {
   type FulfillmentAccessContext,
 } from "../../../entities/fulfillment";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const CONFIRMABLE_STATUSES = new Set(["SHIPPED", "IN_TRANSIT", "DELIVERING"]);
 
 interface ActiveReceiptAccess {
@@ -39,11 +38,7 @@ function isActiveContext(context: FulfillmentAccessContext): context is {
 }
 
 function fulfillmentApi(accessToken: string): FulfillmentApi {
-  return createFulfillmentApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 8000,
-    tokenProvider: () => accessToken,
-  }));
+  return createFulfillmentApi(createAuthenticatedApiClient(accessToken));
 }
 
 function isUncertainConfirmationFailure(cause: unknown): boolean {

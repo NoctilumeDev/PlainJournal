@@ -31,12 +31,16 @@ JWT 密钥只存在本地忽略的 `.env` 或部署环境的密钥系统中，�
 
 ## 3. 浏览器会话边界
 
-M4 第二、第三批采用与现有 Identity API 相容的设备会话策略：
+浏览器采用与现有 Identity API 相容的设备会话策略：
 
 - access token 只保存在前端内存，不写入 `localStorage`；
 - refresh token 保存在当前设备，用于刷新页面后的会话恢复；
 - 恢复时先调用 `/auth/refresh` 完成令牌轮换，再用新 access token 调用 `/me`；
-- 并发恢复复用同一个 Promise，避免同一 refresh token 被并发旋转；
+- 同一标签页的并发恢复合并为一次；同源、同会话命名空间的标签页通过浏览器独占锁串行刷新，并用同源临时消息转交已验证的新 access generation，access token 仍不落盘；
+- 顾客端与员工端使用不同的协调锁和存储命名空间；
+- 业务请求发送时读取当前 access token，不在业务 Store 中保存 JWT 快照；
+- 业务 Store 使用稳定的本地 session authority 判断账户连续性，access token 正常轮换不会重置订单、支付或客服操作的本地状态；
+- 每个受保护请求在首次发送前捕获自己的 session authority；后续即使当前 JWT 已变化，也只有 authority 仍相同时才允许恢复和重放；
 - 服务端注销确认成功后才清除本机会话；
 - 注销网络失败或超时时保留会话并明确显示“结果未知”，用户可稍后重试或显式选择“仅清除此设备”。
 
@@ -46,7 +50,34 @@ refresh token 仍由 JavaScript 可读，这是当前“响应体返回 refresh 
 
 顾客端 `/account/addresses` 已接通完整地址管理：新增或修改只有在 Identity 返回成功后才显示确认；切换默认地址以后端返回事实重载列表；删除使用原位确认，失败或结果未知时不关闭确认并不宣称删除成功。进入编辑状态后焦点移动到表单标题，状态与错误分别使用语义化 `status`/`alert`。
 
-## 3.1 CSRF 边界
+## 3.1 Session Recovery 协议
+
+PlainJournal 保证正常 access token 过期、同一标签页并发和支持 Web Locks 的同源多标签页下的会话连续性；不保证 refresh rotation 已提交但响应丢失后的透明恢复。这里必须区分两类 generation：
+
+- 服务端凭据 generation 可能已经推进；
+- 客户端 observed generation 只有明确收到刷新成功并安装新凭据后才推进；
+- `REFRESH_OUTCOME_UNKNOWN` 不得推断服务端已推进或未推进。
+
+受保护请求遇到安全过滤器返回的 `401 / UNAUTHORIZED` 后，协调者在独占锁内重新读取当前持久化会话。其他业务含义的 401 不触发刷新。刷新明确成功、安装新 refresh token 并重新读取 `/me` 后，原请求最多自动重放一次；刷新 UNKNOWN、明确失败、角色不再允许或重放后仍为 401 时，业务写请求不再自动重放。
+
+| 客户端观察 | 本地处理 | 业务请求 |
+| --- | --- | --- |
+| access token 过期，refresh 成功，`/me` 成功 | observed generation 前进 | 最多重放一次 |
+| 首次 refresh 传输结果未知 | 用同一个 refresh token 有界重试一次 | 暂不重放 |
+| 两次 refresh 都是传输 UNKNOWN | 保留持久化凭据，进入 `outcome-unknown` | 不重放，要求重新认证 |
+| UNKNOWN 后同 token 返回 401 | 当前客户端无法证明连续性，进入 `reauth-required` | 不重放 |
+| 刷新后原请求仍为 401 | 进入 `reauth-required` | 停止，不形成循环 |
+| 员工刷新后角色不再属于工作区 | 尝试撤销新 refresh token并清除本地员工会话 | 不重放 |
+
+持久化会话把稳定的本地 authority 与当前 refresh token 放在同一条记录中。判断是否仍拥有该 authority 与写入、旋转或清理记录必须处于同一个独占锁转换内；刷新赢家只有在新 token 已安装且 `/me` 验证成功后，才通过 `BroadcastChannel` 向等待页转交这次 generation。等待页只有在 authority、前一 refresh token 与当前持久化 successor 全部匹配时才接纳消息；迟到消息不得覆盖更新 generation。旧 authority 的失败不得清除或覆盖新 authority。旧版 refresh-token key 只作为兼容镜像，不是并发所有权依据。
+
+请求重放还受请求级 authority 约束：请求首次发送时捕获的 authority 在整个重试循环中保持不变，而 access token 每次发送时动态读取。若账户 A 的旧请求等待 401 期间同一标签页已经登录到账户 B，旧请求必须直接拒绝；它不得触发 B 的 refresh，不得携带 B 的 JWT 重放，也不得把 B 的会话改成 `reauth-required`。
+
+`reauth-required` 只表示当前客户端无法继续证明会话连续性，不等于 `logged-out` 或 `session-revoked`，也不声明服务端可能存在的未知 successor 已被撤销。重新登录建立新的本地可证明连续性，但不追溯性证明旧 token family 已终止。
+
+当前协议不增加 token family、successor lineage 或可恢复 refresh token 原文。若未来承诺 refresh 响应丢失后的透明恢复，必须另行设计不依赖已消费 refresh token 的连续身份锚点，不能把旧 refresh token 当作领取 successor 的充分证明。
+
+## 3.2 CSRF 边界
 
 Gateway 与 10 个业务服务均是无状态 OAuth2 Resource Server：浏览器只在
 `Authorization: Bearer` 请求头中显式携带 access token，服务端不创建 HTTP
@@ -78,12 +109,14 @@ CSRF。
 
 Spring Security 将 JWT 的 `roles` 声明映射为 `ROLE_*` authority。新增管理接口时使用 `@PreAuthorize` 或统一授权服务约束权限，不能只依赖前端隐藏按钮。
 
-管理端当前只接受 `ADMIN` 或 `OPERATOR` 进入工作区。普通 `CUSTOMER` 即使账号密码验证成功，也会进入明确的权限不足页面；前端会清除本地管理会话，并尝试撤销刚签发的 refresh token。员工账号仍不开放自助注册。
+管理端当前只接受 `ADMIN`、`OPERATOR` 或 `WAREHOUSE` 进入对应工作区。普通 `CUSTOMER` 即使账号密码验证成功，也会进入明确的权限不足页面；前端会清除本地管理会话，并尝试撤销刚签发的 refresh token。员工账号仍不开放自助注册。
 
 ## 5. 已验证场景
 
 - H2 隔离测试：注册、重复邮箱、错误密码、受保护接口、刷新旋转、注销与哈希存储。
 - 并发测试：两个请求同时刷新同一令牌，只允许一个成功。
+- 前端会话测试：并发 401 只触发一次本地刷新；刷新成功后重新读取 `/me` 并最多重放一次；刷新 UNKNOWN 不重放写请求；旧标签页失败不能清理较新的共享会话；账户 A 的迟到 401 不能借账户 B 的 JWT 刷新或重放。
+- 支付集成测试：access token 轮换期间 session authority 与支付幂等键保持不变，成功重放不会被旧 JWT 快照误判为账户切换。
 - 地址测试：默认地址切换、删除接替、输入校验、跨用户修改拒绝和 20 条上限规则。
 - 内部接口测试：只有携带本地服务令牌的 `trade-service` 能读取指定用户自有地址；其他调用者和地址越权均拒绝。
 - 真实环境烟测：Gateway、Nacos、MySQL、Flyway、JWT 全链路，无 Mock。

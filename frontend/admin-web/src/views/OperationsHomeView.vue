@@ -83,7 +83,7 @@ const canReadAnalytics = computed(() =>
 const accessContext = computed(() => ({
   authorized: Boolean(session.authenticated && canReadAnalytics.value),
   operatorId: (session.profile?.id as BusinessId | undefined) ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 const visibleWorkspaces = computed(() =>
   workspaceEntries.filter((entry) =>

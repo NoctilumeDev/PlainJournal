@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { RouterLink, RouterView } from "vue-router";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -39,6 +39,15 @@ const currentWorkspace = computed(() => {
   return matched?.label ?? "管理工作区";
 });
 
+watch(() => session.reauthRequired, (required) => {
+  if (required && route.name !== "staff-login") {
+    void router.replace({
+      name: "staff-login",
+      query: { redirect: route.fullPath },
+    });
+  }
+});
+
 function closeWorkspaceMenu() {
   if (workspaceMenu.value) {
     workspaceMenu.value.open = false;
@@ -55,7 +64,7 @@ async function logout() {
 }
 
 async function clearLocal() {
-  session.clearLocalOnly();
+  await session.clearLocalOnly();
   await router.replace("/login");
 }
 </script>

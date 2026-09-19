@@ -3,15 +3,14 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createTradeApi,
   type AfterSale,
   type AfterSaleItem,
   type BusinessId,
   type TradeApi,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const PENDING_STORAGE_PREFIX =
   "plain-journal:admin-after-sale:pending-review:v1:";
 
@@ -100,11 +99,7 @@ function isActiveContext(
 }
 
 function createApi(accessToken: string): TradeApi {
-  return createTradeApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 10000,
-    tokenProvider: () => accessToken,
-  }));
+  return createTradeApi(createAuthenticatedApiClient(accessToken, 10000));
 }
 
 function storageKey(operatorId: BusinessId): string {

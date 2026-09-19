@@ -13,6 +13,7 @@ import {
   type ReviewReportReason,
   type ReviewSummary,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const LEGACY_PENDING_REVIEW_KEY = "plain-journal:pending-review:v1";
@@ -138,10 +139,12 @@ function reviewCommandKey(): string {
 }
 
 function catalogApi(accessToken: string | null): CatalogApi {
+  if (accessToken) {
+    return createCatalogApi(createAuthenticatedApiClient(accessToken));
+  }
   return createCatalogApi(createApiClient({
     baseUrl: apiBaseUrl,
     timeoutMs: 8000,
-    tokenProvider: () => accessToken,
   }));
 }
 

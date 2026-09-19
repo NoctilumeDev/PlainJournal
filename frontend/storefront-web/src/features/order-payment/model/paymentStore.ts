@@ -3,15 +3,14 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createPaymentApi,
   secureRandomUUID,
   type BusinessId,
   type Payment,
   type PaymentApi,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const LEGACY_PENDING_PAYMENT_KEY = "plain-journal:pending-payment:v1";
 const PENDING_PAYMENT_KEY_PREFIX = "plain-journal:pending-payment:v2:";
 
@@ -121,11 +120,7 @@ function newPaymentKey(): string {
 }
 
 function paymentApi(accessToken: string): PaymentApi {
-  return createPaymentApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 8000,
-    tokenProvider: () => accessToken,
-  }));
+  return createPaymentApi(createAuthenticatedApiClient(accessToken));
 }
 
 function isUncertainPaymentFailure(cause: unknown): boolean {

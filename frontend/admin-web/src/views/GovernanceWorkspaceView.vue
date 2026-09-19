@@ -23,7 +23,7 @@ const accessContext = computed(() => ({
     && session.profile?.roles.includes("ADMIN"),
   ),
   operatorId: session.profile?.id ?? null,
-  accessToken: session.accessToken,
+  accessToken: session.requestAuthority,
 }));
 
 function noticeTone(

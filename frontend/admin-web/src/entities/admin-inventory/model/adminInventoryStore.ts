@@ -3,7 +3,6 @@ import { defineStore } from "pinia";
 
 import {
   ApiError,
-  createApiClient,
   createInventoryApi,
   secureRandomUUID,
   type AdjustStockInput,
@@ -12,8 +11,8 @@ import {
   type StockPosition,
   type Warehouse,
 } from "@plain-journal/foundation";
+import { createAuthenticatedApiClient } from "../../../shared/api";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const PENDING_STORAGE_PREFIX =
   "plain-journal:admin-inventory:pending-command:v1:";
 
@@ -77,11 +76,7 @@ function isActiveContext(
 }
 
 function createApi(accessToken: string): InventoryApi {
-  return createInventoryApi(createApiClient({
-    baseUrl: apiBaseUrl,
-    timeoutMs: 10000,
-    tokenProvider: () => accessToken,
-  }));
+  return createInventoryApi(createAuthenticatedApiClient(accessToken, 10000));
 }
 
 function newMovementNo(): string {
