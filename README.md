@@ -36,16 +36,17 @@ PASS；这一真实中间件容量边界与 `v1.1.0` 已通过的前端门禁分
 ### 架构导览
 
 - [系统架构图](https://noctilumedev.github.io/PlainJournal/visuals/system-architecture.html)：
-  从使用者、两端应用和统一网关进入十个事实所有者，再区分同步短链与异步收敛；
+  详细系统视图，从使用者、两端应用和统一网关进入十个事实所有者，再展开访问链、同步短链、事件收敛与运行组件；
 - [功能模块图](https://noctilumedev.github.io/PlainJournal/visuals/functional-modules.html)：
-  从系统根节点分出顾客端与管理端，再沿六个任务域展开 16 个真实功能模块。
+  产品任务视图，从系统根节点分出顾客端与管理端，再沿六个任务域展开 16 个真实功能模块。
 
 ![素简记系统架构图](docs/assets/visuals/system-architecture.png)
 
 ![素简记功能模块图](docs/assets/visuals/functional-modules.png)
 
-两页支持桌面与手机浏览，只复用纸张材质和基础图元；结构底稿、事实清单及渲染器分别维护。
-仓库门禁会把图中的服务与真实应用目录比对，避免微服务演进后文档静默漂移。
+两页支持桌面与手机浏览。下方的运行与归属图是面向 README 的轻量摘要；三种投影各自回答
+产品能力、详细系统结构与运行归属，但不各自发明事实。结构底稿、语义数据与视图渲染分别维护，
+仓库门禁会把图中的服务、owner、同步边、事件流与真实应用目录及同一份架构数据核对。
 
 ## 已完成路线
 
@@ -53,12 +54,7 @@ PASS；这一真实中间件容量边界与 `v1.1.0` 已通过的前端门禁分
 各阶段的完整定义、时间与证据分别以[项目总计划](docs/00-project-master-plan.md)、
 [项目历史](docs/project-history.md)和[验证索引](docs/verification-index.md)为准。
 
-```mermaid
-flowchart LR
-    A["M0-M2<br/>交易基线 · 所有权 · 失败恢复"] --> B["M3-M5<br/>多实例 · 产品前端 · 容量缓存"]
-    B --> C["M6-M8<br/>秒杀 · 数据规模化 · 协作内容"]
-    C --> D["交付与维护<br/>浏览器验收 · 发布证据 · 边界冻结"]
-```
+![素简记已完成路线：M0-M2 交易基线、所有权与失败恢复，M3-M5 多实例、产品前端与容量缓存，M6-M8 秒杀、数据规模化与协作内容，最后以浏览器验收、发布证据和边界冻结收口。](docs/assets/visuals/completed-journey.svg)
 
 路线图只负责帮助读者定位阶段；当前版本、测试数量和发布结论仍由验证基线生成，避免
 README、历史文档和运行证据形成多份相互漂移的事实。
@@ -77,40 +73,14 @@ README、历史文档和运行证据形成多份相互漂移的事实。
 - **前后端交付闭环**：顾客端和管理端包含类型、单元/契约、Playwright、axe、
   生产构建、Nginx 缓存/404/同源代理和响应式 AVIF/WebP 图片门禁。
 
-## 架构
+## 运行与归属视图
 
-```mermaid
-flowchart LR
-    Browser["Storefront / Admin"] --> Gateway["Spring Cloud Gateway"]
-    Gateway --> Identity["Identity"]
-    Gateway --> Catalog["Catalog"]
-    Gateway --> Inventory["Inventory"]
-    Gateway --> Trade["Trade"]
-    Gateway --> Payment["Payment"]
-    Gateway --> Fulfillment["Fulfillment"]
-    Gateway --> Marketing["Marketing"]
-    Gateway --> Chat["Chat"]
-    Gateway --> Notification["Notification"]
-    Gateway --> Analytics["Analytics"]
+![素简记运行与归属视图：顾客端与管理端经统一网关进入十个事实所有者；同步短链只承担立即裁决，跨域状态通过版本化事件收敛；每个服务保持独立数据所有权。](docs/assets/visuals/service-topology.svg)
 
-    Trade --> Inventory
-    Trade --> Catalog
-    Trade --> Marketing
-    Payment --> Trade
-    Fulfillment --> Trade
-
-    Services["Owner services"] --> MySQL[("Owner MySQL schemas")]
-    Services --> Redis[("Redis projections / leases")]
-    Services --> RocketMQ[("RocketMQ events")]
-    Services --> Nacos[("Nacos discovery")]
-    Chat --> MinIO[("Private MinIO objects")]
-
-    RocketMQ --> Services
-```
-
-同步调用只用于立即裁决；跨域最终收敛使用版本化事件。完整调用、事件和数据库边界见
-[服务架构](docs/02-service-architecture.md)、[数据所有权](docs/04-data-ownership.md)
-和[一致性策略](docs/05-consistency-strategy.md)。
+本图压缩产品入口、事实归属、同步裁决与运行底座，不承担逐线部署或调用拓扑；精确 wiring
+继续由前面的[系统架构图](https://noctilumedev.github.io/PlainJournal/visuals/system-architecture.html)
+承担。完整调用、事件和数据库边界见[服务架构](docs/02-service-architecture.md)、
+[数据所有权](docs/04-data-ownership.md)和[一致性策略](docs/05-consistency-strategy.md)。
 
 ## 快速演示
 
