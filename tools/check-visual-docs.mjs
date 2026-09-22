@@ -111,6 +111,93 @@ function extractRendererClasses(source) {
   return classes;
 }
 
+function readDataAttribute(source, attribute, violations) {
+  const match = source.match(new RegExp(`\\b${attribute}="([^"]*)"`));
+  if (!match) {
+    violations.push(`README ownership projection is missing ${attribute}`);
+    return "";
+  }
+  return match[1];
+}
+
+function readRepeatedDataAttributes(source, attribute) {
+  return [...source.matchAll(new RegExp(`\\b${attribute}="([^"]*)"`, "g"))]
+    .map((match) => match[1]);
+}
+
+async function checkReadmeOwnershipProjection(repositoryRoot, architecture, violations) {
+  const source = await fs.readFile(
+    path.join(repositoryRoot, "docs", "assets", "visuals", "service-topology.svg"),
+    "utf8",
+  );
+
+  if (readDataAttribute(source, "data-view", violations) !== "ownership-runtime") {
+    violations.push("README ownership projection has an unexpected view identity");
+  }
+  if (readDataAttribute(source, "data-source", violations)
+    !== "docs/visuals/data/system-architecture.data.js") {
+    violations.push("README ownership projection does not name its governed data source");
+  }
+
+  compareSets(
+    new Set(architecture.experiences.map((experience) => experience.id)),
+    new Set(readRepeatedDataAttributes(source, "data-experience-id")),
+    "README ownership projection experiences",
+    violations,
+  );
+  compareSets(
+    new Set([architecture.gateway.id]),
+    new Set(readRepeatedDataAttributes(source, "data-gateway-id")),
+    "README ownership projection gateway",
+    violations,
+  );
+  compareSets(
+    new Set(architecture.serviceGroups.flatMap((group) =>
+      group.services.map((service) => service.id))),
+    new Set(readRepeatedDataAttributes(source, "data-service-id")),
+    "README ownership projection services",
+    violations,
+  );
+
+  const expectedSyncEdges = new Set(
+    architecture.synchronous.map((edge) => `${edge.from}->${edge.to}`),
+  );
+  const actualSyncEdges = new Set(
+    readDataAttribute(source, "data-sync-edges", violations).split("|").filter(Boolean),
+  );
+  compareSets(
+    expectedSyncEdges,
+    actualSyncEdges,
+    "README ownership projection synchronous edges",
+    violations,
+  );
+
+  for (const [attribute, expected, label] of [
+    ["data-event-producers", architecture.eventFlow.producers, "event producers"],
+    ["data-event-consumers", architecture.eventFlow.consumers, "event consumers"],
+  ]) {
+    compareSets(
+      new Set(expected),
+      new Set(readDataAttribute(source, attribute, violations).split("|").filter(Boolean)),
+      `README ownership projection ${label}`,
+      violations,
+    );
+  }
+  if (readDataAttribute(source, "data-event-broker", violations)
+    !== architecture.eventFlow.broker) {
+    violations.push("README ownership projection event broker drifted");
+  }
+
+  const knownInfrastructure = new Set(
+    architecture.infrastructure.map((item) => item.title),
+  );
+  for (const title of readRepeatedDataAttributes(source, "data-infrastructure-title")) {
+    if (!knownInfrastructure.has(title)) {
+      violations.push(`README ownership projection contains unknown infrastructure ${title}`);
+    }
+  }
+}
+
 async function checkRendererIsolation(repositoryRoot, pageSources, rendererSources, violations) {
   const visualRoot = path.join(repositoryRoot, "docs", "visuals");
   const sharedStyles = await fs.readFile(
@@ -410,6 +497,7 @@ export async function inspectVisualDocs(
   }
 
   await checkPageAssets(repositoryRoot, violations);
+  await checkReadmeOwnershipProjection(repositoryRoot, architecture, violations);
   await checkDraftCoverage(repositoryRoot, architecture, modules, violations);
   await checkSourceCoverage(repositoryRoot, architecture, actualSchemas, violations);
 

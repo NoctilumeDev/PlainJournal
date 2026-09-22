@@ -84,6 +84,21 @@ test("rejects gateway topology that differs from the real route table", async ()
   assert.ok(result.violations.includes("gateway routes contains unknown unknown-service"));
 });
 
+test("rejects a README ownership projection that invents a synchronous edge", async () => {
+  const altered = structuredClone(systemArchitecture);
+  altered.synchronous.push({
+    from: "Payment",
+    to: "Trade",
+    label: "invented synchronous decision",
+  });
+  const result = await inspectVisualDocs(repositoryRoot, altered, functionalModules);
+  assert.ok(
+    result.violations.includes(
+      "README ownership projection synchronous edges is missing Payment->Trade",
+    ),
+  );
+});
+
 test("rejects a module omitted from the functional module tree", async () => {
   const altered = structuredClone(functionalModules);
   altered.entrances[0].domains[0].moduleIds = ["identity-account"];
