@@ -4,6 +4,7 @@ param(
     [switch]$SkipBuild,
     [switch]$AllowPartialPublisherParticipation,
     [switch]$KeepRunning,
+    [ValidateRange(2, 3)][int]$MaximumScale = 3,
     [ValidateRange(100, 5000)][int]$EventCount = 1000,
     [ValidateRange(60, 300)][int]$TimeoutSeconds = 180
 )
@@ -465,7 +466,7 @@ try {
     }
 
     $nacosHeaders = Get-NacosHeaders
-    foreach ($scale in @(1, 2, 3)) {
+    foreach ($scale in 1..$MaximumScale) {
         Invoke-Compose -Arguments @(
             'up', '-d', '--no-deps', '--scale', "trade-service=$scale", 'trade-service'
         )
@@ -548,7 +549,11 @@ WHERE aggregate_type = '$aggregateType';
     $failure = [int](($metricDelta | Measure-Object Failure -Sum).Sum)
     $stateConflict = [int](($metricDelta | Measure-Object StateConflict -Sum).Sum)
     $activePublishers = @($metricDelta | Where-Object Success -gt 0).Count
-    $requiredActivePublishers = if ($AllowPartialPublisherParticipation) { 1 } else { 3 }
+    $requiredActivePublishers = if ($AllowPartialPublisherParticipation) {
+        1
+    } else {
+        $MaximumScale
+    }
     $orderViolations = [int](Get-MySqlScalar -Sql @"
 SELECT COUNT(*)
 FROM outbox_event first_event
@@ -573,7 +578,7 @@ WHERE first_event.aggregate_type = '$aggregateType'
     }
     $results.Add([pscustomobject]@{
         Scenario = 'containerized-outbox'
-        InstanceCount = 3
+        InstanceCount = $MaximumScale
         EventCount = $EventCount
         ElapsedMilliseconds = [math]::Round($timer.Elapsed.TotalMilliseconds, 3)
         ThroughputEventsPerSecond = [math]::Round(
@@ -586,7 +591,8 @@ WHERE first_event.aggregate_type = '$aggregateType'
     })
 
     $stopTarget = $containers | Sort-Object Name | Select-Object -Last 1
-    $nacosBeforeStop = @(Wait-NacosInstanceCount -Headers $nacosHeaders -ExpectedCount 3)
+    $nacosBeforeStop = @(
+        Wait-NacosInstanceCount -Headers $nacosHeaders -ExpectedCount $MaximumScale)
     $stopTimer = [Diagnostics.Stopwatch]::StartNew()
     docker stop --time 30 $stopTarget.ContainerId | Out-Null
     if ($LASTEXITCODE -ne 0) {
@@ -594,7 +600,10 @@ WHERE first_event.aggregate_type = '$aggregateType'
     }
     $stopTimer.Stop()
     $exitCode = [int](docker inspect --format '{{.State.ExitCode}}' $stopTarget.ContainerId)
-    $nacosAfterStop = @(Wait-NacosInstanceCount -Headers $nacosHeaders -ExpectedCount 2)
+    $nacosAfterStop = @(
+        Wait-NacosInstanceCount `
+            -Headers $nacosHeaders `
+            -ExpectedCount ($MaximumScale - 1))
     $stopLogs = (docker logs $stopTarget.ContainerId 2>&1) -join "`n"
     $knownNacosShutdownIssue = $stopLogs.Contains(
         'Cannot read field "sharePublisher" because "com.alibaba.nacos.common.notify.NotifyCenter.INSTANCE" is null')
@@ -641,7 +650,7 @@ WHERE first_event.aggregate_type = '$aggregateType'
     $evidence | ConvertTo-Json -Depth 12 |
         Set-Content -LiteralPath $evidencePath -Encoding utf8
 
-    Write-Host 'Trade container 1/2/3 instance verification passed.'
+    Write-Host "Trade container 1..$MaximumScale instance verification passed."
     $results | Format-Table -AutoSize
     Write-Host "Evidence: $evidencePath"
 }

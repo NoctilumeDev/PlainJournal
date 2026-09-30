@@ -21,6 +21,16 @@ public interface ProductSpuMapper extends BaseMapper<ProductSpuEntity> {
             """)
     int incrementSearchRevision(@Param("productId") Long productId);
 
+    @Update("""
+            UPDATE product_spu
+            SET search_revision = search_revision + 1
+            WHERE id = #{productId}
+              AND search_revision = #{expectedRevision}
+            """)
+    int incrementSearchRevisionIfCurrent(
+            @Param("productId") Long productId,
+            @Param("expectedRevision") long expectedRevision);
+
     @Select("""
             SELECT * FROM product_spu
             WHERE status = 'ACTIVE'

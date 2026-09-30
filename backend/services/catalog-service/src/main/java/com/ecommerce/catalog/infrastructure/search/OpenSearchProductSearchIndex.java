@@ -26,7 +26,6 @@ public class OpenSearchProductSearchIndex implements ProductSearchIndex {
 
     private static final Set<Integer> OK = Set.of(200, 201);
     private static final Set<Integer> OK_OR_NOT_FOUND = Set.of(200, 201, 404);
-    private static final Set<Integer> OK_OR_SUPERSEDED = Set.of(200, 201, 409);
     private static final Set<Integer> OK_OR_NOT_FOUND_OR_SUPERSEDED = Set.of(200, 201, 404, 409);
     private static final int VERSION_SCAN_PAGE_SIZE = 1_000;
 
@@ -89,12 +88,20 @@ public class OpenSearchProductSearchIndex implements ProductSearchIndex {
     @Override
     public void upsert(SearchProductDocument document) {
         ensureWritableAlias();
-        requestJson(
+        String path = "/" + properties.indexAlias() + "/_doc/" + document.productId()
+                + "?version=" + document.revision() + "&version_type=external_gte";
+        HttpResponse<String> response = send(
                 "PUT",
-                "/" + properties.indexAlias() + "/_doc/" + document.productId()
-                        + "?version=" + document.revision() + "&version_type=external_gte",
-                objectMapper.valueToTree(document),
-                OK_OR_SUPERSEDED);
+                path,
+                serialize(objectMapper.valueToTree(document)),
+                "application/json");
+        if (OK.contains(response.statusCode())) {
+            return;
+        }
+        if (response.statusCode() == 409 && visibleRevision(document.productId()) >= document.revision()) {
+            return;
+        }
+        throw failure(path, response);
     }
 
     @Override
@@ -383,6 +390,18 @@ public class OpenSearchProductSearchIndex implements ProductSearchIndex {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("OpenSearch request serialization failed", exception);
         }
+    }
+
+    private long visibleRevision(Long productId) {
+        JsonNode current = requestJson(
+                "GET",
+                "/" + properties.indexAlias() + "/_doc/" + productId,
+                null,
+                OK_OR_NOT_FOUND);
+        if (!current.path("found").asBoolean(false)) {
+            return -1;
+        }
+        return current.at("/_source/revision").asLong(-1);
     }
 
     private SearchIndexUnavailableException failure(String path, HttpResponse<String> response) {

@@ -566,6 +566,14 @@ class CatalogSearchFlowIntegrationTest {
         assertThat(result.orphan()).isZero();
         assertThat(result.repairEvents()).isOne();
         assertThat(jdbcTemplate.queryForObject(
+                "SELECT search_revision FROM product_spu WHERE id = ?",
+                Long.class,
+                PRODUCT_ID)).isEqualTo(2L);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM catalog_search_outbox
+                WHERE product_id = ? AND target_revision = 2
+                """, Integer.class, PRODUCT_ID)).isOne();
+        assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM catalog_search_outbox WHERE product_id = 9403",
                 Integer.class)).isZero();
     }

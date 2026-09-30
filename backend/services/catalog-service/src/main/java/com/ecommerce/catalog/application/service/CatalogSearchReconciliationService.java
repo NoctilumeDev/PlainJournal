@@ -172,11 +172,18 @@ public class CatalogSearchReconciliationService {
                         now);
             }
             if (repair) {
-                long targetRevision = finding.mysqlRevision() != null
-                        ? finding.mysqlRevision()
-                        : finding.indexRevision() + 1;
-                outboxService.enqueueRepair(finding.productId(), targetRevision);
-                repairEvents++;
+                if ("MISSING".equals(finding.issueType())) {
+                    if (outboxService.enqueueMissingRepair(
+                            finding.productId(), finding.mysqlRevision())) {
+                        repairEvents++;
+                    }
+                } else {
+                    long targetRevision = finding.mysqlRevision() != null
+                            ? finding.mysqlRevision()
+                            : finding.indexRevision() + 1;
+                    outboxService.enqueueRepair(finding.productId(), targetRevision);
+                    repairEvents++;
+                }
             }
         }
 

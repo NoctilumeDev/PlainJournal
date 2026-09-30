@@ -3,6 +3,7 @@ param(
     [switch]$SkipNetworkPreflight,
     [switch]$SkipBuild,
     [switch]$KeepRunning,
+    [switch]$CrashOnly,
     [ValidateRange(100, 5000)][int]$EventCount = 1000,
     [ValidateRange(120, 600)][int]$TimeoutSeconds = 300,
     [bool]$UseIsolatedRocketMq = $true,
@@ -1021,122 +1022,125 @@ try {
 
     Remove-ProbeData
     $nacosHeaders = Get-NacosHeaders
-    foreach ($scale in @(1, 2, 3)) {
-        Invoke-Compose -Arguments @(
-            'up', '-d', '--no-deps', '--scale', "trade-service=$scale", 'trade-service'
-        )
-        $containerIds = @(Wait-TradeContainers -ExpectedCount $scale)
-        $nacosInstances = @(Wait-NacosInstanceCount -Headers $nacosHeaders -ExpectedCount $scale)
-        $beforeMetrics = @(Wait-ConsumerMetricsStable -ContainerIds $containerIds)
-        $scenarioOrderPrefix = "$orderPrefix$scale-"
-        $inputAggregateType = "$inputAggregatePrefix$scale"
-        $timer = [Diagnostics.Stopwatch]::StartNew()
-        Send-TradeMySql -Sql (New-PaymentScenarioSql `
-            -Scale $scale `
-            -ScenarioOrderPrefix $scenarioOrderPrefix `
-            -InputAggregateType $inputAggregateType `
-            -Count $EventCount)
-        $state = Wait-Scenario `
-            -ScenarioOrderPrefix $scenarioOrderPrefix `
-            -InputAggregateType $inputAggregateType `
-            -ExpectedCount $EventCount
-        $timer.Stop()
-        $metricDelta = @(Wait-AcknowledgementDelta `
-            -ContainerIds $containerIds `
-            -Before $beforeMetrics `
-            -ExpectedCount $EventCount)
-        $acknowledged = [int](($metricDelta | Measure-Object Acknowledgements -Sum).Sum)
-        $activeConsumers = @($metricDelta | Where-Object Acknowledgements -gt 0).Count
-        if ($acknowledged -lt $EventCount -or $activeConsumers -ne $scale) {
-            throw ("Scale $scale consumer competition failed: acknowledged=$acknowledged " +
-                "activeConsumers=$activeConsumers minimumExpected=$EventCount/$scale")
-        }
+    if (-not $CrashOnly) {
+        foreach ($scale in @(1, 2, 3)) {
+            Invoke-Compose -Arguments @(
+                'up', '-d', '--no-deps', '--scale', "trade-service=$scale", 'trade-service'
+            )
+            $containerIds = @(Wait-TradeContainers -ExpectedCount $scale)
+            $nacosInstances = @(
+                Wait-NacosInstanceCount -Headers $nacosHeaders -ExpectedCount $scale)
+            $beforeMetrics = @(Wait-ConsumerMetricsStable -ContainerIds $containerIds)
+            $scenarioOrderPrefix = "$orderPrefix$scale-"
+            $inputAggregateType = "$inputAggregatePrefix$scale"
+            $timer = [Diagnostics.Stopwatch]::StartNew()
+            Send-TradeMySql -Sql (New-PaymentScenarioSql `
+                -Scale $scale `
+                -ScenarioOrderPrefix $scenarioOrderPrefix `
+                -InputAggregateType $inputAggregateType `
+                -Count $EventCount)
+            $state = Wait-Scenario `
+                -ScenarioOrderPrefix $scenarioOrderPrefix `
+                -InputAggregateType $inputAggregateType `
+                -ExpectedCount $EventCount
+            $timer.Stop()
+            $metricDelta = @(Wait-AcknowledgementDelta `
+                -ContainerIds $containerIds `
+                -Before $beforeMetrics `
+                -ExpectedCount $EventCount)
+            $acknowledged = [int](($metricDelta | Measure-Object Acknowledgements -Sum).Sum)
+            $activeConsumers = @($metricDelta | Where-Object Acknowledgements -gt 0).Count
+            if ($acknowledged -lt $EventCount -or $activeConsumers -ne $scale) {
+                throw ("Scale $scale consumer competition failed: acknowledged=$acknowledged " +
+                    "activeConsumers=$activeConsumers minimumExpected=$EventCount/$scale")
+            }
 
-        $results.Add([pscustomobject]@{
-            Scenario = 'consumer-competition'
-            InstanceCount = $scale
-            EventCount = $EventCount
-            AcknowledgementCount = $acknowledged
-            DuplicateAcknowledgementCount = $acknowledged - $EventCount
-            ElapsedMilliseconds = [math]::Round($timer.Elapsed.TotalMilliseconds, 3)
-            ThroughputEventsPerSecond = [math]::Round(
-                $EventCount / $timer.Elapsed.TotalSeconds, 3)
-            DatabaseState = $state
-            NacosEndpoints = @($nacosInstances | ForEach-Object { "$($_.ip):$($_.port)" })
-            ConsumerMetrics = $metricDelta
-        })
+            $results.Add([pscustomobject]@{
+                Scenario = 'consumer-competition'
+                InstanceCount = $scale
+                EventCount = $EventCount
+                AcknowledgementCount = $acknowledged
+                DuplicateAcknowledgementCount = $acknowledged - $EventCount
+                ElapsedMilliseconds = [math]::Round($timer.Elapsed.TotalMilliseconds, 3)
+                ThroughputEventsPerSecond = [math]::Round(
+                    $EventCount / $timer.Elapsed.TotalSeconds, 3)
+                DatabaseState = $state
+                NacosEndpoints = @($nacosInstances | ForEach-Object { "$($_.ip):$($_.port)" })
+                ConsumerMetrics = $metricDelta
+            })
 
-        if ($scale -eq 3) {
-            $duplicateBefore = @(Wait-ConsumerMetricsStable -ContainerIds $containerIds)
-            Send-TradeMySql -Sql @"
+            if ($scale -eq 3) {
+                $duplicateBefore = @(Wait-ConsumerMetricsStable -ContainerIds $containerIds)
+                Send-TradeMySql -Sql @"
 UPDATE outbox_event
 SET status = 'PENDING', attempts = 0, next_attempt_at = CURRENT_TIMESTAMP(3),
     claimed_at = NULL, claim_owner = NULL, claim_until = NULL,
     published_at = NULL, last_error = NULL, updated_at = CURRENT_TIMESTAMP(3)
 WHERE aggregate_type = '$inputAggregateType';
 "@
-            $duplicateMetrics = @(Wait-AcknowledgementDelta `
-                -ContainerIds $containerIds `
-                -Before $duplicateBefore `
-                -ExpectedCount $EventCount)
-            $duplicateState = Wait-Scenario `
-                -ScenarioOrderPrefix $scenarioOrderPrefix `
-                -InputAggregateType $inputAggregateType `
-                -ExpectedCount $EventCount
-            $historyCount = [int](Get-MySqlScalar -Sql @"
+                $duplicateMetrics = @(Wait-AcknowledgementDelta `
+                    -ContainerIds $containerIds `
+                    -Before $duplicateBefore `
+                    -ExpectedCount $EventCount)
+                $duplicateState = Wait-Scenario `
+                    -ScenarioOrderPrefix $scenarioOrderPrefix `
+                    -InputAggregateType $inputAggregateType `
+                    -ExpectedCount $EventCount
+                $historyCount = [int](Get-MySqlScalar -Sql @"
 SELECT COUNT(*)
 FROM order_status_history history
 JOIN trade_order trade ON trade.id = history.order_id
 WHERE trade.order_no LIKE '$scenarioOrderPrefix%'
   AND history.command = 'PAYMENT_SUCCEEDED';
 "@)
-            $paymentConfirmingCount = [int](Get-MySqlScalar -Sql @"
+                $paymentConfirmingCount = [int](Get-MySqlScalar -Sql @"
 SELECT COUNT(*)
 FROM trade_order
 WHERE order_no LIKE '$scenarioOrderPrefix%'
   AND status = 'PAYMENT_CONFIRMING';
 "@)
-            $paidCount = [int](Get-MySqlScalar -Sql @"
+                $paidCount = [int](Get-MySqlScalar -Sql @"
 SELECT COUNT(*)
 FROM trade_order
 WHERE order_no LIKE '$scenarioOrderPrefix%'
   AND status = 'PAID';
 "@)
-            $outputCount = [int](Get-MySqlScalar -Sql @"
+                $outputCount = [int](Get-MySqlScalar -Sql @"
 SELECT COUNT(*)
 FROM outbox_event
 WHERE aggregate_type = 'TradeOrder'
   AND aggregate_id LIKE '$scenarioOrderPrefix%'
   AND event_type = 'OrderPaid';
 "@)
-            $consumedCount = [int](Get-MySqlScalar -Sql @"
+                $consumedCount = [int](Get-MySqlScalar -Sql @"
 SELECT COUNT(*)
 FROM consumed_event consumed
 JOIN outbox_event input_event ON input_event.id = consumed.event_id
 WHERE input_event.aggregate_type = '$inputAggregateType'
   AND consumed.consumer_group = 'trade-payment-succeeded-v1';
 "@)
-            if ($historyCount -ne $EventCount -or
-                $paymentConfirmingCount -ne $EventCount -or
-                $paidCount -ne 0 -or
-                $outputCount -ne 0 -or
-                $consumedCount -ne $EventCount) {
-                throw ("Duplicate delivery changed business side effects: history=$historyCount " +
-                    "paymentConfirming=$paymentConfirmingCount paid=$paidCount " +
-                    "output=$outputCount consumed=$consumedCount")
+                if ($historyCount -ne $EventCount -or
+                    $paymentConfirmingCount -ne $EventCount -or
+                    $paidCount -ne 0 -or
+                    $outputCount -ne 0 -or
+                    $consumedCount -ne $EventCount) {
+                    throw ("Duplicate delivery changed business side effects: history=$historyCount " +
+                        "paymentConfirming=$paymentConfirmingCount paid=$paidCount " +
+                        "output=$outputCount consumed=$consumedCount")
+                }
+                $results.Add([pscustomobject]@{
+                    Scenario = 'duplicate-delivery-idempotency'
+                    InstanceCount = 3
+                    DuplicateEventCount = $EventCount
+                    DatabaseState = $duplicateState
+                    HistoryCount = $historyCount
+                    PaymentConfirmingOrderCount = $paymentConfirmingCount
+                    PaidOrderCount = $paidCount
+                    OrderPaidOutboxCount = $outputCount
+                    ConsumedEventCount = $consumedCount
+                    ConsumerMetrics = $duplicateMetrics
+                })
             }
-            $results.Add([pscustomobject]@{
-                Scenario = 'duplicate-delivery-idempotency'
-                InstanceCount = 3
-                DuplicateEventCount = $EventCount
-                DatabaseState = $duplicateState
-                HistoryCount = $historyCount
-                PaymentConfirmingOrderCount = $paymentConfirmingCount
-                PaidOrderCount = $paidCount
-                OrderPaidOutboxCount = $outputCount
-                ConsumedEventCount = $consumedCount
-                ConsumerMetrics = $duplicateMetrics
-            })
         }
     }
 
@@ -1358,6 +1362,7 @@ SELECT id FROM outbox_event WHERE aggregate_type = '$consumerAfterCommitAggregat
             RocketMqMode = if ($UseIsolatedRocketMq) { 'isolated-ephemeral' } else { 'shared' }
             RocketMqBrokerStoreMount = $brokerStoreMount.Trim()
             TradeImage = 'plainjournal/trade-service:local'
+            Mode = if ($CrashOnly) { 'crash-only' } else { 'full' }
         }
         LogsUsedAsProof = $false
         Results = $results
@@ -1433,6 +1438,10 @@ $evidence | Add-Member -NotePropertyName Cleanup -NotePropertyValue ([pscustomob
 $evidence | ConvertTo-Json -Depth 12 |
     Set-Content -LiteralPath $evidencePath -Encoding utf8
 
-Write-Host 'Trade PaymentSucceeded consumer 1/2/3 instance verification passed.'
+if ($CrashOnly) {
+    Write-Host 'Trade PaymentSucceeded crash-boundary verification passed.'
+} else {
+    Write-Host 'Trade PaymentSucceeded consumer 1/2/3 instance verification passed.'
+}
 $results | Format-Table -AutoSize
 Write-Host "Evidence: $evidencePath"

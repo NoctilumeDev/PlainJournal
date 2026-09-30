@@ -568,7 +568,7 @@ $primaryError = $null
 $cleanupErrors = [Collections.Generic.List[string]]::new()
 
 try {
-    Write-Host 'Stage 1/9: validating network, core middleware, ports, and OpenSearch.'
+    Write-Host 'Stage 1/10: validating network, core middleware, ports, and OpenSearch.'
     Write-VerificationTrace 'stage 1 begin'
     if (-not $SkipNetworkPreflight) {
         & (Join-Path $PSScriptRoot 'check-verification-host.ps1')
@@ -592,7 +592,7 @@ try {
     Assert-PortAvailable
     Start-OpenSearch
 
-    Write-Host 'Stage 2/9: building Catalog and creating an isolated real MySQL schema.'
+    Write-Host 'Stage 2/10: building Catalog and creating an isolated real MySQL schema.'
     Write-VerificationTrace 'stage 2 begin'
     if (-not $SkipBuild) {
         Push-Location $script:backendRoot
@@ -610,7 +610,7 @@ try {
     Start-Catalog
     $adminToken = New-AccessToken
 
-    Write-Host 'Stage 3/9: creating two MySQL product facts and verifying incremental projection.'
+    Write-Host 'Stage 3/10: creating two MySQL product facts and verifying incremental projection.'
     Write-VerificationTrace 'stage 3 begin'
     Invoke-CatalogSql -Sql @"
 INSERT INTO catalog_category
@@ -644,7 +644,7 @@ SELECT COUNT(*) FROM catalog_search_outbox WHERE status = 'PUBLISHED';
         firstProductSearchSource = 'OPENSEARCH'
     }
 
-    Write-Host 'Stage 4/9: stopping OpenSearch and proving explicit MySQL fallback plus governed failure.'
+    Write-Host 'Stage 4/10: stopping OpenSearch and proving explicit MySQL fallback plus governed failure.'
     Write-VerificationTrace 'stage 4 begin'
     Stop-OpenSearchForFault
     $updated = Invoke-CatalogApi `
@@ -696,7 +696,7 @@ SELECT attempts FROM catalog_search_outbox WHERE id = '$needsAttentionId';
         attempts = $attemptsDuringOutage
     }
 
-    Write-Host 'Stage 5/9: restoring OpenSearch through idempotent audited recovery.'
+    Write-Host 'Stage 5/10: restoring OpenSearch through idempotent audited recovery.'
     Write-VerificationTrace 'stage 5 begin'
     Restart-OpenSearchAfterFault
     $recoveryBody = @{
@@ -731,7 +731,7 @@ WHERE command_id = 'recover-$($script:suffix)';
         finalSearchSource = 'OPENSEARCH'
     }
 
-    Write-Host 'Stage 6/9: running an idempotent audited blue-green full rebuild.'
+    Write-Host 'Stage 6/10: running an idempotent audited blue-green full rebuild.'
     Write-VerificationTrace 'stage 6 begin'
     $rebuildBody = @{
         commandId = "rebuild-$($script:suffix)"
@@ -776,8 +776,105 @@ WHERE command_id = 'rebuild-$($script:suffix)';
 "@)
     }
 
-    Write-Host 'Stage 7/9: injecting missing, stale, and orphan index divergence.'
+    Write-Host 'Stage 7/10: delivering N+1 before N and duplicate N through the real projection worker.'
     Write-VerificationTrace 'stage 7 begin'
+    $oldRevision = [long](Invoke-CatalogSql -Sql @"
+SELECT search_revision FROM product_spu WHERE id = $($script:firstProductId);
+"@)
+    $currentRevision = $oldRevision + 1
+    $currentTitle = "青荷顺序新版本$($script:suffix)"
+    $newerEventId = [Guid]::NewGuid().ToString()
+    $olderEventId = [Guid]::NewGuid().ToString()
+    $duplicateOlderEventId = [Guid]::NewGuid().ToString()
+    Invoke-CatalogSql -Sql @"
+UPDATE product_spu
+SET title = '$currentTitle',
+    search_revision = $currentRevision,
+    updated_at = CURRENT_TIMESTAMP(3)
+WHERE id = $($script:firstProductId)
+  AND search_revision = $oldRevision;
+INSERT INTO catalog_search_outbox
+    (id, product_id, target_revision, status, attempts, next_attempt_at,
+     claimed_at, claim_owner, claim_until, published_at, last_error, created_at, updated_at)
+VALUES
+    ('$newerEventId', $($script:firstProductId), $currentRevision, 'PENDING', 0,
+     CURRENT_TIMESTAMP(3), NULL, NULL, NULL, NULL, NULL,
+     CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)),
+    ('$olderEventId', $($script:firstProductId), $oldRevision, 'PENDING', 0,
+     TIMESTAMPADD(HOUR, 1, CURRENT_TIMESTAMP(3)), NULL, NULL, NULL, NULL, NULL,
+     CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)),
+    ('$duplicateOlderEventId', $($script:firstProductId), $oldRevision, 'PENDING', 0,
+     TIMESTAMPADD(HOUR, 1, CURRENT_TIMESTAMP(3)), NULL, NULL, NULL, NULL, NULL,
+     CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3));
+"@ | Out-Null
+    Wait-Until -Description 'N+1 search event publication' `
+        -TimeoutSeconds 60 `
+        -Condition {
+            (Invoke-CatalogSql -Sql @"
+SELECT COUNT(*) FROM catalog_search_outbox
+WHERE id = '$newerEventId' AND status = 'PUBLISHED';
+"@) -eq '1'
+        }
+    Invoke-OpenSearch -Method Post -Path "/$targetIndex/_refresh" | Out-Null
+    $afterNewer = Invoke-OpenSearch `
+        -Method Get `
+        -Path "/$targetIndex/_doc/$($script:firstProductId)"
+    if ($afterNewer.status -ne 200 -or
+        [long]$afterNewer.body._version -ne $currentRevision -or
+        [long]$afterNewer.body._source.revision -ne $currentRevision -or
+        [string]$afterNewer.body._source.title -ne $currentTitle) {
+        throw 'N+1 search projection was not observable before older delivery.'
+    }
+    Invoke-CatalogSql -Sql @"
+UPDATE catalog_search_outbox
+SET next_attempt_at = CURRENT_TIMESTAMP(3), updated_at = CURRENT_TIMESTAMP(3)
+WHERE id IN ('$olderEventId', '$duplicateOlderEventId')
+  AND status = 'PENDING';
+"@ | Out-Null
+    Wait-Until -Description 'N and duplicate N search event publication' `
+        -TimeoutSeconds 60 `
+        -Condition {
+            (Invoke-CatalogSql -Sql @"
+SELECT COUNT(*) FROM catalog_search_outbox
+WHERE id IN ('$newerEventId', '$olderEventId', '$duplicateOlderEventId')
+  AND status = 'PUBLISHED';
+"@) -eq '3'
+        }
+    Invoke-OpenSearch -Method Post -Path "/$targetIndex/_refresh" | Out-Null
+    $afterOlderDuplicates = Invoke-OpenSearch `
+        -Method Get `
+        -Path "/$targetIndex/_doc/$($script:firstProductId)"
+    if ($afterOlderDuplicates.status -ne 200 -or
+        [long]$afterOlderDuplicates.body._version -ne $currentRevision -or
+        [long]$afterOlderDuplicates.body._source.revision -ne $currentRevision -or
+        [string]$afterOlderDuplicates.body._source.title -ne $currentTitle) {
+        throw 'Older or duplicate search input rolled the OpenSearch document backward.'
+    }
+    Wait-SearchContains `
+        -Query '顺序新版本' `
+        -ProductId $script:firstProductId
+    $script:verification.outOfOrderProjection = [ordered]@{
+        deliveryOrder = @('N+1', 'N', 'duplicate N')
+        eventIds = @($newerEventId, $olderEventId, $duplicateOlderEventId)
+        targetRevisions = @($currentRevision, $oldRevision, $oldRevision)
+        publishedRows = [long](Invoke-CatalogSql -Sql @"
+SELECT COUNT(*) FROM catalog_search_outbox
+WHERE id IN ('$newerEventId', '$olderEventId', '$duplicateOlderEventId')
+  AND status = 'PUBLISHED';
+"@)
+        mysqlRevision = [long](Invoke-CatalogSql -Sql @"
+SELECT search_revision FROM product_spu WHERE id = $($script:firstProductId);
+"@)
+        indexExternalVersion = [long]$afterOlderDuplicates.body._version
+        indexDocumentRevision = [long]$afterOlderDuplicates.body._source.revision
+        indexDocumentTitle = [string]$afterOlderDuplicates.body._source.title
+        publicSearchSource = 'OPENSEARCH'
+    }
+    $script:failureContext.outOfOrderProjection =
+        $script:verification.outOfOrderProjection
+
+    Write-Host 'Stage 8/10: injecting missing, stale, and orphan index divergence.'
+    Write-VerificationTrace 'stage 8 begin'
     Invoke-OpenSearch `
         -Method Delete `
         -Path "/$targetIndex/_doc/$($script:firstProductId)?refresh=true" | Out-Null
@@ -811,6 +908,10 @@ WHERE id = $($script:secondProductId);
         -Path '/api/v1/catalog/admin/search/reconciliation' `
         -Token $adminToken `
         -Body @{ repair = $true }
+    $script:failureContext.reconciliationDetected = [ordered]@{
+        status = $reconciliation.status
+        data = $reconciliation.body.data
+    }
     if ($reconciliation.status -ne 200 -or
         [int]$reconciliation.body.data.missing -ne 1 -or
         [int]$reconciliation.body.data.stale -ne 1 -or
@@ -830,6 +931,34 @@ WHERE id = $($script:secondProductId);
         -Path '/api/v1/catalog/admin/search/reconciliation' `
         -Token $adminToken `
         -Body @{ repair = $false }
+    $firstDocumentAfterRepair = Invoke-OpenSearch `
+        -Method Get `
+        -Path "/$targetIndex/_doc/$($script:firstProductId)"
+    $secondDocumentAfterRepair = Invoke-OpenSearch `
+        -Method Get `
+        -Path "/$targetIndex/_doc/$($script:secondProductId)"
+    $orphanDocumentAfterRepair = Invoke-OpenSearch `
+        -Method Get `
+        -Path "/$targetIndex/_doc/$orphanProductId"
+    $script:failureContext.reconciliationConvergence = [ordered]@{
+        status = $converged.status
+        data = $converged.body.data
+        mysqlProducts = @(Invoke-CatalogSql -AllRows -Sql @"
+SELECT id, search_revision, status, title
+FROM product_spu
+WHERE id IN ($($script:firstProductId), $($script:secondProductId))
+ORDER BY id;
+"@)
+        firstDocument = $firstDocumentAfterRepair
+        secondDocument = $secondDocumentAfterRepair
+        orphanDocument = $orphanDocumentAfterRepair
+        reconciliationRows = @(Invoke-CatalogSql -AllRows -Sql @"
+SELECT id, issue_type, product_id, mysql_revision, index_revision,
+       status, occurrences, first_detected_at, last_detected_at, resolved_at
+FROM catalog_search_reconciliation
+ORDER BY id;
+"@)
+    }
     if ($converged.status -ne 200 -or
         [int]$converged.body.data.missing -ne 0 -or
         [int]$converged.body.data.stale -ne 0 -or
@@ -857,8 +986,8 @@ SELECT COUNT(*) FROM catalog_search_reconciliation WHERE status = 'RESOLVED';
         orphanHttpStatusAfterRepair = $orphanAfterRepair.status
     }
 
-    Write-Host 'Stage 8/9: unpublishing a product and proving the index cannot keep it public.'
-    Write-VerificationTrace 'stage 8 begin'
+    Write-Host 'Stage 9/10: unpublishing a product and proving the index cannot keep it public.'
+    Write-VerificationTrace 'stage 9 begin'
     $unpublished = Invoke-CatalogApi `
         -Method Post `
         -Path "/api/v1/catalog/admin/products/$($script:secondProductId)/unpublish" `
@@ -892,8 +1021,8 @@ SELECT COUNT(*) FROM catalog_search_reconciliation WHERE status = 'RESOLVED';
         publicItems = @($publicSearch.body.data.items).Count
     }
 
-    Write-Host 'Stage 9/9: recording final facts and metrics.'
-    Write-VerificationTrace 'stage 9 begin'
+    Write-Host 'Stage 10/10: recording final facts and metrics.'
+    Write-VerificationTrace 'stage 10 begin'
     $metrics = Invoke-WebRequest `
         -Method Get `
         -Uri "http://127.0.0.1:$($script:catalogPort)/actuator/prometheus" `
@@ -951,6 +1080,12 @@ SELECT COUNT(*) FROM catalog_search_outbox WHERE status = 'NEEDS_ATTENTION';
 catch {
     $primaryError = $_
     Write-VerificationTrace "verification failed: $($_.Exception.Message)"
+    if ($script:verification.Count -gt 0) {
+        $script:verification | ConvertTo-Json -Depth 20 |
+            Set-Content -LiteralPath (
+                Join-Path $script:runDirectory 'partial-verification.json') `
+                -Encoding utf8
+    }
     [ordered]@{
         message = $_.Exception.Message
         scriptStackTrace = $_.ScriptStackTrace

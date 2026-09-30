@@ -64,6 +64,22 @@ public class CatalogSearchOutboxService {
         enqueue(productId, targetRevision);
     }
 
+    @Transactional
+    public boolean enqueueMissingRepair(Long productId, long observedRevision) {
+        if (!properties.enabled()) {
+            throw new CatalogException(CatalogError.SEARCH_INDEX_UNAVAILABLE);
+        }
+        if (productMapper.incrementSearchRevisionIfCurrent(productId, observedRevision) != 1) {
+            return false;
+        }
+        ProductSpuEntity product = productMapper.selectById(productId);
+        if (product == null) {
+            throw new CatalogException(CatalogError.RESOURCE_NOT_FOUND);
+        }
+        enqueue(productId, product.getSearchRevision());
+        return true;
+    }
+
     @Transactional(readOnly = true)
     public List<SearchOutboxView> list(String status, int limit) {
         return outboxMapper.selectByStatus(status, limit).stream().map(this::view).toList();
