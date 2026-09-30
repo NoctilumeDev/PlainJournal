@@ -1214,7 +1214,7 @@ test("V6.4 Marketing keeps a committed lost rule unknown without repeating its P
   expect(unexpectedConsoleErrors(diagnostics.consoleErrors)).toEqual([]);
 });
 
-test("V6.4 Catalog keeps the admin view as a public projection with images, filters and pagination facts", async ({
+test("V6.4 Catalog keeps the owner workspace with images, filters and pagination facts", async ({
   page,
 }) => {
   await serveCatalogImages(page);
@@ -1224,17 +1224,18 @@ test("V6.4 Catalog keeps the admin view as a public projection with images, filt
     const url = new URL(browserRequest.url());
     if (
       browserRequest.method() === "GET"
-      && url.pathname === "/api/v1/catalog/products"
+      && url.pathname === "/api/v1/catalog/admin/products"
     ) {
-      productRequests.push(url.search);
+      productRequests.push(`${url.pathname}${url.search}`);
     }
   });
 
   await loginAdminAt(page, "/catalog");
   await expect(
-    page.getByRole("heading", { name: "商品目录", level: 1 }),
+    page.getByRole("heading", { name: "商品经营", level: 1 }),
   ).toBeVisible();
-  await expect(page.getByText(/2 条 · 读取于/u)).toBeVisible();
+  await expect(page.locator(".catalog-panel-header small"))
+    .toHaveText(/^2 条 · \d{2}:\d{2}:\d{2}$/u);
   await expect(page.locator(".catalog-list > li")).toHaveCount(2);
   await expect(
     page.locator(".catalog-list").getByAltText("帆布通勤袋 商品图"),
@@ -1247,18 +1248,22 @@ test("V6.4 Catalog keeps the admin view as a public projection with images, filt
       .getByText(/显示 1–2 · 第 1 \/ 1 页/u),
   ).toBeVisible();
 
-  await page.getByLabel("分类", { exact: true })
+  const filters = page.locator("form.catalog-form").filter({
+    has: page.getByRole("heading", { name: "筛选商品", level: 2 }),
+  });
+  await filters.getByLabel("分类", { exact: true })
     .selectOption("2079000000000000101");
-  await page.getByRole("button", { name: "应用筛选" }).click();
-  await expect(page.getByText(/1 条 · 读取于/u)).toBeVisible();
+  await filters.getByRole("button", { name: "应用筛选" }).click();
+  await expect(page.locator(".catalog-panel-header small"))
+    .toHaveText(/^1 条 · \d{2}:\d{2}:\d{2}$/u);
   await expect(page.locator(".catalog-list > li")).toHaveCount(1);
   await expect(page.getByRole("heading", { name: "帆布通勤袋", level: 2 }))
     .toBeVisible();
   expect(productRequests.at(-1)).toBe(
-    "?page=1&size=20&categoryId=2079000000000000101",
+    "/api/v1/catalog/admin/products?page=1&size=20&categoryId=2079000000000000101",
   );
-  expect(productRequests.every((search) =>
-    !search.includes("/admin/"))).toBe(true);
+  expect(productRequests.every((request) =>
+    request.startsWith("/api/v1/catalog/admin/products?"))).toBe(true);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expectNoRootOverflow(page);
@@ -1271,13 +1276,13 @@ test("V6.4 Catalog keeps the admin view as a public projection with images, filt
   expect(unexpectedConsoleErrors(diagnostics.consoleErrors)).toEqual([]);
 });
 
-test("V6.4 Catalog preserves known products when a public projection refresh returns 503", async ({
+test("V6.4 Catalog preserves known owner facts when an owner refresh returns 503", async ({
   page,
 }) => {
   await serveCatalogImages(page);
   const diagnostics = observeDiagnostics(page);
   let failNext = false;
-  await page.route("**/api/v1/catalog/products?*", async (route) => {
+  await page.route("**/api/v1/catalog/admin/products?*", async (route) => {
     if (failNext) {
       failNext = false;
       await route.fulfill({
@@ -1298,18 +1303,18 @@ test("V6.4 Catalog preserves known products when a public projection refresh ret
   await loginAdminAt(page, "/catalog");
   await expect(page.locator(".catalog-list > li")).toHaveCount(2);
   failNext = true;
-  await page.getByRole("button", { name: "重新读取" }).click();
+  await page.getByRole("button", { name: "重新读取 owner 事实" }).click();
   await expect(
     page.locator(".pj-status-notice--danger")
-      .filter({ hasText: "商品投影读取未完成" }),
+      .filter({ hasText: "商品事实读取未完成" }),
   ).toBeVisible();
   await expect(page.locator(".catalog-list > li")).toHaveCount(2);
-  await expect(page.getByText(/保留上一次已显示的商品事实/u)).toBeVisible();
+  await expect(page.getByText(/保留上一次已确认的 owner 事实/u)).toBeVisible();
 
-  await page.getByRole("button", { name: "重新读取" }).click();
+  await page.getByRole("button", { name: "重新读取 owner 事实" }).click();
   await expect(
     page.locator(".pj-status-notice--danger")
-      .filter({ hasText: "商品投影读取未完成" }),
+      .filter({ hasText: "商品事实读取未完成" }),
   ).toHaveCount(0);
   await expect(page.locator(".catalog-list > li")).toHaveCount(2);
   expect(diagnostics.pageErrors).toEqual([]);

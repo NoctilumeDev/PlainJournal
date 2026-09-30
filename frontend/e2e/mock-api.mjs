@@ -1760,6 +1760,59 @@ createServer(async (request, response) => {
     respond(response, 200, catalogProducts.map((product) => product.category));
     return;
   }
+  if (method === "GET" && url.pathname === "/api/v1/catalog/brands") {
+    respond(response, 200, [
+      ...new Map(catalogProducts.map((product) => [
+        product.brand.id,
+        product.brand,
+      ])).values(),
+    ]);
+    return;
+  }
+  if (method === "GET" && url.pathname === "/api/v1/catalog/admin/products") {
+    const page = positiveQueryInteger(url, "page", 1);
+    const size = positiveQueryInteger(url, "size", 20);
+    const status = url.searchParams.get("status");
+    const categoryId = url.searchParams.get("categoryId");
+    const keyword = (url.searchParams.get("keyword") ?? "").trim().toLowerCase();
+    const selectedProducts = catalogProducts.filter((product) =>
+      (!status || product.status === status)
+      && (!categoryId || product.category.id === categoryId)
+      && (!keyword
+        || product.title.toLowerCase().includes(keyword)
+        || (product.subtitle ?? "").toLowerCase().includes(keyword)));
+    const summaries = selectedProducts.map((product) => ({
+      id: product.id,
+      title: product.title,
+      subtitle: product.subtitle,
+      status: product.status,
+      version: product.version,
+      category: product.category,
+      brand: product.brand,
+      minimumPrice: product.skus[0]?.salePrice ?? null,
+      coverUrl: product.media[0]?.url ?? null,
+    }));
+    respond(response, 200, {
+      items: paginate(summaries, page, size),
+      page,
+      size,
+      total: summaries.length,
+    });
+    return;
+  }
+  const adminProductDetailMatch = url.pathname.match(
+    /^\/api\/v1\/catalog\/admin\/products\/([^/]+)$/u,
+  );
+  if (method === "GET" && adminProductDetailMatch) {
+    const selectedProduct = catalogProducts.find((product) =>
+      product.id === adminProductDetailMatch[1]);
+    if (!selectedProduct) {
+      respond(response, 404, null);
+      return;
+    }
+    respond(response, 200, selectedProduct);
+    return;
+  }
   if (method === "GET" && url.pathname === "/api/v1/catalog/products") {
     const page = positiveQueryInteger(url, "page", 1);
     const size = positiveQueryInteger(url, "size", 20);
