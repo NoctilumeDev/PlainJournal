@@ -895,8 +895,10 @@ WHERE u.email = $chainEmail;
             name = "M7 Sharding $probePrefix"
             slug = $brandSlug
         }
+    $catalogProductHeaders = $adminHeaders.Clone()
+    $catalogProductHeaders['Idempotency-Key'] = "catalog:create:m7:$probePrefix"
     $product = Invoke-JsonPost -Uri "$catalogBaseUrl/admin/products" `
-        -Headers $adminHeaders -Body @{
+        -Headers $catalogProductHeaders -Body @{
             categoryId = $category.data.id
             brandId = $brand.data.id
             title = $productTitle

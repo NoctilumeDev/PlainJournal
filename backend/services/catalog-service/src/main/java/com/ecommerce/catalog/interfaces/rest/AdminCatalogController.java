@@ -1,5 +1,6 @@
 package com.ecommerce.catalog.interfaces.rest;
 
+import com.ecommerce.catalog.application.model.CatalogModels.AdminProductSummary;
 import com.ecommerce.catalog.application.model.CatalogModels.BrandView;
 import com.ecommerce.catalog.application.model.CatalogModels.CategoryView;
 import com.ecommerce.catalog.application.model.CatalogModels.CreateProductCommand;
@@ -12,6 +13,7 @@ import com.ecommerce.catalog.application.model.CatalogModels.UpdateSkuCommand;
 import com.ecommerce.catalog.application.model.CatalogModels.UploadIntent;
 import com.ecommerce.catalog.application.service.CatalogService;
 import com.ecommerce.platform.common.api.ApiResponse;
+import com.ecommerce.platform.common.api.PageResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -25,15 +27,22 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.util.List;
 
+@Validated
 @RestController
 @RequestMapping("/api/v1/catalog/admin")
 public class AdminCatalogController {
@@ -57,15 +66,46 @@ public class AdminCatalogController {
         return ApiResponse.success(catalogService.createBrand(request.name(), request.slug()));
     }
 
+    @GetMapping("/products")
+    public ApiResponse<PageResponse<AdminProductSummary>> products(
+            @RequestParam(defaultValue = "1") @Min(1) long page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) long size,
+            @RequestParam(required = false)
+            @Pattern(regexp = "DRAFT|ACTIVE|INACTIVE") String status,
+            @RequestParam(required = false) @Positive Long categoryId,
+            @RequestParam(required = false) @Size(max = 80) String keyword) {
+        return ApiResponse.success(catalogService.listAdminProducts(
+                page, size, status, categoryId, keyword));
+    }
+
+    @GetMapping("/products/{productId}")
+    public ApiResponse<ProductDetail> product(@PathVariable @Positive Long productId) {
+        return ApiResponse.success(catalogService.getAdminProduct(productId));
+    }
+
+    @GetMapping("/products/by-idempotency-key/{commandId}")
+    public ApiResponse<ProductDetail> productByIdempotencyKey(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable @NotBlank @Size(max = 64) String commandId) {
+        return ApiResponse.success(catalogService.findCreatedProduct(userId(jwt), commandId));
+    }
+
     @PostMapping("/products")
-    public ApiResponse<ProductDetail> createProduct(@Valid @RequestBody CreateProductRequest request) {
+    public ApiResponse<ProductDetail> createProduct(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader("Idempotency-Key")
+            @NotBlank @Size(max = 64) String commandId,
+            @Valid @RequestBody CreateProductRequest request) {
         List<CreateSkuCommand> skus = request.skus().stream()
                 .map(sku -> new CreateSkuCommand(sku.skuCode(), sku.name(), sku.specJson(),
                         sku.salePrice(), sku.marketPrice()))
                 .toList();
-        return ApiResponse.success(catalogService.createProduct(new CreateProductCommand(
-                request.categoryId(), request.brandId(), request.title(), request.subtitle(),
-                request.description(), skus)));
+        return ApiResponse.success(catalogService.createProduct(
+                userId(jwt),
+                commandId,
+                new CreateProductCommand(
+                        request.categoryId(), request.brandId(), request.title(), request.subtitle(),
+                        request.description(), skus)));
     }
 
     @PutMapping("/products/{productId}")
@@ -184,5 +224,17 @@ public class AdminCatalogController {
             @NotBlank @Size(max = 500) String objectKey,
             @Min(0) @Max(100000) int sortOrder
     ) {
+    }
+
+    private long userId(Jwt jwt) {
+        try {
+            long value = Long.parseLong(jwt.getSubject());
+            if (value <= 0) {
+                throw new IllegalArgumentException("JWT subject must be positive");
+            }
+            return value;
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("JWT subject is invalid", exception);
+        }
     }
 }

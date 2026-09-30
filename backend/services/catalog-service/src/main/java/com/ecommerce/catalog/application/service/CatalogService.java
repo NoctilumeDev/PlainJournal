@@ -1,10 +1,12 @@
 package com.ecommerce.catalog.application.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ecommerce.catalog.application.exception.CatalogError;
 import com.ecommerce.catalog.application.exception.CatalogException;
 import com.ecommerce.catalog.application.model.CatalogModels.BrandView;
+import com.ecommerce.catalog.application.model.CatalogModels.AdminProductSummary;
 import com.ecommerce.catalog.application.model.CatalogModels.CategoryView;
 import com.ecommerce.catalog.application.model.CatalogModels.CreateProductCommand;
 import com.ecommerce.catalog.application.model.CatalogModels.CreateSkuCommand;
@@ -25,6 +27,7 @@ import com.ecommerce.catalog.infrastructure.persistence.entity.CategoryEntity;
 import com.ecommerce.catalog.infrastructure.persistence.entity.ProductMediaEntity;
 import com.ecommerce.catalog.infrastructure.persistence.entity.ProductSkuEntity;
 import com.ecommerce.catalog.infrastructure.persistence.entity.ProductSpuEntity;
+import com.ecommerce.catalog.infrastructure.persistence.CatalogProductCreateCommandRepository;
 import com.ecommerce.catalog.infrastructure.persistence.mapper.BrandMapper;
 import com.ecommerce.catalog.infrastructure.persistence.mapper.CategoryMapper;
 import com.ecommerce.catalog.infrastructure.persistence.mapper.ProductMediaMapper;
@@ -34,6 +37,7 @@ import com.ecommerce.catalog.infrastructure.storage.MediaStorageProperties;
 import com.ecommerce.platform.common.api.CursorPageResponse;
 import com.ecommerce.platform.common.api.KeysetCursor;
 import com.ecommerce.platform.common.api.PageResponse;
+import com.ecommerce.platform.common.idempotency.PayloadFingerprint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -69,6 +73,7 @@ public class CatalogService {
     private final ProductSpuMapper spuMapper;
     private final ProductSkuMapper skuMapper;
     private final ProductMediaMapper mediaMapper;
+    private final CatalogProductCreateCommandRepository createCommandRepository;
     private final ObjectStorage objectStorage;
     private final CatalogReadRequirement readRequirement;
     private final ProductDetailCache productDetailCache;
@@ -82,6 +87,7 @@ public class CatalogService {
             ProductSpuMapper spuMapper,
             ProductSkuMapper skuMapper,
             ProductMediaMapper mediaMapper,
+            CatalogProductCreateCommandRepository createCommandRepository,
             ObjectStorage objectStorage,
             CatalogReadRequirement readRequirement,
             ProductDetailCache productDetailCache,
@@ -93,6 +99,7 @@ public class CatalogService {
         this.spuMapper = spuMapper;
         this.skuMapper = skuMapper;
         this.mediaMapper = mediaMapper;
+        this.createCommandRepository = createCommandRepository;
         this.objectStorage = objectStorage;
         this.readRequirement = readRequirement;
         this.productDetailCache = productDetailCache;
@@ -156,12 +163,54 @@ public class CatalogService {
 
     @Transactional
     public ProductDetail createProduct(CreateProductCommand command) {
+        return createNewProduct(command, IdWorker.getId());
+    }
+
+    public ProductDetail createProduct(
+            long operatorId,
+            String commandId,
+            CreateProductCommand command) {
+        ProductDetail product = Objects.requireNonNull(transactionTemplate.execute(ignored -> {
+            validateSkuCommands(command.skus());
+            command.skus().forEach(sku -> validatePrices(sku.salePrice(), sku.marketPrice()));
+
+            String requestHash = productCreateFingerprint(command);
+            long productId = IdWorker.getId();
+            Instant now = spuMapper.currentTime();
+            if (!createCommandRepository.claim(
+                    operatorId, commandId, requestHash, productId, now)) {
+                CatalogProductCreateCommandRepository.CreateCommandState existing =
+                        createCommandRepository.findForUpdate(operatorId, commandId);
+                if (existing == null
+                        || !PayloadFingerprint.matches(existing.requestHash(), requestHash)) {
+                    throw new CatalogException(CatalogError.IDEMPOTENCY_CONFLICT);
+                }
+                return loadProductDetail(requireProduct(existing.productId()));
+            }
+            CategoryEntity category = requireActiveCategory(command.categoryId());
+            BrandEntity brand = requireActiveBrand(command.brandId());
+            return createNewProduct(command, productId, category, brand, now);
+        }));
+        return signMediaUrls(product);
+    }
+
+    private ProductDetail createNewProduct(CreateProductCommand command, long productId) {
         CategoryEntity category = requireActiveCategory(command.categoryId());
         BrandEntity brand = requireActiveBrand(command.brandId());
         validateSkuCommands(command.skus());
+        command.skus().forEach(sku -> validatePrices(sku.salePrice(), sku.marketPrice()));
+        return createNewProduct(command, productId, category, brand, spuMapper.currentTime());
+    }
 
-        Instant now = spuMapper.currentTime();
+    private ProductDetail createNewProduct(
+            CreateProductCommand command,
+            long productId,
+            CategoryEntity category,
+            BrandEntity brand,
+            Instant now) {
+
         ProductSpuEntity spu = new ProductSpuEntity();
+        spu.setId(productId);
         spu.setCategoryId(command.categoryId());
         spu.setBrandId(command.brandId());
         spu.setTitle(command.title());
@@ -176,7 +225,6 @@ public class CatalogService {
 
         List<ProductSkuEntity> skus = new ArrayList<>(command.skus().size());
         for (CreateSkuCommand skuCommand : command.skus()) {
-            validatePrices(skuCommand.salePrice(), skuCommand.marketPrice());
             ProductSkuEntity sku = new ProductSkuEntity();
             sku.setSpuId(spu.getId());
             sku.setSkuCode(skuCommand.skuCode());
@@ -212,6 +260,35 @@ public class CatalogService {
                 }));
         return new PageResponse<>(
                 signProductSummaries(snapshot.items()),
+                snapshot.page(),
+                snapshot.size(),
+                snapshot.total());
+    }
+
+    public PageResponse<AdminProductSummary> listAdminProducts(
+            long page,
+            long size,
+            String status,
+            Long categoryId,
+            String keyword) {
+        String normalizedStatus = normalizeProductStatus(status);
+        PageResponse<ProductSummarySnapshot> snapshot = Objects.requireNonNull(
+                transactionTemplate.execute(ignored -> {
+                    LambdaQueryWrapper<ProductSpuEntity> query = new LambdaQueryWrapper<ProductSpuEntity>()
+                            .eq(normalizedStatus != null, ProductSpuEntity::getStatus, normalizedStatus)
+                            .eq(categoryId != null, ProductSpuEntity::getCategoryId, categoryId)
+                            .like(StringUtils.hasText(keyword), ProductSpuEntity::getTitle, keyword)
+                            .orderByDesc(ProductSpuEntity::getUpdatedAt)
+                            .orderByDesc(ProductSpuEntity::getId);
+                    Page<ProductSpuEntity> result = spuMapper.selectPage(Page.of(page, size), query);
+                    return new PageResponse<>(
+                            productSummarySnapshots(result.getRecords()),
+                            page,
+                            size,
+                            result.getTotal());
+                }));
+        return new PageResponse<>(
+                signAdminProductSummaries(snapshot.items()),
                 snapshot.page(),
                 snapshot.size(),
                 snapshot.total());
@@ -286,6 +363,8 @@ public class CatalogService {
                     product.getId(),
                     product.getTitle(),
                     product.getSubtitle(),
+                    product.getStatus(),
+                    product.getVersion(),
                     categoryView(categories.get(product.getCategoryId())),
                     brandView(brands.get(product.getBrandId())),
                     minimumPrice,
@@ -332,6 +411,24 @@ public class CatalogService {
                         () -> loadActiveProductDetail(productId));
         ProductDetail product = loaded
                 .orElseThrow(() -> new CatalogException(CatalogError.RESOURCE_NOT_FOUND));
+        return signMediaUrls(product);
+    }
+
+    public ProductDetail getAdminProduct(Long productId) {
+        ProductDetail product = Objects.requireNonNull(transactionTemplate.execute(
+                ignored -> loadProductDetail(requireProduct(productId))));
+        return signMediaUrls(product);
+    }
+
+    public ProductDetail findCreatedProduct(long operatorId, String commandId) {
+        ProductDetail product = Objects.requireNonNull(transactionTemplate.execute(ignored -> {
+            CatalogProductCreateCommandRepository.CreateCommandState command =
+                    createCommandRepository.find(operatorId, commandId);
+            if (command == null) {
+                throw new CatalogException(CatalogError.RESOURCE_NOT_FOUND);
+            }
+            return loadProductDetail(requireProduct(command.productId()));
+        }));
         return signMediaUrls(product);
     }
 
@@ -450,7 +547,15 @@ public class CatalogService {
 
         ProductMediaEntity media = Objects.requireNonNull(transactionTemplate.execute(ignored -> {
             requireMediaOwner(productId, skuId);
+            ProductMediaEntity existing = mediaMapper.selectOne(
+                    new LambdaQueryWrapper<ProductMediaEntity>()
+                            .eq(ProductMediaEntity::getObjectKey, objectKey));
+            if (existing != null) {
+                requireSameMediaConfirmation(existing, productId, skuId, sortOrder);
+                return existing;
+            }
             ProductMediaEntity candidate = new ProductMediaEntity();
+            candidate.setId(IdWorker.getId());
             candidate.setSpuId(productId);
             candidate.setSkuId(skuId);
             candidate.setObjectKey(objectKey);
@@ -458,12 +563,33 @@ public class CatalogService {
             candidate.setSizeBytes(storedObject.sizeBytes());
             candidate.setSortOrder(sortOrder);
             candidate.setCreatedAt(spuMapper.currentTime());
-            mediaMapper.insert(candidate);
+            if (mediaMapper.insertIgnore(candidate) != 1) {
+                ProductMediaEntity concurrent = mediaMapper.selectOne(
+                        new LambdaQueryWrapper<ProductMediaEntity>()
+                                .eq(ProductMediaEntity::getObjectKey, objectKey));
+                if (concurrent == null) {
+                    throw new CatalogException(CatalogError.CONCURRENT_MODIFICATION);
+                }
+                requireSameMediaConfirmation(concurrent, productId, skuId, sortOrder);
+                return concurrent;
+            }
             searchOutboxService.recordProductChanged(productId);
             return candidate;
         }));
         productDetailCache.invalidateAfterCommit(productId);
         return signMediaUrl(mediaView(media));
+    }
+
+    private void requireSameMediaConfirmation(
+            ProductMediaEntity media,
+            Long productId,
+            Long skuId,
+            int sortOrder) {
+        if (!productId.equals(media.getSpuId())
+                || !Objects.equals(skuId, media.getSkuId())
+                || sortOrder != media.getSortOrder()) {
+            throw new CatalogException(CatalogError.IDEMPOTENCY_CONFLICT);
+        }
     }
 
     private void requireMediaOwner(Long productId, Long skuId) {
@@ -553,6 +679,39 @@ public class CatalogService {
         }
     }
 
+    private String productCreateFingerprint(CreateProductCommand command) {
+        List<Object> components = new ArrayList<>();
+        components.add(command.categoryId());
+        components.add(command.brandId());
+        components.add(command.title());
+        components.add(command.subtitle());
+        components.add(command.description());
+        components.add(command.skus().size());
+        for (CreateSkuCommand sku : command.skus()) {
+            components.add(sku.skuCode());
+            components.add(sku.name());
+            components.add(sku.specJson());
+            components.add(canonicalMoney(sku.salePrice()));
+            components.add(canonicalMoney(sku.marketPrice()));
+        }
+        return PayloadFingerprint.of(components.toArray());
+    }
+
+    private String canonicalMoney(BigDecimal value) {
+        return value == null ? null : value.stripTrailingZeros().toPlainString();
+    }
+
+    private String normalizeProductStatus(String status) {
+        if (!StringUtils.hasText(status)) {
+            return null;
+        }
+        try {
+            return ProductStatus.valueOf(status.trim().toUpperCase(Locale.ROOT)).name();
+        } catch (IllegalArgumentException exception) {
+            throw new CatalogException(CatalogError.INVALID_STATE);
+        }
+    }
+
     private void validatePrices(BigDecimal salePrice, BigDecimal marketPrice) {
         if (salePrice == null || salePrice.signum() <= 0 ||
                 hasMoreThanTwoFractionDigits(salePrice) ||
@@ -630,6 +789,22 @@ public class CatalogService {
                 .toList();
     }
 
+    private List<AdminProductSummary> signAdminProductSummaries(List<ProductSummarySnapshot> products) {
+        return products.stream().map(product -> new AdminProductSummary(
+                product.id(),
+                product.title(),
+                product.subtitle(),
+                product.status(),
+                product.version(),
+                product.category(),
+                product.brand(),
+                product.minimumPrice(),
+                product.coverObjectKey() == null
+                        ? null
+                        : safeDownloadUrl(product.coverObjectKey())))
+                .toList();
+    }
+
     private MediaView signMediaUrl(MediaView media) {
         return new MediaView(
                 media.id(),
@@ -694,6 +869,8 @@ public class CatalogService {
             Long id,
             String title,
             String subtitle,
+            String status,
+            int version,
             CategoryView category,
             BrandView brand,
             BigDecimal minimumPrice,

@@ -201,6 +201,7 @@ $movementNo = "M4-ADJ-$upperToken"
 $ruleCode = "M4-CHECKOUT-$upperToken"
 $grantKey = "M4-GRANT-$upperToken"
 $idempotencyKey = "order:$runToken"
+$catalogCreateCommandId = "catalog:create:m4:$runToken"
 
 $userId = $null
 $productId = $null
@@ -291,8 +292,10 @@ WHERE user_account.email = '$email';
             name = 'M4 Brand'
             slug = $brandSlug
         }
+    $catalogProductHeaders = $adminHeaders.Clone()
+    $catalogProductHeaders['Idempotency-Key'] = $catalogCreateCommandId
     $product = Invoke-JsonApi -Method Post -Uri "$gateway/catalog/admin/products" `
-        -Headers $adminHeaders -Body @{
+        -Headers $catalogProductHeaders -Body @{
             categoryId = $category.data.id
             brandId = $brand.data.id
             title = $productTitle

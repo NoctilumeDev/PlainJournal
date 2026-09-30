@@ -24,6 +24,13 @@ export interface ProductSummary {
   coverUrl: string | null;
 }
 
+export type AdminProductStatus = "DRAFT" | "ACTIVE" | "INACTIVE";
+
+export interface AdminProductSummary extends ProductSummary {
+  status: AdminProductStatus;
+  version: number;
+}
+
 export interface ProductSku {
   id: BusinessId;
   skuCode: string;
@@ -50,7 +57,7 @@ export interface ProductDetail {
   title: string;
   subtitle: string | null;
   description: string | null;
-  status: string;
+  status: AdminProductStatus;
   version: number;
   category: Category;
   brand: Brand;
@@ -63,6 +70,51 @@ export interface ProductQuery {
   size?: number;
   categoryId?: BusinessId;
   keyword?: string;
+}
+
+export interface AdminProductQuery extends ProductQuery {
+  status?: AdminProductStatus;
+}
+
+export interface CreateProductSkuInput {
+  skuCode: string;
+  name: string;
+  specJson: string;
+  salePrice: string;
+  marketPrice?: string | null;
+}
+
+export interface CreateProductInput {
+  categoryId: BusinessId;
+  brandId: BusinessId;
+  title: string;
+  subtitle?: string | null;
+  description?: string | null;
+  skus: CreateProductSkuInput[];
+}
+
+export interface UpdateProductInput {
+  categoryId: BusinessId;
+  brandId: BusinessId;
+  title: string;
+  subtitle?: string | null;
+  description?: string | null;
+  expectedVersion: number;
+}
+
+export interface UpdateProductSkuInput {
+  name: string;
+  specJson: string;
+  salePrice: string;
+  marketPrice?: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  expectedVersion: number;
+}
+
+export interface ProductUploadIntent {
+  objectKey: string;
+  uploadUrl: string;
+  expiresInSeconds: number;
 }
 
 export interface ProductSearchQuery {
@@ -183,9 +235,39 @@ export interface ReviewModerationResult {
 
 export interface CatalogApi {
   listCategories(): Promise<Category[]>;
+  listBrands(): Promise<Brand[]>;
   listProducts(query?: ProductQuery): Promise<PageResponse<ProductSummary>>;
   searchProducts(query: ProductSearchQuery): Promise<ProductSearchPage>;
   getProduct(productId: BusinessId): Promise<ProductDetail>;
+  listAdminProducts(
+    query?: AdminProductQuery,
+  ): Promise<PageResponse<AdminProductSummary>>;
+  getAdminProduct(productId: BusinessId): Promise<ProductDetail>;
+  findCreatedProduct(commandId: string): Promise<ProductDetail>;
+  createProduct(
+    input: CreateProductInput,
+    idempotencyKey: string,
+  ): Promise<ProductDetail>;
+  updateProduct(
+    productId: BusinessId,
+    input: UpdateProductInput,
+  ): Promise<ProductDetail>;
+  publishProduct(productId: BusinessId, expectedVersion: number): Promise<ProductDetail>;
+  unpublishProduct(productId: BusinessId, expectedVersion: number): Promise<ProductDetail>;
+  updateProductSku(
+    productId: BusinessId,
+    skuId: BusinessId,
+    input: UpdateProductSkuInput,
+  ): Promise<ProductSku>;
+  createProductUploadIntent(
+    productId: BusinessId,
+    contentType: string,
+    sizeBytes: number,
+  ): Promise<ProductUploadIntent>;
+  confirmProductMedia(
+    productId: BusinessId,
+    input: { skuId?: BusinessId | null; objectKey: string; sortOrder: number },
+  ): Promise<ProductMedia>;
   reviewSummary(productId: BusinessId): Promise<ReviewSummary>;
   productReviews(
     productId: BusinessId,
@@ -225,6 +307,9 @@ export function createCatalogApi(client: ApiClient): CatalogApi {
     listCategories() {
       return client.request<Category[]>("/api/v1/catalog/categories");
     },
+    listBrands() {
+      return client.request<Brand[]>("/api/v1/catalog/brands");
+    },
     listProducts(query: ProductQuery = {}) {
       const search = new URLSearchParams({
         page: String(query.page ?? 1),
@@ -256,6 +341,88 @@ export function createCatalogApi(client: ApiClient): CatalogApi {
     getProduct(productId: BusinessId) {
       return client.request<ProductDetail>(
         `/api/v1/catalog/products/${encodeURIComponent(productId)}`,
+      );
+    },
+    listAdminProducts(query: AdminProductQuery = {}) {
+      const search = new URLSearchParams({
+        page: String(query.page ?? 1),
+        size: String(query.size ?? 20),
+      });
+      if (query.status) {
+        search.set("status", query.status);
+      }
+      if (query.categoryId) {
+        search.set("categoryId", query.categoryId);
+      }
+      if (query.keyword?.trim()) {
+        search.set("keyword", query.keyword.trim());
+      }
+      return client.request<PageResponse<AdminProductSummary>>(
+        `/api/v1/catalog/admin/products?${search.toString()}`,
+      );
+    },
+    getAdminProduct(productId: BusinessId) {
+      return client.request<ProductDetail>(
+        `/api/v1/catalog/admin/products/${encodeURIComponent(productId)}`,
+      );
+    },
+    findCreatedProduct(commandId: string) {
+      return client.request<ProductDetail>(
+        `/api/v1/catalog/admin/products/by-idempotency-key/${encodeURIComponent(commandId)}`,
+      );
+    },
+    createProduct(input: CreateProductInput, idempotencyKey: string) {
+      return client.request<ProductDetail>("/api/v1/catalog/admin/products", {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify(input),
+      });
+    },
+    updateProduct(productId: BusinessId, input: UpdateProductInput) {
+      return client.request<ProductDetail>(
+        `/api/v1/catalog/admin/products/${encodeURIComponent(productId)}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      );
+    },
+    publishProduct(productId: BusinessId, expectedVersion: number) {
+      return client.request<ProductDetail>(
+        `/api/v1/catalog/admin/products/${encodeURIComponent(productId)}/publish`,
+        { method: "POST", body: JSON.stringify({ expectedVersion }) },
+      );
+    },
+    unpublishProduct(productId: BusinessId, expectedVersion: number) {
+      return client.request<ProductDetail>(
+        `/api/v1/catalog/admin/products/${encodeURIComponent(productId)}/unpublish`,
+        { method: "POST", body: JSON.stringify({ expectedVersion }) },
+      );
+    },
+    updateProductSku(
+      productId: BusinessId,
+      skuId: BusinessId,
+      input: UpdateProductSkuInput,
+    ) {
+      return client.request<ProductSku>(
+        `/api/v1/catalog/admin/products/${encodeURIComponent(productId)}/skus/${encodeURIComponent(skuId)}`,
+        { method: "PUT", body: JSON.stringify(input) },
+      );
+    },
+    createProductUploadIntent(
+      productId: BusinessId,
+      contentType: string,
+      sizeBytes: number,
+    ) {
+      return client.request<ProductUploadIntent>(
+        `/api/v1/catalog/admin/products/${encodeURIComponent(productId)}/media/upload-intents`,
+        { method: "POST", body: JSON.stringify({ contentType, sizeBytes }) },
+      );
+    },
+    confirmProductMedia(
+      productId: BusinessId,
+      input: { skuId?: BusinessId | null; objectKey: string; sortOrder: number },
+    ) {
+      return client.request<ProductMedia>(
+        `/api/v1/catalog/admin/products/${encodeURIComponent(productId)}/media`,
+        { method: "POST", body: JSON.stringify(input) },
       );
     },
     reviewSummary(productId: BusinessId) {

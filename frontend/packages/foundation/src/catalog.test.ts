@@ -120,4 +120,76 @@ describe("catalog review api", () => {
       "/catalog/admin/reviews/reports/REPORT%3A1/resolve",
     );
   });
+
+  it("keeps product management reads and writes on authenticated owner-domain paths", async () => {
+    const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: String(input), init });
+      return success({});
+    }));
+
+    const api = createCatalogApi(createApiClient({
+      tokenProvider: () => "current-access-token",
+    }));
+    await api.listAdminProducts({
+      page: 2,
+      size: 25,
+      status: "DRAFT",
+      categoryId: "12",
+      keyword: "  通勤包  ",
+    });
+    await api.getAdminProduct("P:1");
+    await api.findCreatedProduct("create:1/attempt");
+    await api.createProduct({
+      categoryId: "12",
+      brandId: "34",
+      title: "通勤包",
+      skus: [{
+        skuCode: "BAG-BLACK",
+        name: "黑色",
+        specJson: "{}",
+        salePrice: "99.00",
+      }],
+    }, "create:1");
+    await api.updateProduct("P:1", {
+      categoryId: "12",
+      brandId: "34",
+      title: "通勤包 2",
+      expectedVersion: 3,
+    });
+    await api.publishProduct("P:1", 4);
+    await api.unpublishProduct("P:1", 5);
+    await api.updateProductSku("P:1", "SKU:1", {
+      name: "黑色",
+      specJson: "{}",
+      salePrice: "109.00",
+      status: "ACTIVE",
+      expectedVersion: 2,
+    });
+    await api.createProductUploadIntent("P:1", "image/png", 68);
+    await api.confirmProductMedia("P:1", {
+      objectKey: "products/P:1/cover.png",
+      sortOrder: 0,
+    });
+
+    const listUrl = new URL(requests[0]?.url ?? "/invalid", "http://localhost");
+    expect(listUrl.pathname).toContain("/catalog/admin/products");
+    expect(listUrl.searchParams.get("status")).toBe("DRAFT");
+    expect(listUrl.searchParams.get("keyword")).toBe("通勤包");
+    expect(requests[1]?.url).toContain("/catalog/admin/products/P%3A1");
+    expect(requests[2]?.url).toContain(
+      "/catalog/admin/products/by-idempotency-key/create%3A1%2Fattempt",
+    );
+    expect(new Headers(requests[3]?.init?.headers).get("Idempotency-Key"))
+      .toBe("create:1");
+    expect(requests[4]?.init?.method).toBe("PUT");
+    expect(requests[5]?.url).toContain("/publish");
+    expect(requests[6]?.url).toContain("/unpublish");
+    expect(requests[7]?.url).toContain("/skus/SKU%3A1");
+    expect(requests[8]?.url).toContain("/media/upload-intents");
+    expect(requests[9]?.url).toContain("/media");
+    expect(requests.every((request) =>
+      new Headers(request.init?.headers).get("Authorization")
+        === "Bearer current-access-token")).toBe(true);
+  });
 });

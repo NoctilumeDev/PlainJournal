@@ -27,8 +27,8 @@ interface WorkspaceEntry {
 const workspaceEntries: WorkspaceEntry[] = [
   {
     to: "/catalog",
-    title: "商品目录",
-    description: "查看当前公开 ACTIVE 商品投影与真实分页。",
+    title: "商品经营",
+    description: "管理草稿、上下架、SKU、价格与商品媒体，并保留结果未知边界。",
     roles: ["ADMIN", "OPERATOR"],
   },
   {

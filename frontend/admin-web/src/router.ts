@@ -31,10 +31,10 @@ export const router = createRouter({
     },
     {
       path: "/catalog",
-      name: "catalog-read-only",
+      name: "catalog-management",
       component: CatalogReadOnlyView,
       meta: {
-        title: "商品目录｜素简记管理端",
+        title: "商品经营｜素简记管理端",
         requiresAuth: true,
         roles: ["ADMIN", "OPERATOR"],
       },

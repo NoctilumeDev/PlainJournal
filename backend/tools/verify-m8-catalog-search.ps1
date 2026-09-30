@@ -241,17 +241,21 @@ function Invoke-CatalogApi {
         [Parameter(Mandatory)][string]$Method,
         [Parameter(Mandatory)][string]$Path,
         [string]$Token,
+        [hashtable]$Headers = @{},
         [object]$Body
     )
 
-    $headers = @{}
+    $requestHeaders = @{}
+    foreach ($entry in $Headers.GetEnumerator()) {
+        $requestHeaders[$entry.Key] = $entry.Value
+    }
     if (-not [string]::IsNullOrWhiteSpace($Token)) {
-        $headers.Authorization = "Bearer $Token"
+        $requestHeaders.Authorization = "Bearer $Token"
     }
     return Invoke-JsonRequest `
         -Method $Method `
         -Uri "http://127.0.0.1:$($script:catalogPort)$Path" `
-        -Headers $headers `
+        -Headers $requestHeaders `
         -Body $Body
 }
 
@@ -455,6 +459,7 @@ function New-Product {
         -Method Post `
         -Path '/api/v1/catalog/admin/products' `
         -Token $Token `
+        -Headers @{ 'Idempotency-Key' = "catalog-search:$([Guid]::NewGuid().ToString('N'))" } `
         -Body @{
             categoryId = [string]$script:categoryId
             brandId = [string]$script:brandId

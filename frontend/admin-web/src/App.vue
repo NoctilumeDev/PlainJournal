@@ -20,7 +20,7 @@ const isAdmin = computed(() => roles.value.includes("ADMIN"));
 const workspaceMenu = ref<HTMLDetailsElement | null>(null);
 const workspaceLinks = computed(() => [
   { to: "/", label: "工作区总览", visible: true },
-  { to: "/catalog", label: "商品目录", visible: canCatalog.value },
+  { to: "/catalog", label: "商品经营", visible: canCatalog.value },
   { to: "/inventory", label: "库存", visible: canWarehouse.value },
   { to: "/fulfillment", label: "履约与退货", visible: canWarehouse.value },
   { to: "/after-sales", label: "售后审核", visible: isAdmin.value },
