@@ -15,6 +15,7 @@ import com.ecommerce.catalog.application.model.CatalogModels.SkuView;
 import com.ecommerce.catalog.application.model.CatalogModels.UpdateProductCommand;
 import com.ecommerce.catalog.application.model.CatalogModels.UpdateSkuCommand;
 import com.ecommerce.catalog.application.model.CatalogModels.UploadIntent;
+import com.ecommerce.catalog.application.port.CatalogReadRequirement;
 import com.ecommerce.catalog.application.port.ObjectStorage;
 import com.ecommerce.catalog.application.port.ProductDetailCache;
 import com.ecommerce.catalog.domain.ProductStatus;
@@ -69,6 +70,7 @@ public class CatalogService {
     private final ProductSkuMapper skuMapper;
     private final ProductMediaMapper mediaMapper;
     private final ObjectStorage objectStorage;
+    private final CatalogReadRequirement readRequirement;
     private final ProductDetailCache productDetailCache;
     private final CatalogSearchOutboxService searchOutboxService;
     private final MediaStorageProperties mediaProperties;
@@ -81,6 +83,7 @@ public class CatalogService {
             ProductSkuMapper skuMapper,
             ProductMediaMapper mediaMapper,
             ObjectStorage objectStorage,
+            CatalogReadRequirement readRequirement,
             ProductDetailCache productDetailCache,
             CatalogSearchOutboxService searchOutboxService,
             MediaStorageProperties mediaProperties,
@@ -91,6 +94,7 @@ public class CatalogService {
         this.skuMapper = skuMapper;
         this.mediaMapper = mediaMapper;
         this.objectStorage = objectStorage;
+        this.readRequirement = readRequirement;
         this.productDetailCache = productDetailCache;
         this.searchOutboxService = searchOutboxService;
         this.mediaProperties = mediaProperties;
@@ -320,9 +324,13 @@ public class CatalogService {
     }
 
     public ProductDetail getProduct(Long productId) {
-        ProductDetail product = productDetailCache.get(
+        Optional<ProductDetail> loaded = readRequirement.requiresPrimary()
+                ? Objects.requireNonNull(transactionTemplate.execute(
+                        ignored -> loadActiveProductDetail(productId)))
+                : productDetailCache.get(
                         productId,
-                        () -> loadActiveProductDetail(productId))
+                        () -> loadActiveProductDetail(productId));
+        ProductDetail product = loaded
                 .orElseThrow(() -> new CatalogException(CatalogError.RESOURCE_NOT_FOUND));
         return signMediaUrls(product);
     }

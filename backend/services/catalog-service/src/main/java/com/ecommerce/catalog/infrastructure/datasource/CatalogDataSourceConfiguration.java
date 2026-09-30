@@ -1,5 +1,6 @@
 package com.ecommerce.catalog.infrastructure.datasource;
 
+import com.ecommerce.catalog.application.port.CatalogReadRequirement;
 import com.zaxxer.hikari.HikariDataSource;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
@@ -86,5 +87,10 @@ public class CatalogDataSourceConfiguration {
     CatalogReadConsistencyFilter catalogReadConsistencyFilter(
             CatalogDataSourceMetrics metrics) {
         return new CatalogReadConsistencyFilter(metrics);
+    }
+
+    @Bean
+    CatalogReadRequirement catalogReadRequirement() {
+        return CatalogReadRouteContext::requiresPrimary;
     }
 }

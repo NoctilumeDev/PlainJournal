@@ -37,6 +37,7 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
 
     private static final Logger log = LoggerFactory.getLogger(TwoLevelProductDetailCache.class);
     private static final int SCHEMA_VERSION = 2;
+    private static final int AUTHORITY_STRIPE_COUNT = 256;
 
     private final CatalogCacheProperties properties;
     private final CatalogCacheStore store;
@@ -46,6 +47,7 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
     private final Cache<Long, CacheEnvelope> localCache;
     private final ConcurrentHashMap<Long, CompletableFuture<CacheEnvelope>> inFlight =
             new ConcurrentHashMap<>();
+    private final CacheAuthorityStripe[] authorityStripes = createAuthorityStripes();
     private final Semaphore rebuildPermits;
     private final ExecutorService refreshExecutor;
     private final Counter localHits;
@@ -56,6 +58,7 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
     private final Counter redisFailures;
     private final Counter staleResponses;
     private final Counter rebuildRejections;
+    private final Counter staleWriteRejections;
     private final Counter invalidations;
 
     public TwoLevelProductDetailCache(
@@ -93,6 +96,9 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
         this.rebuildRejections = Counter.builder("ecommerce.catalog.cache.rebuild.rejections")
                 .description("Catalog cache rebuilds rejected by bounded capacity protection")
                 .register(meterRegistry);
+        this.staleWriteRejections = Counter.builder("ecommerce.catalog.cache.stale.write.rejections")
+                .description("Catalog cache writes rejected after a newer invalidation")
+                .register(meterRegistry);
         this.invalidations = Counter.builder("ecommerce.catalog.cache.invalidations")
                 .description("Catalog product detail cache invalidations")
                 .register(meterRegistry);
@@ -109,10 +115,9 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
         }
         localMisses.increment();
 
-        Optional<CacheEnvelope> distributed = readDistributed(productId);
+        Optional<CacheEnvelope> distributed = readDistributedAndPopulateLocalIfCurrent(productId);
         if (distributed.isPresent()) {
             CacheEnvelope envelope = distributed.orElseThrow();
-            localCache.put(productId, envelope);
             return resolve(productId, envelope, loader);
         }
         return loadCold(productId, loader);
@@ -136,8 +141,7 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
 
     @Override
     public void receiveInvalidation(Long productId) {
-        localCache.invalidate(productId);
-        invalidations.increment();
+        invalidate(productId, false);
     }
 
     Optional<CacheEnvelope> localRecord(Long productId) {
@@ -178,10 +182,9 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
                     future.complete(local);
                     return resolve(productId, local, loader);
                 }
-                Optional<CacheEnvelope> distributed = readDistributed(productId);
+                Optional<CacheEnvelope> distributed = readDistributedAndPopulateLocalIfCurrent(productId);
                 if (distributed.isPresent()) {
                     CacheEnvelope record = distributed.orElseThrow();
-                    localCache.put(productId, record);
                     future.complete(record);
                     return resolve(productId, record, loader);
                 }
@@ -248,9 +251,7 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
         if (lockAttempt == LockAttempt.CONTENDED) {
             Optional<CacheEnvelope> shared = awaitDistributed(productId);
             if (shared.isPresent()) {
-                CacheEnvelope record = shared.orElseThrow();
-                localCache.put(productId, record);
-                return record;
+                return shared.orElseThrow();
             }
             if (allowUnlockedFallback) {
                 rebuildRejections.increment();
@@ -263,21 +264,19 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
         boolean locked = lockAttempt == LockAttempt.ACQUIRED;
         try {
             if (locked) {
-                Optional<CacheEnvelope> existing = readDistributed(productId);
+                Optional<CacheEnvelope> existing = readDistributedAndPopulateLocalIfCurrent(productId);
                 if (existing.isPresent() && !existing.orElseThrow().softExpired(now())) {
-                    CacheEnvelope record = existing.orElseThrow();
-                    localCache.put(productId, record);
-                    return record;
+                    return existing.orElseThrow();
                 }
             }
+            long observedGeneration = observeGeneration(productId);
             databaseLoads.increment();
             Optional<ProductDetail> databaseValue = readTransaction.execute(status -> loader.get());
             CacheEnvelope loaded = Optional.ofNullable(databaseValue)
                     .orElseGet(Optional::empty)
                     .map(this::valueEnvelope)
                     .orElseGet(this::negativeEnvelope);
-            localCache.put(productId, loaded);
-            writeDistributed(productId, loaded);
+            installIfCurrent(productId, observedGeneration, loaded, true);
             return loaded;
         } finally {
             if (locked) {
@@ -289,7 +288,7 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
     private Optional<CacheEnvelope> awaitDistributed(Long productId) {
         long deadline = System.nanoTime() + properties.rebuildWait().toNanos();
         do {
-            Optional<CacheEnvelope> shared = readDistributed(productId);
+            Optional<CacheEnvelope> shared = readDistributedAndPopulateLocalIfCurrent(productId);
             if (shared.isPresent() && !shared.orElseThrow().softExpired(now())) {
                 return shared;
             }
@@ -355,6 +354,14 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
         }
     }
 
+    private Optional<CacheEnvelope> readDistributedAndPopulateLocalIfCurrent(Long productId) {
+        long observedGeneration = observeGeneration(productId);
+        Optional<CacheEnvelope> distributed = readDistributed(productId);
+        distributed.ifPresent(envelope ->
+                installIfCurrent(productId, observedGeneration, envelope, false));
+        return distributed;
+    }
+
     private void writeDistributed(Long productId, CacheEnvelope envelope) {
         try {
             long remainingMillis = Math.max(1L, envelope.hardExpiresAtEpochMs() - now());
@@ -391,8 +398,12 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
     }
 
     private void invalidate(Long productId, boolean publish) {
-        localCache.invalidate(productId);
-        safeDelete(cacheKey(productId));
+        CacheAuthorityStripe stripe = authorityStripe(productId);
+        synchronized (stripe) {
+            stripe.generation++;
+            localCache.invalidate(productId);
+            safeDelete(cacheKey(productId));
+        }
         if (publish) {
             try {
                 store.publish(properties.invalidationChannel(), productId.toString());
@@ -401,6 +412,44 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
             }
         }
         invalidations.increment();
+    }
+
+    private long observeGeneration(Long productId) {
+        CacheAuthorityStripe stripe = authorityStripe(productId);
+        synchronized (stripe) {
+            return stripe.generation;
+        }
+    }
+
+    private void installIfCurrent(
+            Long productId,
+            long observedGeneration,
+            CacheEnvelope envelope,
+            boolean writeToDistributedCache) {
+        CacheAuthorityStripe stripe = authorityStripe(productId);
+        synchronized (stripe) {
+            if (stripe.generation != observedGeneration) {
+                staleWriteRejections.increment();
+                return;
+            }
+            localCache.put(productId, envelope);
+            if (writeToDistributedCache) {
+                writeDistributed(productId, envelope);
+            }
+        }
+    }
+
+    private CacheAuthorityStripe authorityStripe(Long productId) {
+        return authorityStripes[Math.floorMod(productId.hashCode(), authorityStripes.length)];
+    }
+
+    private static CacheAuthorityStripe[] createAuthorityStripes() {
+        // Fixed stripes bound bookkeeping; a hash collision only rejects an extra cache fill.
+        CacheAuthorityStripe[] stripes = new CacheAuthorityStripe[AUTHORITY_STRIPE_COUNT];
+        for (int index = 0; index < stripes.length; index++) {
+            stripes[index] = new CacheAuthorityStripe();
+        }
+        return stripes;
     }
 
     private void safeDelete(String key) {
@@ -515,5 +564,10 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
         ACQUIRED,
         CONTENDED,
         UNAVAILABLE
+    }
+
+    private static final class CacheAuthorityStripe {
+
+        private long generation;
     }
 }
