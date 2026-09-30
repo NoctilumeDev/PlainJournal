@@ -55,6 +55,7 @@ class CatalogFlowIntegrationTest {
     void cleanCatalogData() {
         jdbcTemplate.update("DELETE FROM product_media");
         jdbcTemplate.update("DELETE FROM product_sku");
+        jdbcTemplate.update("DELETE FROM catalog_product_create_command");
         jdbcTemplate.update("DELETE FROM product_spu");
         jdbcTemplate.update("DELETE FROM catalog_brand");
         jdbcTemplate.update("DELETE FROM catalog_category");
@@ -88,12 +89,50 @@ class CatalogFlowIntegrationTest {
                         "marketPrice", "159.90"
                 ))
         );
-        JsonNode created = responseJson(adminPost("/api/v1/catalog/admin/products", productRequest));
+        String createCommandId = "catalog-create-example-phone";
+        JsonNode created = responseJson(productAdminPost(createCommandId, productRequest));
         long productId = created.at("/data/id").asLong();
         assertThat(created.at("/data/id").isTextual()).isTrue();
         assertThat(created.at("/data/skus/0/id").isTextual()).isTrue();
         assertThat(created.at("/data/status").asText()).isEqualTo("DRAFT");
         assertThat(created.at("/data/skus/0/salePrice").decimalValue()).isEqualByComparingTo("129.90");
+
+        mockMvc.perform(get("/api/v1/catalog/admin/products")
+                        .with(adminJwt())
+                        .param("status", "DRAFT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(Long.toString(productId)))
+                .andExpect(jsonPath("$.data.items[0].status").value("DRAFT"))
+                .andExpect(jsonPath("$.data.items[0].version").value(0));
+        mockMvc.perform(get("/api/v1/catalog/admin/products/{id}", productId)
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(Long.toString(productId)))
+                .andExpect(jsonPath("$.data.status").value("DRAFT"));
+
+        jdbcTemplate.update("UPDATE catalog_category SET status = 'INACTIVE' WHERE id = ?", categoryId);
+        JsonNode replay = responseJson(productAdminPost(createCommandId, productRequest));
+        jdbcTemplate.update("UPDATE catalog_category SET status = 'ACTIVE' WHERE id = ?", categoryId);
+        assertThat(replay.at("/data/id").asText()).isEqualTo(Long.toString(productId));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM product_spu", Long.class)).isEqualTo(1L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM product_sku", Long.class)).isEqualTo(1L);
+        mockMvc.perform(get("/api/v1/catalog/admin/products/by-idempotency-key/{key}", createCommandId)
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(Long.toString(productId)));
+
+        Map<String, Object> conflictingRequest = new java.util.LinkedHashMap<>(productRequest);
+        conflictingRequest.put("title", "A different product");
+        mockMvc.perform(post("/api/v1/catalog/admin/products")
+                        .with(adminJwt())
+                        .header("Idempotency-Key", createCommandId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(conflictingRequest)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_CONFLICT"));
 
         mockMvc.perform(get("/api/v1/catalog/products/{id}", productId))
                 .andExpect(status().isNotFound())
@@ -144,10 +183,20 @@ class CatalogFlowIntegrationTest {
                             .isFalse();
                     return "http://storage.invalid/download";
                 });
-        adminPost("/api/v1/catalog/admin/products/" + productId + "/media", Map.of(
+        JsonNode confirmedMedia = responseJson(adminPost(
+                "/api/v1/catalog/admin/products/" + productId + "/media", Map.of(
                 "objectKey", objectKey,
                 "sortOrder", 0
-        ));
+        )));
+        JsonNode replayedMedia = responseJson(adminPost(
+                "/api/v1/catalog/admin/products/" + productId + "/media", Map.of(
+                        "objectKey", objectKey,
+                        "sortOrder", 0
+                )));
+        assertThat(replayedMedia.at("/data/id").asText())
+                .isEqualTo(confirmedMedia.at("/data/id").asText());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM product_media", Long.class)).isEqualTo(1L);
         assertThat(statInsideTransaction).isFalse();
 
         mockMvc.perform(get("/api/v1/catalog/products/{id}", productId))
@@ -183,6 +232,7 @@ class CatalogFlowIntegrationTest {
 
         mockMvc.perform(post("/api/v1/catalog/admin/products")
                         .with(adminJwt())
+                        .header("Idempotency-Key", "catalog-invalid-price")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "categoryId", categoryId,
@@ -201,6 +251,7 @@ class CatalogFlowIntegrationTest {
 
         mockMvc.perform(post("/api/v1/catalog/admin/products")
                         .with(adminJwt())
+                        .header("Idempotency-Key", "catalog-invalid-precision")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of(
                                 "categoryId", categoryId,
@@ -259,7 +310,7 @@ class CatalogFlowIntegrationTest {
     }
 
     private void createPublishedProduct(long categoryId, long brandId, int index) throws Exception {
-        JsonNode created = responseJson(adminPost("/api/v1/catalog/admin/products", Map.of(
+        JsonNode created = responseJson(productAdminPost("catalog-create-cursor-" + index, Map.of(
                 "categoryId", categoryId,
                 "brandId", brandId,
                 "title", "Cursor Product " + index,
@@ -285,8 +336,20 @@ class CatalogFlowIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
     }
 
+    private String productAdminPost(String commandId, Object body) throws Exception {
+        return mockMvc.perform(post("/api/v1/catalog/admin/products")
+                        .with(adminJwt())
+                        .header("Idempotency-Key", commandId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andReturn().getResponse().getContentAsString();
+    }
+
     private org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor adminJwt() {
-        return jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        return jwt().jwt(token -> token.subject("9001"))
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
 
     private long dataId(String response) throws Exception {

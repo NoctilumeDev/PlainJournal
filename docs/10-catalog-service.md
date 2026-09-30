@@ -29,6 +29,11 @@ DRAFT -> ACTIVE -> INACTIVE
 - 公开接口只返回 `ACTIVE` 商品，草稿和下架商品返回 `404`。
 - SPU、SKU、分类和品牌包含 `version` 字段；管理修改采用 MyBatis-Plus 乐观锁。
 - SPU 与初始 SKU 在同一个本地 MySQL 事务中写入。
+- 商品创建使用 `operatorId + Idempotency-Key + requestHash` 建立命令身份；同键同载荷返回
+  原商品，同键异载荷返回 `IDEMPOTENCY_CONFLICT`。管理端可按原键查询创建事实，网络
+  UNKNOWN 后先查询、再原样重放，不能换键猜测重试。
+- 媒体确认以唯一 `objectKey` 收敛；相同商品、SKU 和排序的重复确认返回原媒体，旧键
+  不能被拿来改绑另一个商品或排序位置。
 - 金额使用 MySQL `DECIMAL(18,2)` 和 Java `BigDecimal`；HTTP DTO 与应用服务都拒绝超过两位小数的价格，避免依赖数据库静默舍入。
 - 商品详情两级缓存的 loader 只拥有它开始读取时那一代 cache-write authority；更新提交后的
   本地或跨实例失效会推进 generation，迟到 loader 可以完成原请求，但不能再把旧快照写回
@@ -112,7 +117,10 @@ catalog -> MySQL: 保存 product_media
 | `GET` | `/api/v1/catalog/search/products` | OpenSearch 商品搜索；故障时明确 MySQL 降级 |
 | `POST` | `/api/v1/catalog/admin/categories` | 创建分类 |
 | `POST` | `/api/v1/catalog/admin/brands` | 创建品牌 |
-| `POST` | `/api/v1/catalog/admin/products` | 创建 SPU 和初始 SKU |
+| `GET` | `/api/v1/catalog/admin/products` | 主库读取全部经营状态的商品分页 |
+| `GET` | `/api/v1/catalog/admin/products/{id}` | 主库读取完整经营详情 |
+| `GET` | `/api/v1/catalog/admin/products/by-idempotency-key/{key}` | 按当前操作员与原创建键查询事实 |
+| `POST` | `/api/v1/catalog/admin/products` | 按 `Idempotency-Key` 创建 SPU 和初始 SKU |
 | `PUT` | `/api/v1/catalog/admin/products/{id}` | 更新 SPU |
 | `POST` | `/api/v1/catalog/admin/products/{id}/publish` | 上架 |
 | `POST` | `/api/v1/catalog/admin/products/{id}/unpublish` | 下架 |
@@ -137,21 +145,25 @@ catalog -> MySQL: 保存 product_media
 
 ## 6. 当前管理前端的目录边界
 
-截至 V6.4.3，Catalog 后端拥有商品创建、编辑、上下架、SKU 和媒体管理命令，但没有
-管理端商品列表或详情 GET 契约。当前 Foundation 也没有覆盖这些管理写接口。因此
-管理端 `/catalog` 页面只定位为公开 `ACTIVE` 商品观察窗，不是完整商品经营后台：
+管理端 `/catalog` 已是 Catalog owner 商品经营工作区：
 
-- 分类和商品通过公开 GET 读取，不携带员工 Bearer Token；
-- 页面不展示或猜测 `DRAFT`、`INACTIVE` 商品，也不提供管理写动作；
-- `page / size / total`、筛选条件、商品图片、品牌、分类和金额均按公开 DTO 展示；
-- 64 位商品、分类和品牌 ID 在 JSON、Foundation、Pinia 和 Vue 中全程保持字符串；
-- 公开读可能来自读副本，所以页面使用“公开投影”措辞，不宣称它是最新主库经营事实；
-- 503、超时或非法响应不会清空上一次已知商品投影，也不会显示伪造的空目录；
-- 员工或 token 切换后，旧请求结果不得写入新会话。
+- 管理列表和详情使用员工 Bearer Token，从主库读取 `DRAFT / ACTIVE / INACTIVE`，不再
+  用公开 ACTIVE 投影冒充经营事实；
+- 页面支持创建含首个 SKU 的草稿、编辑 SPU、上下架、更新 SKU/价格，以及申请直传
+  URL、上传并确认商品媒体；
+- 64 位商品、SKU、分类、品牌和媒体 ID 在 JSON、Foundation、Pinia 和 Vue 中全程保持
+  字符串；写命令提交当前 owner version，不让旧详情覆盖新事实；
+- 商品创建在发送前把操作员、命令 ID 和完整载荷保存在本地。网络、超时、非法响应或
+  5xx 后进入 `UNKNOWN`，先按原键查询服务端事实，只允许原样重放；
+- 版本化 SPU 命令在 UNKNOWN 后读取 owner 详情，只有目标字段和下一 version 同时吻合才
+  恢复为成功；否则保持 UNKNOWN，不自动重放业务写；
+- 媒体确认 UNKNOWN 后按相同 object key 查询 owner 详情。确认接口本身幂等，避免响应
+  丢失后写出第二条媒体记录；
+- 503、超时或非法读取不会清空上一次已知事实；员工或会话 authority 切换后，旧读写
+  结果都不得进入新会话。
 
-以后若建设完整商品经营后台，必须先补充管理端列表/详情读模型、Foundation 管理 API、
-写命令的幂等或结果未知恢复契约，再另立业务切片验证；不能在视觉迁移中直接复用公开
-投影冒充完整管理事实。前端实现由 E2E 与
+分类和品牌在本切片只作为已有活跃事实供选择；其创建接口尚未扩成独立经营页面，也不
+在这里伪造结果未知恢复。前端实现由真实浏览器验收与
 [当前验证摘要](verification-summary.md)约束。
 
 ### 6.1 当前管理前端的评价治理边界
@@ -205,7 +217,8 @@ cd backend
 ./run-foundation-smoke.ps1
 ```
 
-H2 集成测试覆盖权限、草稿隔离、发布、金额精度、乐观锁、媒体确认、MinIO 读取降级，
+H2 集成测试覆盖权限、草稿隔离、管理读、创建幂等与按键恢复、发布、金额精度、乐观锁、
+媒体重复确认、MinIO 读取降级，
 评价资格幂等、所有者隔离、并发提交、汇总、点赞、回复、举报和审核状态，以及搜索
 Outbox 状态、恢复审计、重建、对账、降级元数据、10,000 结果窗口和公开回读边界。
 缓存单元测试另覆盖失效撤销在途 loader 写资格、远端失效删除两级缓存；路由集成测试

@@ -61,6 +61,19 @@ public final class CatalogModels {
     ) {
     }
 
+    public record AdminProductSummary(
+            @JsonSerialize(using = ToStringSerializer.class) Long id,
+            String title,
+            String subtitle,
+            String status,
+            int version,
+            CategoryView category,
+            BrandView brand,
+            BigDecimal minimumPrice,
+            String coverUrl
+    ) {
+    }
+
     public record ProductDetail(
             @JsonSerialize(using = ToStringSerializer.class) Long id,
             String title,

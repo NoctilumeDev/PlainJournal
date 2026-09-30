@@ -280,12 +280,12 @@
       "entry": "admin",
       "route": "/catalog",
       "samplePath": "/catalog",
-      "routeName": "catalog-read-only",
+      "routeName": "catalog-management",
       "component": "frontend/admin-web/src/views/CatalogReadOnlyView.vue",
       "family": "F",
       "access": "ADMIN|OPERATOR",
       "factOwners": ["catalog"],
-      "keyStates": ["loading", "loaded", "empty", "filtered", "read-error", "permission-denied"]
+      "keyStates": ["loading", "loaded", "empty", "filtered", "mutating", "result-unknown", "read-error", "permission-denied"]
     },
     {
       "id": "admin-fulfillment",
