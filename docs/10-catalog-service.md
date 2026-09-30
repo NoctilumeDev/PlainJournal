@@ -30,6 +30,10 @@ DRAFT -> ACTIVE -> INACTIVE
 - SPU、SKU、分类和品牌包含 `version` 字段；管理修改采用 MyBatis-Plus 乐观锁。
 - SPU 与初始 SKU 在同一个本地 MySQL 事务中写入。
 - 金额使用 MySQL `DECIMAL(18,2)` 和 Java `BigDecimal`；HTTP DTO 与应用服务都拒绝超过两位小数的价格，避免依赖数据库静默舍入。
+- 商品详情两级缓存的 loader 只拥有它开始读取时那一代 cache-write authority；更新提交后的
+  本地或跨实例失效会推进 generation，迟到 loader 可以完成原请求，但不能再把旧快照写回
+  local/Redis。远端失效接收者也删除 Redis 键，避免在途写入夹在发布端 delete 与消息到达之间
+  复活旧值。
 
 评价状态：
 
@@ -185,6 +189,10 @@ X-Catalog-Read-Consistency: primary
 分片和规模数据实验互斥。最终机制、故障和资源结论见
 [M0-M8 三层工程验收](evidence/m0-m8-three-layer-acceptance-20260728.md)。
 
+`primary` 是事实源要求，不只是 datasource route hint。商品详情收到该要求时必须绕过
+不能证明新鲜度的 local/Redis cache，并在主库事务中重新加载；普通读的旧缓存存在不能
+成为强读返回旧投影的理由。
+
 公开评价列表和评分汇总也属于显式副本资格；评价资格、提交、点赞、举报、回复和
 审核全部固定主库。副本延迟只能造成短暂展示滞后，不能改变评价资格或审核事实。
 
@@ -200,6 +208,8 @@ cd backend
 H2 集成测试覆盖权限、草稿隔离、发布、金额精度、乐观锁、媒体确认、MinIO 读取降级，
 评价资格幂等、所有者隔离、并发提交、汇总、点赞、回复、举报和审核状态，以及搜索
 Outbox 状态、恢复审计、重建、对账、降级元数据、10,000 结果窗口和公开回读边界。
+缓存单元测试另覆盖失效撤销在途 loader 写资格、远端失效删除两级缓存；路由集成测试
+保留旧缓存前提并验证显式 `primary` 商品详情只读取主库事实。
 OpenSearch 版本扫描另有 1,001 条文档拆为 1,000 + 1 两页并携带 `search_after` 的
 HTTP 适配器测试。
 

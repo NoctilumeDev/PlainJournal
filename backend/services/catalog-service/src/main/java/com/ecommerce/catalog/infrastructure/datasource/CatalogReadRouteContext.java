@@ -21,10 +21,14 @@ final class CatalogReadRouteContext {
 
     static boolean shouldUseReplica() {
         Deque<Preference> preferences = PREFERENCES.get();
-        if (preferences.contains(Preference.PRIMARY)) {
+        if (requiresPrimary()) {
             return false;
         }
         return preferences.contains(Preference.REPLICA);
+    }
+
+    static boolean requiresPrimary() {
+        return PREFERENCES.get().contains(Preference.PRIMARY);
     }
 
     private static Scope push(Preference preference) {

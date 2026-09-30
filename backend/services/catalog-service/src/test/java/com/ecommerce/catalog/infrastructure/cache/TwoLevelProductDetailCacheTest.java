@@ -285,6 +285,65 @@ class TwoLevelProductDetailCacheTest {
         }
     }
 
+    @Test
+    void invalidationRevokesAnInFlightDatabaseWriteBack() throws Exception {
+        FakeStore store = new FakeStore();
+        CatalogCacheProperties properties = properties(Duration.ofSeconds(2), 4);
+        CountDownLatch loaderStarted = new CountDownLatch(1);
+        CountDownLatch releaseLoader = new CountDownLatch(1);
+        AtomicInteger loads = new AtomicInteger();
+        ExecutorService callers = Executors.newSingleThreadExecutor();
+
+        try (TwoLevelProductDetailCache cache = cache(properties, store, new MutableClock())) {
+            Future<Optional<ProductDetail>> oldLoad = callers.submit(() ->
+                    cache.get(1L, () -> {
+                        loads.incrementAndGet();
+                        loaderStarted.countDown();
+                        await(releaseLoader);
+                        return Optional.of(product("before"));
+                    }));
+            assertThat(loaderStarted.await(1, TimeUnit.SECONDS)).isTrue();
+
+            cache.receiveInvalidation(1L);
+            releaseLoader.countDown();
+
+            assertThat(oldLoad.get(2, TimeUnit.SECONDS).orElseThrow().title())
+                    .isEqualTo("before");
+            assertThat(cache.localRecord(1L)).isEmpty();
+            assertThat(store.values).isEmpty();
+
+            assertThat(cache.get(1L, () -> {
+                loads.incrementAndGet();
+                return Optional.of(product("after"));
+            }).orElseThrow().title()).isEqualTo("after");
+            assertThat(cache.localRecord(1L).orElseThrow().product().title())
+                    .isEqualTo("after");
+            assertThat(store.values).isNotEmpty();
+            assertThat(loads).hasValue(2);
+        } finally {
+            releaseLoader.countDown();
+            callers.shutdownNow();
+        }
+    }
+
+    @Test
+    void remoteInvalidationRemovesBothCacheLevelsWithoutRepublishing() {
+        FakeStore store = new FakeStore();
+
+        try (TwoLevelProductDetailCache cache =
+                     cache(properties(Duration.ofMillis(100), 4), store, new MutableClock())) {
+            cache.get(1L, () -> Optional.of(product("before")));
+            assertThat(store.values).isNotEmpty();
+            assertThat(cache.localRecord(1L)).isPresent();
+
+            cache.receiveInvalidation(1L);
+
+            assertThat(store.values).isEmpty();
+            assertThat(cache.localRecord(1L)).isEmpty();
+            assertThat(store.lastPublished).isNull();
+        }
+    }
+
     private static TwoLevelProductDetailCache cache(
             CatalogCacheProperties properties,
             FakeStore store,

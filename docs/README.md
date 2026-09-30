@@ -13,6 +13,9 @@
 - [验证索引](verification-index.md)：UI Demo、Core Smoke、Full Lab 三档入口；
 - [32 GiB 扩展验收协议](32gib-extended-validation-runbook.md)：内存升级后的 fresh
   bootstrap、默认 Core Smoke、代表服务三实例、容量阶梯、故障恢复和清理；
+- [分布式故障反证协议](distributed-failure-falsifier-runbook.md)：以有限反例检查旧 actor、
+  强读 authority、响应丢失、重复乱序、lease、生命周期、慢依赖与版本共存；C1/C2
+  已复现首败并在修复候选上重放通过，其余场景尚未执行；
 - [项目历史](project-history.md)：阶段演进、Git 公开历史和版本边界；
 - [验收证据](evidence/README.md)：M0-M8 三层验收与正式发布前的工程冻结快照。
 
