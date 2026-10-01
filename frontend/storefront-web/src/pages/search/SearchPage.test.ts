@@ -133,4 +133,75 @@ describe("SearchPage", () => {
       .not.toContain("search-canvas--has-query");
     expect(wrapper.find(".search-results").exists()).toBe(false);
   });
+
+  it("keeps Browser Back pointed at the page that opened search", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => success({
+      items: [],
+      page: 1,
+      size: 12,
+      matchedTotal: 0,
+      source: "MYSQL",
+      degraded: false,
+    })));
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/search", name: "search", component: SearchPage },
+        { path: "/products", name: "products", component: { template: "<div />" } },
+      ],
+    });
+    await router.push("/products?category=writing");
+    await router.push("/search");
+    await router.isReady();
+
+    const wrapper = mount(SearchPage, {
+      global: { plugins: [router] },
+    });
+    await wrapper.get<HTMLInputElement>("#site-search").setValue("123456");
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(router.currentRoute.value.fullPath).toBe("/search?q=123456");
+    router.back();
+    await flushPromises();
+    expect(router.currentRoute.value.fullPath).toBe("/products?category=writing");
+  });
+
+  it("offers a real recovery path when a query has no results", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => success({
+      items: [],
+      page: 1,
+      size: 12,
+      matchedTotal: 0,
+      source: "MYSQL",
+      degraded: false,
+    })));
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/search", name: "search", component: SearchPage },
+        { path: "/products", name: "products", component: { template: "<div />" } },
+        {
+          path: "/products/:productId",
+          name: "product-detail",
+          component: { template: "<div />" },
+        },
+      ],
+    });
+    await router.push("/products?category=writing");
+    await router.push("/search?q=123456");
+    await router.isReady();
+
+    const wrapper = mount(SearchPage, {
+      global: { plugins: [router] },
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("没有找到匹配商品");
+    expect(wrapper.get('a[href="/products"]').text()).toContain("查看全部商品");
+
+    await wrapper.get('[data-testid="search-return-source"]').trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.fullPath).toBe("/products");
+  });
 });

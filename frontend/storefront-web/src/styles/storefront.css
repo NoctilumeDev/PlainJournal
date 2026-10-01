@@ -71,6 +71,17 @@
   font-size: var(--pj-font-size-sm);
 }
 
+.mobile-context-return {
+  display: none;
+}
+
+@media (max-width: 48rem) {
+  .mobile-context-return {
+    display: inline-flex;
+    margin-bottom: var(--pj-space-4);
+  }
+}
+
 .catalog-header {
   display: flex;
   align-items: end;

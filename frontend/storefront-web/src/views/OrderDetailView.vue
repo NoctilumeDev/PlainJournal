@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { formatMoney } from "@plain-journal/foundation";
 import {
@@ -31,8 +31,10 @@ import {
   type PaymentAccessContext,
 } from "../features/order-payment";
 import { useSessionStore } from "../features/customer-session";
+import { returnToPreviousOr } from "../shared/lib";
 
 const route = useRoute();
+const router = useRouter();
 const session = useSessionStore();
 const orders = useOrdersStore();
 const afterSales = useAfterSalesStore();
@@ -187,10 +189,21 @@ function formatTimestamp(value: string): string {
 }
 
 watch(orderNo, loadOrder, { immediate: true });
+
+async function returnToSource() {
+  await returnToPreviousOr(
+    router,
+    { name: "orders" },
+    (path) => path.split(/[?#]/, 1)[0] !== "/checkout",
+  );
+}
 </script>
 
 <template>
   <PjPageContainer as="section" class="order-detail-page">
+    <PjButton class="mobile-context-return" variant="text" @click="returnToSource">
+      ← 返回上一处
+    </PjButton>
     <nav class="content-path" aria-label="当前位置">
       <RouterLink to="/orders">我的订单</RouterLink>
       <span aria-hidden="true">/</span>
