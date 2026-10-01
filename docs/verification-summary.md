@@ -2,7 +2,7 @@
 
 > 本文件由 `.github/verification-baseline.json` 通过
 > `node tools/render-verification-summary.mjs` 生成。逐批过程由 Git 历史追溯，
-> 本页刻意分开发布对象代码门禁、历史运行证据、本轮 fresh 复验和未来 32 GiB 协议；
+> 本页刻意分开发布对象代码门禁、最近维护主线代码门禁、历史运行证据、本轮 fresh 复验和未来 32 GiB 协议；
 > 它们不是同一时间、同一对象或同一宿主条件下的一次“完整验证”。
 
 ## 发布坐标
@@ -15,7 +15,7 @@
 | 门禁对象提交 | `52f7de692d26e760661c4d3172746f1ac517952c` |
 | 门禁数字来源 | `52f7de692d26e760661c4d3172746f1ac517952c:.github/verification-baseline.json`；blob `4ac8d553009c432be454e00baf22263312fcebae` |
 | 代码门禁验证日期 | 2026-08-28 |
-| 下一候选 | `v1.1.0`（`released`） |
+| 后续发布 | `v1.1.0`（`released`） |
 
 ## `v1.0.10` 发布对象代码门禁
 
@@ -35,13 +35,13 @@ GitHub Actions 运行后，外部访问者可在仓库 Actions 页面复核同�
 架构、文档和安全门禁。
 
 
-## `v1.1.0` 候选代码门禁
+## `v1.1.0` 后续发布代码门禁
 
 | 项目 | 当前值 |
 | --- | --- |
-| 候选状态 | `released` |
+| 后续发布状态 | `released` |
 | 已验证代码对象 | `1937f4136a16dc2ec27d618c35e50739ed5aed0d` |
-| 候选数字来源 | `1937f4136a16dc2ec27d618c35e50739ed5aed0d:docs/frontend-layout-restructure-plan.md`；blob `54fa06e94d5f8da54a6b36a1aeb316bee1c675e0` |
+| 数字来源 | `1937f4136a16dc2ec27d618c35e50739ed5aed0d:docs/frontend-layout-restructure-plan.md`；blob `54fa06e94d5f8da54a6b36a1aeb316bee1c675e0` |
 | 验证日期 | 2026-09-01 |
 | 前端单元/契约 | 327 / 327 |
 | 前端聚合行覆盖率 | 73.9%（门禁 ≥ 70%） |
@@ -50,8 +50,29 @@ GitHub Actions 运行后，外部访问者可在仓库 Actions 页面复核同�
 | 前端分层规则 | 28 条 |
 | 真实运行证据 | `UNCHANGED / NOT REVALIDATED` |
 
-该候选只新增前端代码与视觉门禁事实；后端、真实中间件、容量、三实例和故障恢复仍沿用
+该后续发布记录只新增前端代码与视觉门禁事实；后端、真实中间件、容量、三实例和故障恢复仍沿用
 下方已经冻结的历史边界，不表述为本轮重新执行。
+
+
+
+## 最近维护主线代码门禁
+
+| 项目 | 已记录事实 |
+| --- | --- |
+| 对象 | `refs/heads/main` 在 `e8ec24aa209803bb6a1c448eed04a2f6d6ceff01` 的代码状态 |
+| 验证日期 | 2026-10-02 |
+| 裁决边界 | `PASS`；`CODE GATES ONLY / RUNTIME NOT REVALIDATED` |
+| 后端 Maven | 100 份 Surefire 报告，441 tests，0 failures，0 errors，0 skipped |
+| 后端行覆盖率 | 13553/18641，72.71%（门禁 ≥ 70%） |
+| 前端单元/契约 | 354 / 354 |
+| 前端聚合行覆盖率 | 6735/9249，72.82%（门禁 ≥ 70%） |
+| 浏览器门禁 | 开发态 61/61；生产构建 3/3 |
+| 公开运行 | [CI](https://github.com/NoctilumeDev/PlainJournal/actions/runs/36890795752) · [Security](https://github.com/NoctilumeDev/PlainJournal/actions/runs/36890795768) · [Online Preview](https://github.com/NoctilumeDev/PlainJournal/actions/runs/36890795825) |
+
+该记录只描述上述精确维护对象的代码门禁，不改变 `v1.0.10`、
+`v1.1.0` 或历史运行证据，也不声称重新执行真实中间件、
+容量、三实例、故障恢复或 32 GiB 延期协议。后续主线变化必须产生新的维护对象记录；
+旧记录继续保留其原始坐标，不自动升级为新提交的证据。
 
 
 ## 历史冻结运行证据

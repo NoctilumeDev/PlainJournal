@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "targetRelease": "v1.0.10",
   "status": "released",
   "codeGateEvidence": {
@@ -101,6 +101,50 @@
       "productionE2E": 3,
       "layerRules": 28,
       "lineCoverage": 73.9,
+      "lineCoverageMinimum": 70
+    }
+  },
+  "maintenanceHead": {
+    "verifiedOn": "2026-10-02",
+    "objectRef": "refs/heads/main",
+    "objectCommit": "e8ec24aa209803bb6a1c448eed04a2f6d6ceff01",
+    "status": "PASS",
+    "scope": "CODE GATES ONLY / RUNTIME NOT REVALIDATED",
+    "runs": {
+      "ci": {
+        "id": 36890795752,
+        "url": "https://github.com/NoctilumeDev/PlainJournal/actions/runs/36890795752",
+        "conclusion": "success"
+      },
+      "security": {
+        "id": 36890795768,
+        "url": "https://github.com/NoctilumeDev/PlainJournal/actions/runs/36890795768",
+        "conclusion": "success"
+      },
+      "onlinePreview": {
+        "id": 36890795825,
+        "url": "https://github.com/NoctilumeDev/PlainJournal/actions/runs/36890795825",
+        "conclusion": "success"
+      }
+    },
+    "backend": {
+      "surefireReports": 100,
+      "tests": 441,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "lineCovered": 13553,
+      "lineTotal": 18641,
+      "lineCoverage": 72.71,
+      "lineCoverageMinimum": 70
+    },
+    "frontend": {
+      "unitAndContractTests": 354,
+      "developmentE2E": 61,
+      "productionE2E": 3,
+      "lineCovered": 6735,
+      "lineTotal": 9249,
+      "lineCoverage": 72.82,
       "lineCoverageMinimum": 70
     }
   }

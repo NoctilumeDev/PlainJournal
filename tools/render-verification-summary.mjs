@@ -42,6 +42,14 @@ function requireNumber(record, key, scope) {
   return value;
 }
 
+function requirePositiveInteger(record, key, scope) {
+  const value = requireNumber(record, key, scope);
+  if (!Number.isInteger(value) || value === 0) {
+    invalid(`${scope}.${key} must be a positive integer.`);
+  }
+  return value;
+}
+
 function requireExact(value, expected, name) {
   if (value !== expected) {
     invalid(`${name} must be ${JSON.stringify(expected)}.`);
@@ -81,6 +89,40 @@ function requireMetricRecord(record, fields, scope) {
   }
 }
 
+function requireCoverageRecord(record, scope) {
+  requireMetricRecord(record, [
+    "lineCovered", "lineTotal", "lineCoverage", "lineCoverageMinimum",
+  ], scope);
+  if (record.lineTotal === 0 || record.lineCovered > record.lineTotal) {
+    invalid(`${scope} line counts are inconsistent.`);
+  }
+  const calculated = Math.round((record.lineCovered / record.lineTotal) * 10000) / 100;
+  if (record.lineCoverage !== calculated) {
+    invalid(`${scope}.lineCoverage must match the recorded line counts.`);
+  }
+  if (record.lineCoverage < record.lineCoverageMinimum) {
+    invalid(`${scope} coverage cannot be below its recorded minimum.`);
+  }
+}
+
+function requireWorkflowRun(record, scope) {
+  requireOnlyKeys(record, ["id", "url", "conclusion"], scope);
+  const id = requirePositiveInteger(record, "id", scope);
+  const url = requireString(record, "url", scope);
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    invalid(`${scope}.url must be an absolute URL.`);
+  }
+  if (parsed.protocol !== "https:"
+      || parsed.hostname !== "github.com"
+      || !parsed.pathname.endsWith(`/actions/runs/${id}`)) {
+    invalid(`${scope}.url must identify its GitHub Actions run.`);
+  }
+  requireExact(requireString(record, "conclusion", scope), "success", `${scope}.conclusion`);
+}
+
 export function validateVerificationBaseline(baseline) {
   requireRecord(baseline, "baseline");
   requireOnlyKeys(baseline, [
@@ -92,9 +134,10 @@ export function validateVerificationBaseline(baseline) {
     "freshRevalidation",
     "deferred32GiBValidation",
     "pendingRelease",
+    "maintenanceHead",
   ], "baseline");
-  if (![2, 3].includes(baseline.schemaVersion)) {
-    invalid("schemaVersion must be 2 or 3.");
+  if (![2, 3, 4].includes(baseline.schemaVersion)) {
+    invalid("schemaVersion must be 2, 3 or 4.");
   }
 
   const targetRelease = requireString(baseline, "targetRelease", "baseline");
@@ -125,8 +168,11 @@ export function validateVerificationBaseline(baseline) {
   }
 
   const pending = baseline.pendingRelease;
+  let pendingVerifiedOn;
   if (pending !== undefined) {
-    requireExact(baseline.schemaVersion, 3, "schemaVersion with pendingRelease");
+    if (![3, 4].includes(baseline.schemaVersion)) {
+      invalid("schemaVersion with pendingRelease must be 3 or 4.");
+    }
     const pendingRecord = requireRecord(pending, "pendingRelease");
     requireOnlyKeys(pendingRecord, [
       "targetRelease", "status", "verifiedOn", "objectCommit", "sourcePath",
@@ -140,7 +186,7 @@ export function validateVerificationBaseline(baseline) {
     if (!["release-candidate", "released"].includes(pendingStatus)) {
       invalid("pendingRelease.status must be release-candidate or released.");
     }
-    const pendingVerifiedOn = requireDate(pendingRecord, "verifiedOn", "pendingRelease");
+    pendingVerifiedOn = requireDate(pendingRecord, "verifiedOn", "pendingRelease");
     if (pendingVerifiedOn < gateVerifiedOn) {
       invalid("pendingRelease must not predate the frozen released baseline.");
     }
@@ -168,8 +214,87 @@ export function validateVerificationBaseline(baseline) {
     if (pendingFrontend.lineCoverage < pendingFrontend.lineCoverageMinimum) {
       invalid("pendingRelease frontend coverage cannot be below its recorded minimum.");
     }
-  } else if (baseline.schemaVersion === 3) {
-    invalid("schemaVersion 3 requires pendingRelease.");
+  } else if (baseline.schemaVersion >= 3) {
+    invalid(`schemaVersion ${baseline.schemaVersion} requires pendingRelease.`);
+  }
+
+  const maintenance = baseline.maintenanceHead;
+  if (maintenance !== undefined) {
+    requireExact(baseline.schemaVersion, 4, "schemaVersion with maintenanceHead");
+    const maintenanceRecord = requireRecord(maintenance, "maintenanceHead");
+    requireOnlyKeys(maintenanceRecord, [
+      "verifiedOn", "objectRef", "objectCommit", "status", "scope", "runs",
+      "backend", "frontend",
+    ], "maintenanceHead");
+    const maintenanceVerifiedOn = requireDate(
+      maintenanceRecord,
+      "verifiedOn",
+      "maintenanceHead",
+    );
+    if (maintenanceVerifiedOn < (pendingVerifiedOn ?? gateVerifiedOn)) {
+      invalid("maintenanceHead must not predate the latest recorded release gate.");
+    }
+    requireExact(
+      requireRef(maintenanceRecord, "objectRef", "maintenanceHead"),
+      "refs/heads/main",
+      "maintenanceHead.objectRef",
+    );
+    requireSha(maintenanceRecord, "objectCommit", "maintenanceHead");
+    requireExact(
+      requireString(maintenanceRecord, "status", "maintenanceHead"),
+      "PASS",
+      "maintenanceHead.status",
+    );
+    requireExact(
+      requireString(maintenanceRecord, "scope", "maintenanceHead"),
+      "CODE GATES ONLY / RUNTIME NOT REVALIDATED",
+      "maintenanceHead.scope",
+    );
+
+    const runs = requireRecord(maintenanceRecord.runs, "maintenanceHead.runs");
+    requireOnlyKeys(runs, ["ci", "security", "onlinePreview"], "maintenanceHead.runs");
+    requireWorkflowRun(requireRecord(runs.ci, "maintenanceHead.runs.ci"), "maintenanceHead.runs.ci");
+    requireWorkflowRun(
+      requireRecord(runs.security, "maintenanceHead.runs.security"),
+      "maintenanceHead.runs.security",
+    );
+    requireWorkflowRun(
+      requireRecord(runs.onlinePreview, "maintenanceHead.runs.onlinePreview"),
+      "maintenanceHead.runs.onlinePreview",
+    );
+
+    const maintenanceBackend = requireRecord(
+      maintenanceRecord.backend,
+      "maintenanceHead.backend",
+    );
+    requireOnlyKeys(maintenanceBackend, [
+      "surefireReports", "tests", "failures", "errors", "skipped",
+      "lineCovered", "lineTotal", "lineCoverage", "lineCoverageMinimum",
+    ], "maintenanceHead.backend");
+    requireMetricRecord(maintenanceBackend, [
+      "surefireReports", "tests", "failures", "errors", "skipped",
+    ], "maintenanceHead.backend");
+    requireCoverageRecord(maintenanceBackend, "maintenanceHead.backend");
+    if (maintenanceBackend.failures !== 0
+        || maintenanceBackend.errors !== 0
+        || maintenanceBackend.skipped !== 0) {
+      invalid("maintenanceHead contains a non-passing backend counter.");
+    }
+
+    const maintenanceFrontend = requireRecord(
+      maintenanceRecord.frontend,
+      "maintenanceHead.frontend",
+    );
+    requireOnlyKeys(maintenanceFrontend, [
+      "unitAndContractTests", "developmentE2E", "productionE2E",
+      "lineCovered", "lineTotal", "lineCoverage", "lineCoverageMinimum",
+    ], "maintenanceHead.frontend");
+    requireMetricRecord(maintenanceFrontend, [
+      "unitAndContractTests", "developmentE2E", "productionE2E",
+    ], "maintenanceHead.frontend");
+    requireCoverageRecord(maintenanceFrontend, "maintenanceHead.frontend");
+  } else if (baseline.schemaVersion === 4) {
+    invalid("schemaVersion 4 requires maintenanceHead.");
   }
 
   const backend = requireRecord(gates.backend, "codeGateEvidence.backend");
@@ -336,14 +461,16 @@ export function renderVerificationSummary(baseline) {
   const fresh = baseline.freshRevalidation;
   const deferred = baseline.deferred32GiBValidation;
   const pending = baseline.pendingRelease;
+  const maintenance = baseline.maintenanceHead;
+  const pendingDisplayName = pending?.status === "released" ? "后续发布" : "候选";
   const pendingSummary = pending ? `
-## \`${pending.targetRelease}\` 候选代码门禁
+## \`${pending.targetRelease}\` ${pendingDisplayName}代码门禁
 
 | 项目 | 当前值 |
 | --- | --- |
-| 候选状态 | \`${pending.status}\` |
+| ${pendingDisplayName}状态 | \`${pending.status}\` |
 | 已验证代码对象 | \`${pending.objectCommit}\` |
-| 候选数字来源 | \`${pending.objectCommit}:${pending.sourcePath}\`；blob \`${pending.sourceBlob}\` |
+| 数字来源 | \`${pending.objectCommit}:${pending.sourcePath}\`；blob \`${pending.sourceBlob}\` |
 | 验证日期 | ${pending.verifiedOn} |
 | 前端单元/契约 | ${pending.frontend.unitAndContractTests} / ${pending.frontend.unitAndContractTests} |
 | 前端聚合行覆盖率 | ${pending.frontend.lineCoverage}%（门禁 ≥ ${pending.frontend.lineCoverageMinimum}%） |
@@ -352,7 +479,7 @@ export function renderVerificationSummary(baseline) {
 | 前端分层规则 | ${pending.frontend.layerRules} 条 |
 | 真实运行证据 | \`${pending.runtimeEvidence}\` |
 
-该候选只新增前端代码与视觉门禁事实；后端、真实中间件、容量、三实例和故障恢复仍沿用
+该${pendingDisplayName}记录只新增前端代码与视觉门禁事实；后端、真实中间件、容量、三实例和故障恢复仍沿用
 下方已经冻结的历史边界，不表述为本轮重新执行。
 ` : "";
   const historicalSources = historical.sourceSnapshots
@@ -362,11 +489,31 @@ export function renderVerificationSummary(baseline) {
       + `证据坐标 \`${source.sourceCommit}:${source.path}\`；blob \`${source.sourceBlob}\``
     ))
     .join("\n");
+  const maintenanceSummary = maintenance ? `
+## 最近维护主线代码门禁
+
+| 项目 | 已记录事实 |
+| --- | --- |
+| 对象 | \`${maintenance.objectRef}\` 在 \`${maintenance.objectCommit}\` 的代码状态 |
+| 验证日期 | ${maintenance.verifiedOn} |
+| 裁决边界 | \`${maintenance.status}\`；\`${maintenance.scope}\` |
+| 后端 Maven | ${maintenance.backend.surefireReports} 份 Surefire 报告，${maintenance.backend.tests} tests，${maintenance.backend.failures} failures，${maintenance.backend.errors} errors，${maintenance.backend.skipped} skipped |
+| 后端行覆盖率 | ${maintenance.backend.lineCovered}/${maintenance.backend.lineTotal}，${maintenance.backend.lineCoverage}%（门禁 ≥ ${maintenance.backend.lineCoverageMinimum}%） |
+| 前端单元/契约 | ${maintenance.frontend.unitAndContractTests} / ${maintenance.frontend.unitAndContractTests} |
+| 前端聚合行覆盖率 | ${maintenance.frontend.lineCovered}/${maintenance.frontend.lineTotal}，${maintenance.frontend.lineCoverage}%（门禁 ≥ ${maintenance.frontend.lineCoverageMinimum}%） |
+| 浏览器门禁 | 开发态 ${maintenance.frontend.developmentE2E}/${maintenance.frontend.developmentE2E}；生产构建 ${maintenance.frontend.productionE2E}/${maintenance.frontend.productionE2E} |
+| 公开运行 | [CI](${maintenance.runs.ci.url}) · [Security](${maintenance.runs.security.url}) · [Online Preview](${maintenance.runs.onlinePreview.url}) |
+
+该记录只描述上述精确维护对象的代码门禁，不改变 \`${baseline.targetRelease}\`、
+\`${pending?.targetRelease ?? "无后续发布"}\` 或历史运行证据，也不声称重新执行真实中间件、
+容量、三实例、故障恢复或 32 GiB 延期协议。后续主线变化必须产生新的维护对象记录；
+旧记录继续保留其原始坐标，不自动升级为新提交的证据。
+` : "";
   return `# 当前验证摘要
 
 > 本文件由 \`.github/verification-baseline.json\` 通过
 > \`node tools/render-verification-summary.mjs\` 生成。逐批过程由 Git 历史追溯，
-> 本页刻意分开发布对象代码门禁、历史运行证据、本轮 fresh 复验和未来 32 GiB 协议；
+> 本页刻意分开发布对象代码门禁、最近维护主线代码门禁、历史运行证据、本轮 fresh 复验和未来 32 GiB 协议；
 > 它们不是同一时间、同一对象或同一宿主条件下的一次“完整验证”。
 
 ## 发布坐标
@@ -379,7 +526,7 @@ export function renderVerificationSummary(baseline) {
 | 门禁对象提交 | \`${gates.objectCommit}\` |
 | 门禁数字来源 | \`${gates.objectCommit}:${gates.sourcePath}\`；blob \`${gates.sourceBlob}\` |
 | 代码门禁验证日期 | ${gates.verifiedOn} |
-${pending ? `| 下一候选 | \`${pending.targetRelease}\`（\`${pending.status}\`） |` : ""}
+${pending ? `| ${pendingDisplayName} | \`${pending.targetRelease}\`（\`${pending.status}\`） |` : ""}
 
 ## \`${baseline.targetRelease}\` 发布对象代码门禁
 
@@ -399,6 +546,8 @@ GitHub Actions 运行后，外部访问者可在仓库 Actions 页面复核同�
 架构、文档和安全门禁。
 
 ${pendingSummary}
+
+${maintenanceSummary}
 
 ## 历史冻结运行证据
 

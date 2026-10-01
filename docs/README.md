@@ -8,8 +8,8 @@
 - [项目总计划](00-project-master-plan.md)：当前范围、M0-M8 结果和冻结规则；
 - [参考基线与 Pro 边界](reference-baseline-and-pro-boundary.md)：16GB 单机方法、
   并发数字解释，以及 PlainJournalPro 职责；
-- [当前验证摘要](verification-summary.md)：分别索引固定发布对象代码门禁、历史运行证据、
-  16 GiB fresh 宿主边界与 32 GiB 延期协议；
+- [当前验证摘要](verification-summary.md)：分别索引固定发布对象代码门禁、最近维护主线
+  代码门禁、历史运行证据、16 GiB fresh 宿主边界与 32 GiB 延期协议；
 - [验证索引](verification-index.md)：UI Demo、Core Smoke、Full Lab 三档入口；
 - [32 GiB 扩展验收协议](32gib-extended-validation-runbook.md)：内存升级后的 fresh
   bootstrap、默认 Core Smoke、代表服务三实例、容量阶梯、故障恢复和清理；
@@ -75,7 +75,8 @@
 
 ## 维护规则
 
-1. 当前版本和验证数字只修改 `.github/verification-baseline.json`，再运行生成器。
+1. 发布对象与维护对象的验证数字只修改 `.github/verification-baseline.json`，再运行生成器；
+   两类坐标必须分开，维护结果不得覆盖已冻结的发布证据。
 2. 根目录文档只描述当前有效规则，不复制逐批施工流水。
 3. 过程记录依赖 Git 历史追溯；只有终局验收矩阵可以进入 `evidence/`。
 4. 新的现行规范必须加入本导航，新的验收快照必须说明日期和适用版本。
