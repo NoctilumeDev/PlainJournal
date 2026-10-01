@@ -254,8 +254,85 @@ test("renders an additive pending release without rewriting the released baselin
   const output = renderVerificationSummary(baseline);
   assert.match(output, /v1\.0\.10.*released/su);
   assert.match(output, /v1\.1\.0.*release-candidate/su);
+  assert.match(output, /v1\.1\.0` 候选代码门禁/u);
   assert.match(output, /327 \/ 327/u);
   assert.match(output, /UNCHANGED \/ NOT REVALIDATED/u);
+});
+
+test("renders maintenance evidence as an exact code-gate object", () => {
+  const baseline = fixture();
+  baseline.schemaVersion = 4;
+  baseline.pendingRelease = {
+    targetRelease: "v1.1.0",
+    status: "released",
+    verifiedOn: "2026-09-01",
+    objectCommit: "9".repeat(40),
+    sourcePath: "docs/frontend-layout-restructure-plan.md",
+    sourceBlob: "a".repeat(40),
+    runtimeEvidence: "UNCHANGED / NOT REVALIDATED",
+    frontend: {
+      unitAndContractTests: 327,
+      developmentE2E: 61,
+      productionE2E: 3,
+      layerRules: 28,
+      lineCoverage: 73.9,
+      lineCoverageMinimum: 70,
+    },
+  };
+  baseline.maintenanceHead = {
+    verifiedOn: "2026-10-02",
+    objectRef: "refs/heads/main",
+    objectCommit: "b".repeat(40),
+    status: "PASS",
+    scope: "CODE GATES ONLY / RUNTIME NOT REVALIDATED",
+    runs: {
+      ci: {
+        id: 101,
+        url: "https://github.com/example/project/actions/runs/101",
+        conclusion: "success",
+      },
+      security: {
+        id: 102,
+        url: "https://github.com/example/project/actions/runs/102",
+        conclusion: "success",
+      },
+      onlinePreview: {
+        id: 103,
+        url: "https://github.com/example/project/actions/runs/103",
+        conclusion: "success",
+      },
+    },
+    backend: {
+      surefireReports: 100,
+      tests: 441,
+      failures: 0,
+      errors: 0,
+      skipped: 0,
+      lineCovered: 7271,
+      lineTotal: 10000,
+      lineCoverage: 72.71,
+      lineCoverageMinimum: 70,
+    },
+    frontend: {
+      unitAndContractTests: 354,
+      developmentE2E: 61,
+      productionE2E: 3,
+      lineCovered: 7282,
+      lineTotal: 10000,
+      lineCoverage: 72.82,
+      lineCoverageMinimum: 70,
+    },
+  };
+
+  const output = renderVerificationSummary(baseline);
+  assert.match(output, /v1\.1\.0` 后续发布代码门禁/u);
+  assert.doesNotMatch(output, /下一候选/u);
+  assert.match(output, /最近维护主线代码门禁/u);
+  assert.match(output, /441 tests/u);
+  assert.match(output, /354 \/ 354/u);
+  assert.match(output, /CODE GATES ONLY \/ RUNTIME NOT REVALIDATED/u);
+  assert.match(output, /github\.com\/example\/project\/actions\/runs\/101/u);
+  assert.match(output, /不声称重新执行真实中间件/u);
 });
 
 test("rejects schema drift and contradictory evidence states", async (t) => {
@@ -329,6 +406,43 @@ test("rejects schema drift and contradictory evidence states", async (t) => {
       const baseline = fixture();
       mutate(baseline);
       assert.throws(() => renderVerificationSummary(baseline), expected);
+    });
+  }
+});
+
+test("rejects maintenance evidence that cannot support its recorded PASS", async (t) => {
+  const baseline = await readRepositoryBaseline();
+  const cases = [
+    [
+      "coverage percentage detached from counts",
+      (value) => { value.maintenanceHead.frontend.lineCoverage = 99; },
+      /lineCoverage must match/u,
+    ],
+    [
+      "workflow URL detached from run identity",
+      (value) => {
+        value.maintenanceHead.runs.ci.url
+          = "https://github.com/NoctilumeDev/PlainJournal/actions/runs/1";
+      },
+      /must identify its GitHub Actions run/u,
+    ],
+    [
+      "failed backend counter under PASS",
+      (value) => { value.maintenanceHead.backend.failures = 1; },
+      /non-passing backend counter/u,
+    ],
+    [
+      "mutable maintenance evidence added to the archival schema",
+      (value) => { value.schemaVersion = 3; },
+      /schemaVersion with maintenanceHead/u,
+    ],
+  ];
+
+  for (const [name, mutate, expected] of cases) {
+    await t.test(name, () => {
+      const candidate = structuredClone(baseline);
+      mutate(candidate);
+      assert.throws(() => validateVerificationBaseline(candidate), expected);
     });
   }
 });
@@ -420,7 +534,7 @@ test("binds the repository baseline to reachable immutable Git objects", async (
   assert.deepEqual(gates.frontend, gateSource.frontend);
 
   const pending = baseline.pendingRelease;
-  assert.equal(baseline.schemaVersion, 3);
+  assert.equal(baseline.schemaVersion, 4);
   assert.ok(pending);
   assert.equal(git("rev-parse", `${pending.objectCommit}^{commit}`), pending.objectCommit);
   assert.doesNotThrow(() => git(
@@ -441,6 +555,60 @@ test("binds the repository baseline to reachable immutable Git objects", async (
   assert.match(pendingSource, /327 条单元测试/u);
   assert.match(pendingSource, /61 条开发 E2E/u);
   assert.match(pendingSource, /73\.9%/u);
+
+  const maintenance = baseline.maintenanceHead;
+  assert.ok(maintenance);
+  assert.equal(maintenance.objectRef, "refs/heads/main");
+  assert.equal(
+    git("rev-parse", `${maintenance.objectCommit}^{commit}`),
+    maintenance.objectCommit,
+  );
+  assert.doesNotThrow(() => git(
+    "merge-base",
+    "--is-ancestor",
+    maintenance.objectCommit,
+    resolveMainlineRef(),
+  ));
+  assert.equal(maintenance.status, "PASS");
+  assert.equal(maintenance.scope, "CODE GATES ONLY / RUNTIME NOT REVALIDATED");
+  assert.deepEqual({
+    reports: maintenance.backend.surefireReports,
+    tests: maintenance.backend.tests,
+    failures: maintenance.backend.failures,
+    errors: maintenance.backend.errors,
+    skipped: maintenance.backend.skipped,
+    covered: maintenance.backend.lineCovered,
+    total: maintenance.backend.lineTotal,
+    coverage: maintenance.backend.lineCoverage,
+  }, {
+    reports: 100,
+    tests: 441,
+    failures: 0,
+    errors: 0,
+    skipped: 0,
+    covered: 13553,
+    total: 18641,
+    coverage: 72.71,
+  });
+  assert.deepEqual({
+    tests: maintenance.frontend.unitAndContractTests,
+    developmentE2E: maintenance.frontend.developmentE2E,
+    productionE2E: maintenance.frontend.productionE2E,
+    covered: maintenance.frontend.lineCovered,
+    total: maintenance.frontend.lineTotal,
+    coverage: maintenance.frontend.lineCoverage,
+  }, {
+    tests: 354,
+    developmentE2E: 61,
+    productionE2E: 3,
+    covered: 6735,
+    total: 9249,
+    coverage: 72.82,
+  });
+  for (const run of Object.values(maintenance.runs)) {
+    assert.equal(run.conclusion, "success");
+    assert.match(run.url, new RegExp(`/actions/runs/${run.id}$`, "u"));
+  }
 
   const historicalSources = [];
   for (const snapshot of baseline.historicalRuntimeEvidence.sourceSnapshots) {
