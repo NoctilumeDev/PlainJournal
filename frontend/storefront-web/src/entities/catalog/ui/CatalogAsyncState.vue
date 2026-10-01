@@ -32,6 +32,9 @@ defineEmits<{
     :empty-message="emptyMessage"
     @retry="$emit('retry')"
   >
+    <template #empty-actions>
+      <slot name="empty-actions" />
+    </template>
     <slot />
   </AsyncState>
 </template>

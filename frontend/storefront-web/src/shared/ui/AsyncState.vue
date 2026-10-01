@@ -37,6 +37,7 @@ defineEmits<{
     <p class="eyebrow">{{ emptyEyebrow ?? "没有匹配结果" }}</p>
     <h2>{{ emptyTitle ?? "这里暂时没有商品。" }}</h2>
     <p>{{ emptyMessage ?? "可以调整查找词或返回全部商品。" }}</p>
+    <slot name="empty-actions" />
   </div>
   <slot v-else />
 </template>

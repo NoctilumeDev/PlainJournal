@@ -22,6 +22,7 @@ import {
   catalogApi,
   CatalogAsyncState,
 } from "../entities/catalog";
+import { returnToPreviousOr } from "../shared/lib";
 import { useBagStore } from "../entities/guest-bag";
 import type { ReviewAccessContext } from "../entities/product-review";
 import { useSessionStore } from "../features/customer-session";
@@ -104,12 +105,19 @@ function addToBag() {
 
 onMounted(load);
 watch(() => route.params.productId, load);
+
+async function returnToSource() {
+  await returnToPreviousOr(router, { name: "products" });
+}
 </script>
 
 <template>
   <PjPageContainer as="section" class="product-detail-page">
     <CatalogAsyncState :loading="loading" :error="error" @retry="load">
       <template v-if="product">
+        <PjButton class="mobile-context-return" variant="text" @click="returnToSource">
+          ← 返回上一处
+        </PjButton>
         <nav class="content-path" aria-label="当前位置">
           <RouterLink to="/">素简记</RouterLink>
           <span aria-hidden="true">/</span>

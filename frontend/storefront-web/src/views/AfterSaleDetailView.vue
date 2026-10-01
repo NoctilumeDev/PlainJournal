@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
-import { PjPageContainer } from "@plain-journal/ui";
+import { PjButton, PjPageContainer } from "@plain-journal/ui";
 
 import type { AfterSaleAccessContext } from "../entities/after-sale";
 import { AfterSaleWorkspace } from "../features/after-sale-workflow";
 import { useSessionStore } from "../features/customer-session";
+import { returnToPreviousOr } from "../shared/lib";
 
 const route = useRoute();
+const router = useRouter();
 const session = useSessionStore();
 const afterSaleNo = computed(() => String(route.params.afterSaleNo ?? ""));
 const access = computed<AfterSaleAccessContext>(() => ({
@@ -16,10 +18,17 @@ const access = computed<AfterSaleAccessContext>(() => ({
   ownerId: session.profile?.id ?? null,
   accessToken: session.requestAuthority,
 }));
+
+async function returnToSource() {
+  await returnToPreviousOr(router, { name: "after-sales" });
+}
 </script>
 
 <template>
   <PjPageContainer as="section" class="after-sale-detail-page">
+    <PjButton class="mobile-context-return" variant="text" @click="returnToSource">
+      ← 返回上一处
+    </PjButton>
     <nav class="content-path" aria-label="当前位置">
       <RouterLink to="/after-sales">售后服务</RouterLink>
       <span aria-hidden="true">/</span>

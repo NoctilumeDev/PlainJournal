@@ -28,6 +28,7 @@ import {
   pageCount,
   pageFromQuery,
   queryWithPage,
+  returnToPreviousOr,
 } from "../../shared/lib";
 
 const PAGE_SIZE = 12;
@@ -97,10 +98,16 @@ async function search() {
 
 function submit() {
   const normalized = input.value.trim();
-  router.push({
+  // A query change is still the same search context. Replacing this entry keeps
+  // Browser Back pointed at the page from which the user entered search.
+  router.replace({
     name: "search",
     query: normalized ? { q: normalized } : {},
   });
+}
+
+async function returnToSource() {
+  await returnToPreviousOr(router, { name: "products" });
 }
 
 onMounted(search);
@@ -188,6 +195,20 @@ watch(() => route.fullPath, search);
         empty-message="尝试更短的关键词，或返回全部商品。"
         @retry="search"
       >
+        <template #empty-actions>
+          <div class="search-empty-actions" aria-label="无搜索结果操作">
+            <PjButton
+              data-testid="search-return-source"
+              variant="text"
+              @click="returnToSource"
+            >
+              返回上一处
+            </PjButton>
+            <RouterLink class="text-action" :to="{ name: 'products' }">
+              查看全部商品
+            </RouterLink>
+          </div>
+        </template>
         <ProductGrid :products="products" :heading-level="2" />
         <CatalogPagination
           :current-page="currentPage"
@@ -324,6 +345,14 @@ watch(() => route.fullPath, search);
 
 .search-degraded {
   margin-bottom: var(--pj-space-6);
+}
+
+.search-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pj-space-4);
+  margin-top: var(--pj-space-4);
 }
 
 .search-results__heading {

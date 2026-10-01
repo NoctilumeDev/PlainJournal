@@ -1,4 +1,4 @@
-export { safeReturnTo } from "./navigation";
+export { returnToPreviousOr, safeReturnTo } from "./navigation";
 export {
   pageCount,
   pageFromQuery,
