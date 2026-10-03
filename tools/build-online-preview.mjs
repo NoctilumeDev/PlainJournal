@@ -14,14 +14,16 @@ await fs.mkdir(assetRoot, { recursive: true });
 const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], {
   cwd: repositoryRoot,
   encoding: "utf8",
+  windowsHide: true,
 }).trim();
 if (!/^[0-9a-f]{40}$/u.test(sourceCommit)) {
   throw new Error("Online preview requires an exact source commit.");
 }
 const sourceMarker = '<a data-source-coordinate href="https://github.com/NoctilumeDev/PlainJournal/tree/main">维护主线</a>';
-const hasLocalChanges = execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], {
+const hasLocalChanges = execFileSync("git", ["status", "--porcelain", "--untracked-files=normal"], {
   cwd: repositoryRoot,
   encoding: "utf8",
+  windowsHide: true,
 }).trim().length > 0;
 const template = await fs.readFile(path.join(sourceRoot, "index.html"), "utf8");
 if (!template.includes(sourceMarker)) {
