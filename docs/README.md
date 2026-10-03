@@ -16,7 +16,8 @@
   bootstrap、默认 Core Smoke、代表服务三实例、容量阶梯、故障恢复和清理；
 - [分布式故障反证协议](distributed-failure-falsifier-runbook.md)：以有限反例检查旧 actor、
   强读 authority、响应丢失、重复乱序、lease、生命周期、慢依赖与版本共存；C1/C2
-  已复现首败并在修复候选上重放通过，其余场景尚未执行；
+  已复现首败、修复重放通过并合入主线；T1、S1 已通过，M1 修复后重放通过。
+  L1/B1/V1 仍未执行，运行证据仅适用于协议绑定的构件；
 - [项目历史](project-history.md)：阶段演进、Git 公开历史和版本边界；
 - [验收证据](evidence/README.md)：M0-M8 三层验收与正式发布前的工程冻结快照。
 
