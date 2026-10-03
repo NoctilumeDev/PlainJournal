@@ -283,8 +283,13 @@ record their checksums, and prove them by restoring into an isolated empty
 MySQL instance.
 
 For a fresh development clone, start the core middleware with the commands
-above and run Core Smoke once so every owner service applies its Flyway
-migrations. After Core Smoke cleans its temporary facts, create the small,
+above and run Core Smoke once. It starts Gateway plus the seven core owners
+(Identity, Catalog, Inventory, Trade, Payment, Fulfillment, and Marketing),
+which apply their own Flyway migrations. Bootstrap creates all ten owner
+schemas and users, but Chat, Notification, and Analytics migrate only when
+their applications start; Core Smoke does not start them. Do not merge or
+manually replay the service-owned migration files into one SQL dump.
+After Core Smoke cleans its temporary facts, create the small,
 deterministic repository fixture:
 
 ```powershell

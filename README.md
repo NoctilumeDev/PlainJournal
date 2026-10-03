@@ -25,8 +25,8 @@ JDK 17 和 Vue 3，围绕数据所有权、交易一致性、结果未知恢复�
 ## 成品预览
 
 [在线预览](https://noctilumedev.github.io/PlainJournal/) 使用 GitHub Pages 展示
-`v1.1.0` 的发布快照页面、响应式布局和运行边界，不冒充最新主线产品状态或真实后端
-环境。下面三张截图分别
+V7.4 阶段的历史页面截图、维护中的架构图和运行边界；页面标明这些来源与构建提交。
+它不代表 `v1.1.0` 或最新主线的完整交互产品，当前界面请使用下方 UI Demo。下面三张截图分别
 覆盖商品选择、结算事实核对和管理端售后工作台，均由现行演示夹具在真实浏览器中截取；
 验收基线继续独立保留，不与展示素材混用。
 
@@ -87,7 +87,9 @@ README、历史文档和运行证据形成多份相互漂移的事实。
 
 ## 快速演示
 
-UI Demo 只需要 Node.js 和 pnpm，不启动 Docker 或 Java：
+旧计划、施工记录、历史资料与失败材料的分类入口见 [history/](history/README.md)；现行规范见 [文档导航](docs/README.md)。
+
+UI Demo 只需要 Node.js `22.12+` 和 pnpm `11.9.0`，不启动 Docker 或 Java：
 
 ```bash
 git clone https://github.com/NoctilumeDev/PlainJournal.git
@@ -123,7 +125,10 @@ pnpm demo:start
 仓库不提交真实 MySQL 数据、数据库文件或真实数据导出。需要在新电脑上使用真实
 MySQL 开发时，先按 [Docker 说明](deploy/docker/README.md) 创建本地资源并运行一次
 Core Smoke，让各服务以自己的 Flyway 迁移建立结构；随后使用仓库内的确定性合成
-数据：
+数据。Core Smoke 实际启动 Gateway 与 Identity、Catalog、Inventory、Trade、Payment、
+Fulfillment、Marketing 七个核心所有者服务，只有这些服务会在本轮应用迁移。
+Chat、Notification、Analytics 在各自启动时迁移；bootstrap 创建空库与账号不等于迁移完成。
+当前合成数据使用已迁移的核心业务库：
 
 ```powershell
 cd backend
