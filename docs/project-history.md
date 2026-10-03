@@ -36,6 +36,18 @@ PlainJournal 在本地 Git 工作区中开发，`2026-07-16` 建立可运行基�
 完整阶段索引见 [项目总计划](00-project-master-plan.md) 和
 [验证索引](verification-index.md)。
 
+## 文档与视觉记录的归属
+
+现行产品、架构和运行规范从 [文档导航](README.md) 进入；现行前端规范为
+[轻量化重构计划](frontend-layout-restructure-plan.md)，页面注册表、桌面/移动视觉基线、
+展示素材与不可替代的终局验收快照继续保留。
+
+旧《设计与实施计划书》与逐批视觉施工记录保留在 [历史目录](../history/README.md)，
+不再作为根目录的现行阅读入口。已被现行视觉基线替代的 `frontend-audit` 过程截图从工作树移除；
+清理前的固定提交 [8f47b451](https://github.com/NoctilumeDev/PlainJournal/tree/8f47b451dff86e0dbf65b3cf6e70a92e11a19fec)
+仍保留全部原始附件，可按原路径回查。这次归属调整不改写发布标签、冻结证据、
+历史运行结果或当前视觉基线，也不表示重新执行过旧验收。
+
 ## 产品冻结
 
 当前仓库冻结为 16GB Windows 单机约束下已经闭环的 M0-M8 单经营主体、自营 B2C

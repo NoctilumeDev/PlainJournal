@@ -20,6 +20,10 @@
 
 ### Changed
 
+- 按 `history/plans`、`worklogs`、`materials`、`failures` 分类保留旧计划、施工记录和历史证据入口，清除已被现行视觉基线替代的过程截图；
+- 订正实际管理端角色、未实现密码重置、Core Smoke 七个核心所有者迁移范围与故障协议导航；
+- Pages 区分 V7.4 历史截图、维护架构图、当前发布基线和构建提交，本地修改明确标注。
+
 - 认证请求统一从当前会话 authority 读取凭据，并以同浏览器协调域的 single-flight、
   generation 传播和最多一次业务请求重放处理正常过期；无法证明连续性时进入
   `REAUTH_REQUIRED`，不伪造透明恢复；
