@@ -34,6 +34,7 @@ jobs:
           node tools/check-backend-boundaries.mjs
           node tools/check-visual-docs.mjs
           node tools/check-documentation-structure.mjs
+          node tools/check-residual-hygiene.mjs
           node tools/check-markdown-links.mjs
           node tools/check-frontend-page-registry.mjs
           node tools/check-frontend-baseline.mjs

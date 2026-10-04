@@ -1,7 +1,7 @@
 # 历史设计 QA 记录
 
 > 本文保留当时的施工过程和审查结论，不作为现行设计规范或最新验收结果。当前资料见[文档导航](../../docs/README.md)与[验证摘要](../../docs/verification-summary.md)。
-> 配套截图已随本文归档，链接指向本目录的 `frontend-audit/`；其余原文仓库路径以项目根目录为基准，本机临时路径仅描述当时环境。
+> 配套截图已从当前 checkout 外置，本文链接固定到删除前的精确提交 `d1567a7`；其余原文仓库路径以项目根目录为基准，本机临时路径仅描述当时环境。
 
 ---
 
@@ -297,11 +297,11 @@ passed
 ## Implementation evidence
 
 - Refined desktop capture:
-  [frontend-audit/2026-09-01-admin-foundation/03-after-sales-foundation-desktop-refined.png](frontend-audit/2026-09-01-admin-foundation/03-after-sales-foundation-desktop-refined.png).
+  [frontend-audit/2026-09-01-admin-foundation/03-after-sales-foundation-desktop-refined.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-foundation/03-after-sales-foundation-desktop-refined.png).
 - Mobile capture at a `390 x 844` CSS viewport:
-  [frontend-audit/2026-09-01-admin-foundation/04-after-sales-foundation-mobile.png](frontend-audit/2026-09-01-admin-foundation/04-after-sales-foundation-mobile.png).
+  [frontend-audit/2026-09-01-admin-foundation/04-after-sales-foundation-mobile.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-foundation/04-after-sales-foundation-mobile.png).
 - Same-input visual comparison:
-  [frontend-audit/2026-09-01-admin-foundation/06-source-implementation-comparison.png](frontend-audit/2026-09-01-admin-foundation/06-source-implementation-comparison.png).
+  [frontend-audit/2026-09-01-admin-foundation/06-source-implementation-comparison.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-foundation/06-source-implementation-comparison.png).
 - Working route: `http://127.0.0.1:18201/after-sales`.
 
 ## Comparison findings
@@ -354,8 +354,8 @@ final result: passed
   `/fulfillment`, `/after-sales`, `/inventory`, `/marketing`, `/governance`, `/chat` and `/reviews`.
   Every route was inspected at `1440 x 1000` and `390 x 844` rather than inferred from source code.
 - Batch contact sheets are preserved at
-  [frontend-audit/2026-09-01-admin-batch-regression/desktop-contact-sheet.png](frontend-audit/2026-09-01-admin-batch-regression/desktop-contact-sheet.png) and
-  [frontend-audit/2026-09-01-admin-batch-regression/mobile-contact-sheet.png](frontend-audit/2026-09-01-admin-batch-regression/mobile-contact-sheet.png).
+  [frontend-audit/2026-09-01-admin-batch-regression/desktop-contact-sheet.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-batch-regression/desktop-contact-sheet.png) and
+  [frontend-audit/2026-09-01-admin-batch-regression/mobile-contact-sheet.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-batch-regression/mobile-contact-sheet.png).
   Each individual desktop and mobile capture remains beside those sheets.
 - All nine mobile documents measured `375px` wide in a `375px` layout viewport; all nine desktop
   documents measured `1425px` wide in a `1425px` layout viewport. Root overflow was `0px` for every
@@ -381,7 +381,7 @@ final result: passed
   management page or shared business implementation, and it no longer nests queue, claim or
   thread content inside generic card surfaces.
 - The selected management reference and the final populated thread were judged together in
-  [frontend-audit/2026-09-01-admin-foundation/53-chat-source-implementation-comparison.png](frontend-audit/2026-09-01-admin-foundation/53-chat-source-implementation-comparison.png).
+  [frontend-audit/2026-09-01-admin-foundation/53-chat-source-implementation-comparison.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-foundation/53-chat-source-implementation-comparison.png).
   Final evidence is preserved in `49-chat-after-desktop-thread.png`,
   `50-chat-after-mobile-top.png`, `51-chat-after-mobile-queue.png` and
   `52-chat-after-mobile-thread.png`.
@@ -409,7 +409,7 @@ final result: passed
   workbench or another page's business implementation, so this command-only surface can evolve
   without coupling unrelated management domains.
 - Source and implementation were judged together at `1280 x 900` in
-  [frontend-audit/2026-09-01-admin-foundation/39-marketing-source-implementation-comparison.png](frontend-audit/2026-09-01-admin-foundation/39-marketing-source-implementation-comparison.png).
+  [frontend-audit/2026-09-01-admin-foundation/39-marketing-source-implementation-comparison.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-foundation/39-marketing-source-implementation-comparison.png).
   Final evidence is preserved in `35-marketing-after-desktop.png`,
   `36-marketing-after-mobile-top.png`, `37-marketing-after-mobile-rule.png` and
   `38-marketing-after-mobile-grant.png`.
@@ -439,7 +439,7 @@ final result: passed
   four-domain read-only reconciliation, and the selected Payment compensation command. It does not
   import transaction/list workbenches or another page's business implementation.
 - Source and implementation were judged together at `1280 x 900` in
-  [frontend-audit/2026-09-01-admin-foundation/46-governance-source-implementation-comparison.png](frontend-audit/2026-09-01-admin-foundation/46-governance-source-implementation-comparison.png).
+  [frontend-audit/2026-09-01-admin-foundation/46-governance-source-implementation-comparison.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-foundation/46-governance-source-implementation-comparison.png).
   Final evidence is preserved in `42-governance-after-desktop.png`,
   `43-governance-after-mobile-top.png`, `44-governance-after-mobile-reconciliation.png` and
   `45-governance-after-mobile-command.png`.
@@ -470,7 +470,7 @@ final result: passed
   `SplitWorkbench` or any transaction-page business implementation, so the two management layout
   families can evolve independently.
 - The source and implementation were judged together at the same `1280 x 900` CSS viewport in
-  [frontend-audit/2026-09-01-admin-foundation/24-catalog-source-implementation-comparison.png](frontend-audit/2026-09-01-admin-foundation/24-catalog-source-implementation-comparison.png).
+  [frontend-audit/2026-09-01-admin-foundation/24-catalog-source-implementation-comparison.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-foundation/24-catalog-source-implementation-comparison.png).
   Final evidence is preserved in `20-catalog-after-desktop.png`,
   `21-catalog-after-mobile-top.png`, `22-catalog-after-mobile-list.png` and
   `23-catalog-after-mobile-detail.png`.
@@ -499,7 +499,7 @@ final result: passed
   queue and detail regions; Fulfillment retains its own filters, command forms, recovery rules and
   page-scoped selectors.
 - Source and implementation were compared at the same `1280 x 900` CSS viewport in
-  [frontend-audit/2026-09-01-admin-foundation/17-fulfillment-source-implementation-comparison.png](frontend-audit/2026-09-01-admin-foundation/17-fulfillment-source-implementation-comparison.png).
+  [frontend-audit/2026-09-01-admin-foundation/17-fulfillment-source-implementation-comparison.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-foundation/17-fulfillment-source-implementation-comparison.png).
   The implementation evidence is preserved in `14-fulfillment-after-desktop.png`,
   `15-fulfillment-after-mobile-top.png` and `16-fulfillment-after-mobile-detail.png`.
 - The former long page has been separated into three task modes: forward fulfillment, reverse
@@ -539,7 +539,7 @@ final result: passed
   `ReviewWorkspaceView.vue` keeps its own Catalog projection, fields, command forms and page-scoped
   presentation rules instead of importing after-sale business code or page selectors.
 - Source and implementation were compared at the same `1280 x 900` CSS viewport in
-  [frontend-audit/2026-09-01-admin-foundation/12-reviews-source-implementation-comparison.png](frontend-audit/2026-09-01-admin-foundation/12-reviews-source-implementation-comparison.png).
+  [frontend-audit/2026-09-01-admin-foundation/12-reviews-source-implementation-comparison.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-foundation/12-reviews-source-implementation-comparison.png).
 - The desktop implementation retains the approved `208px / 435.20px / 621.47px` task rail, queue
   and detail columns. It contains no legacy `.review-page`, `.review-record`, `PjSurface` stack or
   management-side navigation card.
@@ -565,7 +565,7 @@ final result: passed
   transaction business implementations: authority scope, selectable warehouse list and one
   warehouse-bound stock detail context.
 - Source and implementation were judged together at `1280 x 900` in
-  [frontend-audit/2026-09-01-admin-foundation/32-inventory-source-implementation-comparison.png](frontend-audit/2026-09-01-admin-foundation/32-inventory-source-implementation-comparison.png).
+  [frontend-audit/2026-09-01-admin-foundation/32-inventory-source-implementation-comparison.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-admin-foundation/32-inventory-source-implementation-comparison.png).
   Final evidence is preserved in `27-inventory-after-desktop.png`,
   `28-inventory-after-mobile-top.png`, `29-inventory-after-mobile-list.png`,
   `30-inventory-after-mobile-detail.png` and `31-inventory-after-mobile-adjustment.png`.
@@ -599,7 +599,7 @@ final result: passed
   remains true about role-scoped access, and offers one safe return. It reuses the existing
   borderless special-page foundation instead of adding a third page shell or nested card.
 - Before/after and unchanged-route evidence is preserved in
-  [frontend-audit/2026-09-01-special-pages/](frontend-audit/2026-09-01-special-pages/). The mobile 404 and forbidden documents
+  [frontend-audit/2026-09-01-special-pages/](https://github.com/NoctilumeDev/PlainJournal/tree/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-special-pages/). The mobile 404 and forbidden documents
   report no root horizontal overflow.
 - `NotFoundView.test.ts` locks the message hierarchy and the single safe return action.
 - The completed batch passed `17 / 17` V6.4 E2E scenarios, `24` admin test files / `97` tests,
@@ -622,7 +622,7 @@ final result: passed
 - The fix was then inspected in the real in-app browser at `320 x 800`: the usable document width
   and scroll width both report `305px`, while the open overlay stays between `16px` and `288.67px`.
   Evidence is preserved in
-  [frontend-audit/2026-09-01-first-pass-release/01-admin-mobile-workspace-switcher.png](frontend-audit/2026-09-01-first-pass-release/01-admin-mobile-workspace-switcher.png).
+  [frontend-audit/2026-09-01-first-pass-release/01-admin-mobile-workspace-switcher.png](https://github.com/NoctilumeDev/PlainJournal/blob/d1567a7067516636b01dd898b6ef85d8ccb55887/history/worklogs/frontend-audit/2026-09-01-first-pass-release/01-admin-mobile-workspace-switcher.png).
 - Delivery readiness was updated from `53` to `55` production Vue files for the two intentional,
   business-free layout components (`ListWorkbench` and `SplitWorkbench`).
 - `pnpm check` passed end to end: 28 layer-boundary tests, delivery/deployment/release readiness,
