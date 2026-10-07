@@ -262,6 +262,7 @@ function Start-TradeInstances {
             '--ecommerce.trade.after-sale-fulfillment-consumer.enabled=false',
             '--ecommerce.trade.after-sale-inventory-consumer.enabled=false',
             '--ecommerce.trade.refund-result-consumer.enabled=false',
+            '--ecommerce.trade.flash-sale-consumer.enabled=false',
             # This probe publishes pre-seeded Outbox rows and never allocates an
             # order ID. Keep the experiment focused on Claim/lease fencing instead
             # of making three publisher-only JVMs contend for the local ID worker.
