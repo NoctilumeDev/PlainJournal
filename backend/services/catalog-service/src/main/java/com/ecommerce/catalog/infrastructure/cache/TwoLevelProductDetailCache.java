@@ -97,7 +97,7 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
                 .description("Catalog cache rebuilds rejected by bounded capacity protection")
                 .register(meterRegistry);
         this.staleWriteRejections = Counter.builder("ecommerce.catalog.cache.stale.write.rejections")
-                .description("Catalog cache writes rejected after a newer invalidation")
+                .description("Catalog cache writes rejected after invalidation or unconfirmed rebuild ownership")
                 .register(meterRegistry);
         this.invalidations = Counter.builder("ecommerce.catalog.cache.invalidations")
                 .description("Catalog product detail cache invalidations")
@@ -276,7 +276,8 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
                     .orElseGet(Optional::empty)
                     .map(this::valueEnvelope)
                     .orElseGet(this::negativeEnvelope);
-            installIfCurrent(productId, observedGeneration, loaded, true);
+            // Redis outage permits a bounded local fallback, never an unowned shared write.
+            installIfCurrent(productId, observedGeneration, loaded, locked ? token : null);
             return loaded;
         } finally {
             if (locked) {
@@ -358,24 +359,27 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
         long observedGeneration = observeGeneration(productId);
         Optional<CacheEnvelope> distributed = readDistributed(productId);
         distributed.ifPresent(envelope ->
-                installIfCurrent(productId, observedGeneration, envelope, false));
+                installIfCurrent(productId, observedGeneration, envelope, null));
         return distributed;
     }
 
-    private void writeDistributed(Long productId, CacheEnvelope envelope) {
+    private boolean writeDistributedIfOwned(Long productId, CacheEnvelope envelope, String token) {
         try {
             long remainingMillis = Math.max(1L, envelope.hardExpiresAtEpochMs() - now());
-            store.put(
+            return store.putIfOwned(
                     cacheKey(productId),
                     objectMapper.writeValueAsString(envelope),
-                    Duration.ofMillis(remainingMillis));
+                    Duration.ofMillis(remainingMillis),
+                    lockKey(productId),
+                    token);
         } catch (JsonProcessingException exception) {
             redisFailures.increment();
-            log.warn("Catalog cache record serialization failed; serving from MySQL/local cache: productId={}",
+            log.warn("Catalog cache record serialization failed; serving uncached database result: productId={}",
                     productId, exception);
         } catch (RuntimeException exception) {
             redisFailures.increment();
         }
+        return false;
     }
 
     private LockAttempt tryDistributedLock(Long productId, String token) {
@@ -425,17 +429,19 @@ public class TwoLevelProductDetailCache implements ProductDetailCache, AutoClose
             Long productId,
             long observedGeneration,
             CacheEnvelope envelope,
-            boolean writeToDistributedCache) {
+            String rebuildToken) {
         CacheAuthorityStripe stripe = authorityStripe(productId);
         synchronized (stripe) {
             if (stripe.generation != observedGeneration) {
                 staleWriteRejections.increment();
                 return;
             }
-            localCache.put(productId, envelope);
-            if (writeToDistributedCache) {
-                writeDistributed(productId, envelope);
+            if (rebuildToken != null && !writeDistributedIfOwned(productId, envelope, rebuildToken)) {
+                // An expired or replaced owner must not promote its snapshot to either cache.
+                staleWriteRejections.increment();
+                return;
             }
+            localCache.put(productId, envelope);
         }
     }
 

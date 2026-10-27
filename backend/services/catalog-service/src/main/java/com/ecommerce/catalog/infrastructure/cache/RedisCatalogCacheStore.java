@@ -9,6 +9,14 @@ import java.util.Optional;
 
 public class RedisCatalogCacheStore implements CatalogCacheStore {
 
+    private static final DefaultRedisScript<Long> PUT_IF_OWNED_SCRIPT = new DefaultRedisScript<>("""
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+              redis.call('set', KEYS[2], ARGV[2], 'PX', ARGV[3])
+              return 1
+            end
+            return 0
+            """, Long.class);
+
     private static final DefaultRedisScript<Long> UNLOCK_SCRIPT = new DefaultRedisScript<>("""
             if redis.call('get', KEYS[1]) == ARGV[1] then
               return redis.call('del', KEYS[1])
@@ -28,8 +36,10 @@ public class RedisCatalogCacheStore implements CatalogCacheStore {
     }
 
     @Override
-    public void put(String key, String value, Duration ttl) {
-        redisTemplate.opsForValue().set(key, value, ttl);
+    public boolean putIfOwned(String key, String value, Duration ttl, String lockKey, String token) {
+        return Long.valueOf(1L).equals(redisTemplate.execute(
+                PUT_IF_OWNED_SCRIPT, List.of(lockKey, key), token, value,
+                Long.toString(Math.max(1L, ttl.toMillis()))));
     }
 
     @Override

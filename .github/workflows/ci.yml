@@ -66,6 +66,14 @@ jobs:
   backend:
     name: Backend verify
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7.4.9-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s
+          --health-timeout 3s --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
@@ -78,7 +86,7 @@ jobs:
           node-version: 24.14.0
       - name: Run backend tests
         working-directory: backend
-        run: ./mvnw --batch-mode --no-transfer-progress clean verify
+        run: ./mvnw --batch-mode --no-transfer-progress -Dcatalog.redis.test.port=6379 clean verify
       - name: Enforce aggregate backend coverage
         run: node tools/check-backend-coverage.mjs
       - name: Run PMD

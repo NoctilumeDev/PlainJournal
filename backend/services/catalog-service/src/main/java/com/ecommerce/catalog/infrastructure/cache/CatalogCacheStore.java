@@ -7,7 +7,8 @@ public interface CatalogCacheStore {
 
     Optional<String> get(String key);
 
-    void put(String key, String value, Duration ttl);
+    // Ownership check and cache write must be a single atomic operation.
+    boolean putIfOwned(String key, String value, Duration ttl, String lockKey, String token);
 
     void delete(String key);
 
