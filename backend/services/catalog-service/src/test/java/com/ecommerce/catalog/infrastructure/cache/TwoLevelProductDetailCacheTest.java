@@ -344,6 +344,75 @@ class TwoLevelProductDetailCacheTest {
         }
     }
 
+    @Test
+    void expiredValueAndNegativeLoadCannotOverwriteSuccessor() {
+        for (boolean missing : List.of(false, true)) {
+            FakeStore store = new FakeStore();
+            CatalogCacheProperties properties = properties(Duration.ofMillis(100), 4);
+            try (TwoLevelProductDetailCache old = cache(properties, store, new MutableClock());
+                 TwoLevelProductDetailCache successor = cache(properties, store, new MutableClock());
+                 TwoLevelProductDetailCache reader = cache(properties, store, new MutableClock())) {
+                Optional<ProductDetail> snapshot = old.get(1L, () -> {
+                    store.locks.clear(); // Explicitly revoke the paused loader's lease.
+                    successor.get(1L, () -> Optional.of(product("new")));
+                    return missing ? Optional.empty() : Optional.of(product("old"));
+                });
+                assertThat(snapshot.isEmpty()).isEqualTo(missing);
+                assertThat(old.localRecord(1L)).isEmpty();
+                assertThat(reader.get(1L, () -> {
+                    throw new AssertionError("must read the successor's shared value");
+                }).orElseThrow().title()).isEqualTo("new");
+            }
+        }
+    }
+
+    @Test
+    void expiredLoadWithoutSuccessorIsNotPromotedToEitherCache() {
+        FakeStore store = new FakeStore();
+        try (TwoLevelProductDetailCache cache =
+                     cache(properties(Duration.ofMillis(100), 4), store, new MutableClock())) {
+            assertThat(cache.get(1L, () -> {
+                store.locks.clear();
+                return Optional.of(product("snapshot"));
+            }).orElseThrow().title()).isEqualTo("snapshot");
+            assertThat(cache.localRecord(1L)).isEmpty();
+            assertThat(store.values).isEmpty();
+        }
+    }
+
+    @Test
+    void unavailableLockCannotBecomeUnownedSharedWriteAfterRedisRecovers() {
+        FakeStore store = new FakeStore();
+        store.fail = true;
+        CatalogCacheProperties properties = properties(Duration.ofMillis(100), 4);
+        try (TwoLevelProductDetailCache fallback = cache(properties, store, new MutableClock());
+             TwoLevelProductDetailCache owner = cache(properties, store, new MutableClock());
+             TwoLevelProductDetailCache reader = cache(properties, store, new MutableClock())) {
+            assertThat(fallback.get(1L, () -> {
+                store.fail = false;
+                owner.get(1L, () -> Optional.of(product("new")));
+                return Optional.of(product("fallback"));
+            }).orElseThrow().title()).isEqualTo("fallback");
+            assertThat(reader.get(1L, () -> {
+                throw new AssertionError("unowned fallback must not overwrite shared cache");
+            }).orElseThrow().title()).isEqualTo("new");
+        }
+    }
+
+    @Test
+    void failedOwnershipCheckServesDatabaseWithoutCaching() {
+        FakeStore store = new FakeStore();
+        try (TwoLevelProductDetailCache cache =
+                     cache(properties(Duration.ofMillis(100), 4), store, new MutableClock())) {
+            assertThat(cache.get(1L, () -> {
+                store.fail = true;
+                return Optional.of(product("database"));
+            }).orElseThrow().title()).isEqualTo("database");
+            assertThat(cache.localRecord(1L)).isEmpty();
+            assertThat(store.values).isEmpty();
+        }
+    }
+
     private static TwoLevelProductDetailCache cache(
             CatalogCacheProperties properties,
             FakeStore store,
@@ -458,9 +527,13 @@ class TwoLevelProductDetailCacheTest {
         }
 
         @Override
-        public void put(String key, String value, Duration ttl) {
+        public synchronized boolean putIfOwned(String key, String value, Duration ttl, String lockKey, String token) {
             requireAvailable();
+            if (!token.equals(locks.get(lockKey))) {
+                return false;
+            }
             values.put(key, value);
+            return true;
         }
 
         @Override
@@ -470,7 +543,7 @@ class TwoLevelProductDetailCacheTest {
         }
 
         @Override
-        public boolean tryLock(String key, String token, Duration ttl) {
+        public synchronized boolean tryLock(String key, String token, Duration ttl) {
             requireAvailable();
             boolean acquired = locks.putIfAbsent(key, token) == null;
             if (!acquired) {
@@ -480,7 +553,7 @@ class TwoLevelProductDetailCacheTest {
         }
 
         @Override
-        public void unlock(String key, String token) {
+        public synchronized void unlock(String key, String token) {
             requireAvailable();
             locks.remove(key, token);
         }
