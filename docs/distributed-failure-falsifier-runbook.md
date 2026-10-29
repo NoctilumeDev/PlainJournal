@@ -131,9 +131,9 @@ Docker 启动后再执行 Docker 预检。任一资源停止线触发时结果�
 | C2 | `primary` 强读被旧缓存提前回答 | Catalog API、MySQL、Redis、浏览器 Network | 只增加 `X-Catalog-Read-Consistency: primary` | 普通读、强读、DB primary、Redis envelope 和实际 datasource 访问 | `FAIL REPRODUCED / FIX RERUN PASS / MERGED` |
 | T1 | 服务端成功但响应丢失，恢复不得产生第二次库存副作用 | `run-foundation-smoke.ps1 -EnableInventoryReservationResponseLossFaultInjection` | 只丢失一次已获上游 200 的响应 | request identity、订单、预占、流水、UNKNOWN 查询、取消后库存基线 | `PASS / CLEANUP READBACK PASS` |
 | M1 | 重复与乱序不能让旧 Catalog 搜索投影覆盖新 revision | Catalog search runner + 受控消息顺序 | 同 product 先交付 N+1，再交付 N，并重复 N | Outbox identity、revision、OpenSearch version、MySQL 当前状态、公开搜索结果 | `M1 PASS / RECOVERY FAIL REPRODUCED / FIX RERUN PASS / INCLUDED IN THIS REVISION` |
-| L1 | lease 过期后的旧执行者不能提交领域副作用 | `ConsumerFailureRetryCoordinator` 代表性 handler | A claim 后暂停，lease 到期由 B 接管，再恢复 A | claim owner、DB clock、handler 幂等事实、领域副作用、最终 retry 状态 | `TARGET SELECTION GATE / NOT_RUN` |
+| L1 | lease 过期后的旧执行者不能提交领域副作用 | `ConsumerFailureRetryCoordinator` 代表性 handler | A claim 后暂停，lease 到期由 B 接管，再恢复 A | claim owner、DB clock、handler 幂等事实、领域副作用、最终 retry 状态 | `LOCAL INVENTORY WITNESS / 见第 11 节的范围限定` |
 | S1 | graceful stop 与 crash 下的 in-flight work 不丢失也不重复 | Trade 多实例 runner + 精确进程终止 runner | 分别只做 SIGTERM 或 `Runtime.halt(91)` | deregistration、exit、Outbox/MQ/DB、副作用次数、接管与重启后事实 | `PASS / CLEANUP READBACK PASS` |
-| B1 | 慢依赖不能通过多层重试放大成全站资源雪崩 | 容器网络内单边延迟代理 | 只给一个下游增加延迟，不断开 | deadline、attempt、线程/连接池、熔断、队列、其他链路可用性和恢复 | `HARNESS REQUIRED / NOT_RUN` |
+| B1 | 慢依赖不能通过多层重试放大成全站资源雪崩 | 容器网络内单边延迟代理 | 只给一个下游增加延迟，不断开 | deadline、attempt、线程/连接池、熔断、队列、其他链路可用性和恢复 | `LOCAL PAYMENT–TRADE WITNESS`，见第 12.4 节；不授予全站结论 |
 | V1 | 新旧版本共存不能误读事件/状态或做不安全回滚 | gateway rolling + trade dual-version runners | 只改变一个服务版本 | source/artifact identity、Nacos 实例、路由、信封兼容、数据库迁移和回滚限制 | `EXISTING HARNESS / NOT_RUN` |
 
 `EXISTING HARNESS` 只表示代码入口存在，不表示它仍适用于当前 SHA，更不表示曾经的 PASS
@@ -316,3 +316,162 @@ T1 实际启动构件的 SHA-256 为：Gateway
 `89CB03B898DD9323654CE0A23D7AFC0D4B7FA00CC21C5F13A0D4BE237AB43384`、Fulfillment
 `D05C7F8BE40607D60168CBE080177A2487FE1325CC6E8B5982939B8CA0289463`、Marketing
 `41F5B61F4A6D2D604AF57FE76249EC72A4F405B56EF4F57CC3F125CE82F65427`。
+
+## 11. 2026-10-27：L1 库存业务路径的有限补验
+
+本次另行批准的对象是 `OrderPaidConsumer.retry -> OrderPaidHandler ->
+InventoryService.confirmReservation`。产品源码绑定
+`784fd894e0c16375120af515262d49fd58cf7a0e`；新增的本地候选只有测试与本节记录，
+不修改业务实现、依赖或生产租约参数。测试为
+`backend/services/inventory-service/src/test/java/com/ecommerce/inventory/infrastructure/messaging/ConsumerRetryBusinessLeaseIntegrationTest.java`。
+
+### 11.1 实际执行边界
+
+- 两个 coordinator owner 在同一 JVM 内执行，使用真实 consumer 解析、Spring 事务代理和
+  MyBatis SQL。真实 MySQL 为独立的 `8.4.10` 容器与 `pj_l1_inventory` schema，绑定回环端口；
+  不复用业务数据库，不连接 RocketMQ，不宣称完成多进程或 Broker 生命周期验证。
+- A/B 使用同样的 3 秒测试租约；等待 MySQL `CURRENT_TIMESTAMP(3)` 自然超过 `claim_until`。
+  不改数据库时钟，不直接改 claim/库存状态，不通过额外数据库锁制造交错。生产默认租约不变。
+- 暂停仅发生在实际 handler 调用之前或其事务提交之后。SQL 独立读回 owner、deadline、
+  恢复状态、预占状态、库存余额、确认流水、Outbox 和消费回执。
+- MySQL 会话与 JDBC 时间映射显式设为 UTC；日志同时记录数据库产品、隔离级别和会话时间。
+  H2 是额外回归入口，不能替代 MySQL 结果。
+
+### 11.2 四项见证
+
+| 场景 | 观察结果 | 裁决范围 |
+| --- | --- | --- |
+| 单 owner 正常恢复 | 20 件库存、预占 3 件；恢复后库存 17、预占 0，确认流水/确认事件/消费回执各 1 | 正常路径对照 |
+| A 在业务执行前暂停，B 接管完成，A 恢复 | A、B 都调用真实 handler；最终仍只有一份确认副作用，B 的恢复记录未被覆盖 | 所测交错没有重复扣减 |
+| A 业务提交后暂停，B 接管完成，A 恢复 | B 读取已有消费事实；库存和事件数量不变，A 不能覆盖 B 的恢复记录 | 提交与任务记账之间的重复恢复安全 |
+| A 暂停期间预占通过业务接口释放，B 接管后 A 恢复 | 两者均被真实 `INVALID_STATE` 拒绝；库存 20、预占 0，无确认流水/确认事件/消费回执；B 的下一次重试记录保持不变 | 不复活已释放预占；拒绝事务回滚消费回执 |
+
+最终 MySQL 执行结果见绑定本次源码与环境的 Surefire XML。异常场景必须精确匹配
+`InventoryException / INVALID_STATE`；解析错误、SQL 异常或测试工具失败不能算作预期拒绝。
+每例结束仅清理其 UUID 对应的测试数据并读回；独立容器清理另留所有权和读回记录。
+
+重要限制：这些见证证明的是上述库存路径的业务幂等、合法状态转换和任务记录保护。
+**租约过期没有取消旧线程，旧 owner 仍可能调用 handler。** 本次不证明所有旧 owner 都无法
+进入领域事务，也不把“handler 被调用两次”解释成“库存必然扣了两次”。矩阵 L1 的绝对
+“失权后不提交任何领域副作用”措辞不能由这些结果整体授予 PASS；其他 handler、外部
+不可撤销副作用、其他执行顺序和多 JVM 场景没有取得本次资格。本节执行时 B1、V1 未执行；
+B1 后续结果见第 12.4 节，V1 仍未执行。
+
+首个 MySQL 启动命令被 Windows batch 的 URL `&` 分隔符拆开，Maven 未取得 goal，
+结果为 `NOT_RUN / HARNESS_COMMAND_QUOTING`。当次复制的 XML 来自前一轮 H2，已明确标记
+为陈旧文件，不作为 MySQL 证据。第二次 MySQL 运行通过后，又显式校准 UTC 时间映射并
+增加拒绝原因校验，以最后一次结果为本节依据；原日志保留，不包装成产品首败。
+
+本地证据目录为 `tmp/plainjournal-l1-20261027`（工作区父目录）：
+`mysql-final.log`、`mysql-final.xml`、`mysql-execution-manifest.json` 保存四项见证及实际
+class/test-source SHA-256；`mysql-first-status.json` 保存首次命令失败和陈旧报告说明。
+本节不表示候选已经提交、经远端 CI 通过或合并。
+
+## 12. B1 支付到交易慢依赖实验
+
+本节继续使用 `784fd894e0c16375120af515262d49fd58cf7a0e` 的业务实现，保留第 11 节
+库存补验的独立边界。10 月 27 日仅完成实验准备；10 月 29 日恢复后取得的局部见证
+列于第 12.4 节，不能替代全站抗雪崩验收。
+
+### 12.1 实验对象与判据
+
+选定 `PaymentService.createPayment` → `HttpTradeClient` → 交易服务 payment-context
+接口。支付、交易均使用重新构建的应用 JAR 和各自的临时 MySQL schema，延迟代理转发
+真实交易响应，不伪造业务返回。订单初始事实为合成夹具，不授予订单创建链资格。
+
+- 保留现有连接超时、读取超时、有限重试、并发隔离及熔断参数；所有参数冻结在每次运行的
+  `contract.json`，不在故障过程中调整。
+- 先取得无延迟基线，再分别延迟响应头和响应正文；观察下游实际尝试次数、请求耗时、
+  已有支付单查询、线程与数据库连接、失败后是否残留支付单，以及解除延迟后的自然恢复。
+- 恢复时使用同一幂等键复查支付标识，核对数据库支付数量与金额；不能以 HTTP 成功代替
+  业务事实，也不能用手动切换熔断器状态代替恢复。
+- 每次使用独立网络与带所有权标签的容器，观察端口仅发布到回环地址。MySQL 数据在
+  本次容器的 tmpfs 中，结束后只清理本次资源。
+- 服务发现采用固定的 SimpleDiscoveryClient 地址，保留客户端负载均衡层；不运行 Nacos、
+  Gateway、MQ 或其他业务服务。因此即使此局部实验通过，也不证明全站抗雪崩或容量上限。
+
+### 12.2 2026-10-27 准备阶段记录
+
+本地证据位于工作区外层 `tmp/plainjournal-b1-20261027/`，不把该目录内容当作已发布证据。
+构建日志保留在 `build.log`；业务 JAR、镜像、脚本哈希和实际启动参数按每次尝试留存。
+
+| 尝试 | 实际结果 | 结论 |
+| --- | --- | --- |
+| `attempt-1` | Docker 内部网络没有提供观察用发布端口，未进入业务基线 | 夹具启动未完成，`INCONCLUSIVE` |
+| `attempt-2` | 两个真实应用及迁移启动成功；运行前可用内存降至 2.69 GiB，低于原定 3 GiB 下限 | 资源护栏拒绝继续，`INCONCLUSIVE` |
+
+两次尝试均已按标签确认所有权并清理容器与网络，清理读回无遗留容器。
+第二次尚未植入订单数据，也未开始延迟、并发请求或恢复实验。
+资源不足不是业务反例，不降低阈值，不改写为 `PASS`；用户选择暂存待跑。
+
+### 12.3 复跑入口与停止线
+
+脚本为 [运行器](../backend/tools/run-payment-slow-boundary.py) 和
+[延迟代理](../backend/tools/payment-slow-boundary-proxy.mjs)。10 月 27 日只完成语法检查和
+应用启动；端到端执行记录另见第 12.4 节，不能以脚本已经存在关闭 B1。
+
+在资源恢复后，先核对源码坐标并重新构建两个应用，再指定一个**不存在的新证据目录**运行：
+
+```powershell
+.\backend\mvnw.cmd -f backend/pom.xml -pl services/payment-service,services/trade-service -am package -DskipTests
+python backend/tools/run-payment-slow-boundary.py --evidence <new-evidence-directory> --pwsh <PowerShell-7-path>
+```
+
+需已具备 Docker、Python 3、PowerShell 7 及脚本声明的本地镜像；候选不自动拉取镜像，
+不启动宿主 Docker 引擎，不操作其他进程。构建命令跳过测试只为生成实际应用产物，
+不构成回归通过证据。每次原始失败和清理结果单独保存。
+
+恢复后仍按资源准入 → 基线 → 单边延迟 → 业务/资源读回 → 自然恢复 → 清理的顺序执行。
+首次有效业务失败单独归因；环境或夹具失败保持 `INCONCLUSIVE`，不混算业务缺陷。
+10 月 27 日 B1 暂存待跑，10 月 29 日用户授权恢复；V1 没有因此取得任何新资格。
+
+### 12.4 2026-10-29：真实服务局部见证
+
+源码与远端主线均重新核对为本节固定 SHA。两个应用重新构建，使用真实 Spring 服务、
+客户端负载均衡层、MySQL 与实际交易响应，未改变业务代码、超时、重试或并发隔离配置。
+容器就绪后的宿主资源检查通过，没有沿用之前资源不足的现场。
+
+本地原始记录保留在工作区父目录 `tmp/plainjournal-b1-20261029/`：
+
+- `attempt-1` 完成基线、两种延迟、恢复、数据库与幂等性检查。复核时发现未按状态标签
+  过滤的熔断指标为所有状态之和，不能据此证明 OPEN/CLOSED；该观察缺口单独保留。
+- `attempt-2` 只补充观察脚本的分状态读数，以及 OPEN 时无下游请求的拒绝见证；业务
+  JAR 和镜像与首轮相同，仍使用原参数。以下数据来自这次完整执行。
+
+| 观察 | 响应头延迟 | 响应正文延迟 |
+| --- | --- | --- |
+| 注入方式 | 真实响应头前等待 2.5 秒 | 真实响应头和首字节已返回，余下正文等待 2.5 秒 |
+| 同批创建请求 | 18 个，全部返回预期 503 | 18 个，全部返回预期 503 |
+| 最长创建请求耗时 | 3,125 毫秒 | 1,516 毫秒 |
+| 实际到达交易服务 | 8 个订单各尝试 2 次，共 16 次 | 8 个订单各尝试 1 次，共 8 次 |
+| 同时查询已有支付单 | 12 次均成功，最长 156 毫秒 | 8 次均成功，最长 32 毫秒 |
+| 故障请求落库 | 对应支付单为 0 | 对应支付单为 0 |
+| 熔断打开后追加请求 | 约 16 毫秒拒绝，新增下游尝试为 0 | 约 16 毫秒拒绝，新增下游尝试为 0 |
+| 解除延迟后 | 等待原熔断窗口，正常调用促成关闭 | 等待原熔断窗口，正常调用促成关闭 |
+
+上述尝试次数是实际观察：正文中断没有继承响应头超时的二次尝试行为，不能据此声称
+所有读取异常都会重试。两者均满足本次有限尝试和失败不落库的业务条件。
+
+采样显示，并发隔离可用槽位从 8 降至 0 后归还到 8；Tomcat 忙线程峰值为 19，
+数据库连接等待数采样值为 0。已有支付单查询继续可用。采样不证明任意时刻都没有资源
+争用，也不替代容量测试。HTTP socket 快照、容器资源与 JVM/连接池指标原样留存。
+
+解除延迟后，原请求以相同幂等键成功创建支付，再重复调用保持原支付标识；恢复与重复
+调用未产生额外下游尝试。最终数据库读回为 40 个不同订单对应 40 笔支付，总金额
+1,592.00，支付流水与 Outbox 均为 0（本实验只创建支付单，不执行支付成功回调）。
+
+证据入口为 `attempt-2/contract.json`、`headers-phase.json`、`body-phase.json`、
+各模式的 `circuit-open` / `open-rejection` / `circuit-recovered` / `recovery` /
+`idempotency` 记录，以及 `business-readback.json`、`result.json`、`sha256.json`。
+运行器绑定的应用 SHA-256：
+
+| 应用 | SHA-256 |
+| --- | --- |
+| Trade | `a403b27b817ac702756a19830b92ddada7c268f5ed7d89dd0d40fec1372bd2a3` |
+| Payment | `2856bc1acb59d9d2b75c541cbd339b9c6f9bd91983ddf5c1bf747a6dcac2d7c0` |
+
+两次运行返回 `PASS_SCOPED`，所有本次容器与网络已清理；容器停止状态和最终端口读回
+另行保留。结论限定为这条 Payment→Trade 边界、固定延迟和本次并发规模下的业务拒绝、
+读取隔离与恢复。**不证明全站不会雪崩，不覆盖 Nacos 故障、Gateway 重试、MQ 或任意
+负载，也不表示已提交、通过远端 CI 或合并。** 本批没有发现需修改业务实现的反例。
+
