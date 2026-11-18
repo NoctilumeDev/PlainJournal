@@ -79,19 +79,24 @@ logging:
     root: warn
     com.alibaba.nacos: error
 
+resilience4j:
+  retry:
+    metrics:
+      # Use the MeterBinder while Resilience4j targets Boot 3 metric auto-configuration.
+      legacy:
+        enabled: true
+
 management:
   tracing:
-    enabled: true
+    export:
+      otlp:
+        enabled: false
     baggage:
       enabled: false
     sampling:
       probability: 1.0
     propagation:
       type: W3C
-  otlp:
-    tracing:
-      export:
-        enabled: false
   prometheus:
     metrics:
       export:

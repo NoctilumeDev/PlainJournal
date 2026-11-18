@@ -2,6 +2,9 @@ server:
   port: ${FULFILLMENT_SERVICE_PORT:18106}
 
 spring:
+  http:
+    converters:
+      preferred-json-mapper: jackson2
   application:
     name: fulfillment-service
   config:
