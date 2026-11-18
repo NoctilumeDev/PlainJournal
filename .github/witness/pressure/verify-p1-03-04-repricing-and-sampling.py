@@ -84,8 +84,11 @@ class PriceCase(refund.RefundCase):
         auth = "/api/v1/identity/auth"
         credentials = {"email": "price-witness@example.invalid", "password": "SyntheticTestPass123"}
         registration = self.get("identity", auth + "/register", {**credentials, "displayName": "Price Witness"})
-        assert registration["status"] == 200 and "CUSTOMER" in registration["body"]["data"]["roles"]
+        self.save("registration-http-status.json", {"status": registration["status"]})
+        assert registration["status"] == 201 and registration["body"]["code"] == "OK"
+        assert "CUSTOMER" in registration["body"]["data"]["roles"]
         login = self.get("identity", auth + "/login", credentials)
+        self.save("login-http-status.json", {"status": login["status"]})
         assert login["status"] == 200 and login["body"]["code"] == "OK"
         self.customer = {"Authorization": "Bearer " + login["body"]["data"]["accessToken"]}
         self.address = self.data("customer-address", self.get("identity", "/api/v1/identity/addresses", {
