@@ -149,11 +149,11 @@ jobs:
           path: frontend/coverage/
           if-no-files-found: ignore
 
-  pressure_supplemental:
-    name: Supplemental commerce pressure witness
-    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'qualification/plainjournal-supplemental-53ecf62'
+  pressure_repricing:
+    name: Commerce repricing and ledger witness
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'qualification/plainjournal-repricing-53ecf62'
     runs-on: ubuntu-24.04
-    timeout-minutes: 48
+    timeout-minutes: 28
     permissions:
       contents: read
     env:
@@ -165,6 +165,7 @@ jobs:
       PJ_JRE_REF: eclipse-temurin@sha256:e1898fd6a11fc965a994d8ace186fd3585aeb636cf8f05f47a723fcfee0b0918
       PJ_ROCKETMQ_REF: apache/rocketmq@sha256:4a80ff5cd4b0a3d3ef6dc338ce2028a85bd995648cb3aa5c3e753746d2dbc587
       PJ_NODE_REF: node@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+      PJ_REDIS_REF: redis@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
       PJ_SOURCE: ${{ github.workspace }}/product
     steps:
       - name: Check out the pressure witness
@@ -195,7 +196,7 @@ jobs:
             ./mvnw --version | tee "$PJ_WITNESS_INPUTS/toolchain.txt"
             grep -F 'Java version: 25.0.5' "$PJ_WITNESS_INPUTS/toolchain.txt"
             grep -F 'Apache Maven 3.9.16' "$PJ_WITNESS_INPUTS/toolchain.txt"
-            ./mvnw --batch-mode --no-transfer-progress -pl services/trade-service,services/payment-service,services/inventory-service,services/fulfillment-service,services/marketing-service -am -DskipTests clean package
+            ./mvnw --batch-mode --no-transfer-progress -pl services/trade-service,services/payment-service,services/inventory-service,services/identity-service,services/catalog-service,services/marketing-service -am -DskipTests clean package
           )
           python3 -I - <<'PY'
           import hashlib
@@ -206,7 +207,7 @@ jobs:
 
           folder = Path(os.environ["PJ_WITNESS_INPUTS"])
           product = Path(os.environ["PJ_SOURCE"])
-          services = ("trade", "payment", "inventory", "fulfillment", "marketing")
+          services = ("trade", "payment", "inventory", "identity", "catalog", "marketing")
 
           def package_hashes(root, apps):
               hashes = {}
@@ -228,30 +229,19 @@ jobs:
           for name, content in records.items():
               (folder/f"{name}.json").write_text(json.dumps(content,indent=2)+"\n",encoding="utf-8")
           PY
-          for image in "$PJ_MYSQL_REF" "$PJ_JRE_REF" "$PJ_ROCKETMQ_REF" "$PJ_NODE_REF"; do
+          for image in "$PJ_MYSQL_REF" "$PJ_JRE_REF" "$PJ_ROCKETMQ_REF" "$PJ_NODE_REF" "$PJ_REDIS_REF"; do
             docker pull --platform linux/amd64 "$image"
           done
-      - name: P0-05 simultaneous authenticated sessions
-        run: python3 -B witness/.github/witness/pressure/verify-p0-05-multisession.py --evidence "$RUNNER_TEMP/pj-pressure/p0-multisession"
-      - name: P0-06 same payment over two isolated networks
-        run: python3 -B witness/.github/witness/pressure/verify-p0-06-two-networks.py --evidence "$RUNNER_TEMP/pj-pressure/p0-two-networks"
-      - name: P1-01 last stock unit
-        run: python3 -B witness/.github/witness/pressure/verify-p1-01-last-stock-readback.py --evidence "$RUNNER_TEMP/pj-pressure/p1-last-stock"
-      - name: Ordinary shipment return and four ledgers
-        run: python3 -B witness/.github/witness/pressure/verify-ordinary-return-four-ledgers.py --evidence "$RUNNER_TEMP/pj-pressure/ordinary-return"
-      - name: P0-10 single-currency input
-        run: python3 -B witness/.github/witness/pressure/verify-p0-10-currency.py --evidence "$RUNNER_TEMP/pj-pressure/p0-currency"
-      - name: P1-05 database interruption and reconciliation
-        run: python3 -B witness/.github/witness/pressure/verify-p1-05-database-disruption.py --evidence "$RUNNER_TEMP/pj-pressure/p1-db-recovery"
-      - name: P0-07 selected service clock boundaries around midnight
-        run: python3 -B witness/.github/witness/pressure/verify-p0-07-payment-cross-midnight.py --evidence "$RUNNER_TEMP/pj-pressure/p0-midnight"
+      - name: P1-03 and P1-04 checkout across a catalog price change
+        run: python3 -B witness/.github/witness/pressure/verify-p1-03-04-repricing-and-sampling.py --evidence "$RUNNER_TEMP/pj-pressure/repricing"
       - name: Retain scoped outcomes and business ledgers
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: supplemental-commerce-pressure-53ecf62
+          name: commerce-repricing-53ecf62
           if-no-files-found: error
           path: |
             ${{ runner.temp }}/pj-pressure-inputs/*.json
             ${{ runner.temp }}/pj-pressure-inputs/toolchain.txt
             ${{ runner.temp }}/pj-pressure/**/*.json
+            !${{ runner.temp }}/pj-pressure/**/*-stopped.json
