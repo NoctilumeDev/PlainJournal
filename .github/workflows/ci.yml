@@ -148,3 +148,110 @@ jobs:
           name: frontend-coverage
           path: frontend/coverage/
           if-no-files-found: ignore
+
+  pressure_supplemental:
+    name: Supplemental commerce pressure witness
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'qualification/plainjournal-supplemental-53ecf62'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 48
+    permissions:
+      contents: read
+    env:
+      PRODUCT_SHA: 53ecf628741e2df3ab43e5f744d1dbabf4131883
+      BASELINE_SHA: 3e96b8d7c8dd0df3b94a64c068c6cc1e823a43f3
+      PYTHONDONTWRITEBYTECODE: '1'
+      MAVEN_OPTS: -Xmx1024m
+      PJ_MYSQL_REF: mysql@sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6
+      PJ_JRE_REF: eclipse-temurin@sha256:e1898fd6a11fc965a994d8ace186fd3585aeb636cf8f05f47a723fcfee0b0918
+      PJ_ROCKETMQ_REF: apache/rocketmq@sha256:4a80ff5cd4b0a3d3ef6dc338ce2028a85bd995648cb3aa5c3e753746d2dbc587
+      PJ_NODE_REF: node@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+      PJ_SOURCE: ${{ github.workspace }}/product
+    steps:
+      - name: Check out the pressure witness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: witness
+          persist-credentials: false
+      - name: Check out the fixed product
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 53ecf628741e2df3ab43e5f744d1dbabf4131883
+          path: product
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '25.0.5'
+      - name: Package fixed SHA JARs and acquire pinned fixtures
+        run: |
+          test "$(git -C "$PJ_SOURCE" rev-parse HEAD)" = "$PRODUCT_SHA"
+          test -z "$(git -C "$PJ_SOURCE" status --porcelain)"
+          export PJ_WITNESS_INPUTS="$RUNNER_TEMP/pj-pressure-inputs"
+          echo "PJ_WITNESS_INPUTS=$PJ_WITNESS_INPUTS" >> "$GITHUB_ENV"
+          mkdir -p "$PJ_WITNESS_INPUTS"
+          (
+            cd "$PJ_SOURCE/backend"
+            ./mvnw --version | tee "$PJ_WITNESS_INPUTS/toolchain.txt"
+            grep -F 'Java version: 25.0.5' "$PJ_WITNESS_INPUTS/toolchain.txt"
+            grep -F 'Apache Maven 3.9.16' "$PJ_WITNESS_INPUTS/toolchain.txt"
+            ./mvnw --batch-mode --no-transfer-progress -pl services/trade-service,services/payment-service,services/inventory-service,services/fulfillment-service,services/marketing-service -am -DskipTests clean package
+          )
+          python3 -I - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          folder = Path(os.environ["PJ_WITNESS_INPUTS"])
+          product = Path(os.environ["PJ_SOURCE"])
+          services = ("trade", "payment", "inventory", "fulfillment", "marketing")
+
+          def package_hashes(root, apps):
+              hashes = {}
+              for name in apps:
+                  path = f"backend/services/{name}-service/target/{name}-service.jar"
+                  data = (root / path).read_bytes()
+                  hashes[path] = hashlib.sha256(data).hexdigest()
+                  with ZipFile(root / path) as jar:
+                      classes = [item for item in jar.namelist()
+                                 if item.startswith("BOOT-INF/classes/") and item.endswith(".class")]
+                      assert classes and all(int.from_bytes(jar.read(item)[6:8], "big")==61 for item in classes)
+                      assert "BOOT-INF/lib/spring-boot-4.1.2.jar" in jar.namelist()
+              return hashes
+
+          records = {
+              "candidate-jars": package_hashes(product, services),
+              "coordinates": {"candidate": os.environ["PRODUCT_SHA"], "baseline": os.environ["BASELINE_SHA"]},
+          }
+          for name, content in records.items():
+              (folder/f"{name}.json").write_text(json.dumps(content,indent=2)+"\n",encoding="utf-8")
+          PY
+          for image in "$PJ_MYSQL_REF" "$PJ_JRE_REF" "$PJ_ROCKETMQ_REF" "$PJ_NODE_REF"; do
+            docker pull --platform linux/amd64 "$image"
+          done
+      - name: P0-05 simultaneous authenticated sessions
+        run: python3 -B witness/.github/witness/pressure/verify-p0-05-multisession.py --evidence "$RUNNER_TEMP/pj-pressure/p0-multisession"
+      - name: P0-06 same payment over two isolated networks
+        run: python3 -B witness/.github/witness/pressure/verify-p0-06-two-networks.py --evidence "$RUNNER_TEMP/pj-pressure/p0-two-networks"
+      - name: P1-01 last stock unit
+        run: python3 -B witness/.github/witness/pressure/verify-p1-01-last-stock-readback.py --evidence "$RUNNER_TEMP/pj-pressure/p1-last-stock"
+      - name: Ordinary shipment return and four ledgers
+        run: python3 -B witness/.github/witness/pressure/verify-ordinary-return-four-ledgers.py --evidence "$RUNNER_TEMP/pj-pressure/ordinary-return"
+      - name: P0-10 single-currency input
+        run: python3 -B witness/.github/witness/pressure/verify-p0-10-currency.py --evidence "$RUNNER_TEMP/pj-pressure/p0-currency"
+      - name: P1-05 database interruption and reconciliation
+        run: python3 -B witness/.github/witness/pressure/verify-p1-05-database-disruption.py --evidence "$RUNNER_TEMP/pj-pressure/p1-db-recovery"
+      - name: P0-07 selected service clock boundaries around midnight
+        run: python3 -B witness/.github/witness/pressure/verify-p0-07-payment-cross-midnight.py --evidence "$RUNNER_TEMP/pj-pressure/p0-midnight"
+      - name: Retain scoped outcomes and business ledgers
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: supplemental-commerce-pressure-53ecf62
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/pj-pressure-inputs/*.json
+            ${{ runner.temp }}/pj-pressure-inputs/toolchain.txt
+            ${{ runner.temp }}/pj-pressure/**/*.json
