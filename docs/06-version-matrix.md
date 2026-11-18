@@ -12,7 +12,7 @@
 | Docker Engine | 29.6.1 | 已验证 |
 | Docker Compose | 5.3.0 | 已验证 |
 
-本机和 GitHub Actions 都以 Node.js 24.14.0 / pnpm 11.9.0 为当前验证坐标。仓库入口
+历史运行证据使用 Node.js 24.14.0 / pnpm 11.9.0。当前 GitHub Actions 与 `.nvmrc` 使用 Node.js 24.22.3。仓库入口
 只依赖 `PATH` 与 Corepack，不依赖某台机器的 `NODE_HOME`、盘符或 Junction。
 
 ## 2. 已运行的中间件
@@ -85,7 +85,7 @@ RocketMQ Spring Starter 2.3.6 可以完成收发，但在 Spring Boot 3.5 下会
 
 | 技术 | 当前版本/方案 | 边界 |
 | --- | --- | --- |
-| Node.js | 24.14.0 | 工程最低要求 22.12.0 |
+| Node.js | 24.22.3 | 工程最低要求 22.12.0 |
 | pnpm | 11.9.0 | workspace 包管理器 |
 | Vue | 3.5.42 | 顾客端与管理端 |
 | Vue Router | 5.2.0 | URL 状态与刷新恢复 |
