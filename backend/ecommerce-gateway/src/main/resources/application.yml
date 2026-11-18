@@ -2,6 +2,9 @@ server:
   port: ${GATEWAY_PORT:18000}
 
 spring:
+  http:
+    codecs:
+      preferred-json-mapper: jackson2
   application:
     name: ecommerce-gateway
   config:

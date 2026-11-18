@@ -39,11 +39,11 @@ ecommerce:
       enabled: false
 
 management:
-  tracing:
+  opentelemetry:
     enabled: false
-  otlp:
-    tracing:
-      export:
+  tracing:
+    export:
+      otlp:
         enabled: false
   prometheus:
     metrics:

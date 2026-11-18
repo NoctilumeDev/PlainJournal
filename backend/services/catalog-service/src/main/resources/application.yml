@@ -2,6 +2,9 @@ server:
   port: ${CATALOG_SERVICE_PORT:18102}
 
 spring:
+  http:
+    converters:
+      preferred-json-mapper: jackson2
   application:
     name: catalog-service
   config:

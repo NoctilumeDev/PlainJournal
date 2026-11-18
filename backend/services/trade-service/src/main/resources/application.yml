@@ -3,6 +3,9 @@ server:
   shutdown: ${SERVER_SHUTDOWN:graceful}
 
 spring:
+  http:
+    converters:
+      preferred-json-mapper: jackson2
   application:
     name: trade-service
   lifecycle:
@@ -201,23 +204,32 @@ ecommerce:
       initial-delay: 10000
       scan-limit: 500
 
+resilience4j:
+  retry:
+    metrics:
+      # Use the MeterBinder while Resilience4j targets Boot 3 metric auto-configuration.
+      legacy:
+        enabled: true
+
 management:
   tracing:
-    enabled: true
+    export:
+      otlp:
+        enabled: ${MANAGEMENT_OTLP_TRACING_EXPORT_ENABLED:${OTLP_TRACING_EXPORT_ENABLED:false}}
     baggage:
       enabled: false
     sampling:
       probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
     propagation:
       type: W3C
-  otlp:
+  opentelemetry:
     tracing:
       export:
-        enabled: ${OTLP_TRACING_EXPORT_ENABLED:false}
-      endpoint: ${OTLP_TRACING_ENDPOINT:http://127.0.0.1:14318/v1/traces}
-      transport: http
-      connect-timeout: 1s
-      timeout: 3s
+        otlp:
+          endpoint: ${OTLP_TRACING_ENDPOINT:http://127.0.0.1:14318/v1/traces}
+          transport: http
+          connect-timeout: 1s
+          timeout: 3s
   prometheus:
     metrics:
       export:
