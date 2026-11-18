@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25.0.5_8-jre-alpine
 
 LABEL org.opencontainers.image.title="PlainJournal Gateway" \
       org.opencontainers.image.description="Gateway runtime for local release-governance experiments"

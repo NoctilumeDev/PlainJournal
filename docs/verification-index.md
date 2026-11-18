@@ -27,7 +27,7 @@ pnpm demo:start
 **用途**：从真实核心中间件验证身份、商品、库存、营销、下单、支付、履约、取消、
 结果未知恢复、权限和清理。
 
-**资源**：PowerShell 7、JDK 17、Docker、核心中间件和代表业务服务。
+**资源**：PowerShell 7、JDK 25、Docker、核心中间件和代表业务服务。历史 JDK 17 复验仍受支持。
 
 ```powershell
 cd backend

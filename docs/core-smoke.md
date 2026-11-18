@@ -17,7 +17,7 @@ Core Smoke 复用 `backend/run-foundation-smoke.ps1`，不复制第二套业务�
 ## 环境
 
 - Windows 11 或支持 PowerShell 7 与 Docker Desktop 的 Windows 环境；
-- JDK 17；
+- JDK 25。JDK 17 仍可用于复验历史构件；
 - Docker Engine / Compose；
 - 建议为 Docker 与 Java 进程预留至少 8 GiB 可用内存；
 - 首次拉取镜像和 Maven 依赖不计入执行时间，稳定环境通常需要约 20–45 分钟。

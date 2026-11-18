@@ -238,6 +238,10 @@ function Get-ContainerIdentity {
 
     $name = (docker inspect --format '{{.Name}}' $ContainerId).TrimStart('/')
     $uid = (docker exec $ContainerId id -u).Trim()
+    $javaVersionOutput = docker exec $ContainerId java -version 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0 -or $javaVersionOutput -notmatch 'version "(17|25)(\.|")') {
+        throw "Cannot verify the Java runtime in Trade container $name."
+    }
     $identityLines = @(docker exec $ContainerId sh -lc @'
 java_pid=$(pidof java)
 tr "\000" "\n" < /proc/$java_pid/environ |
@@ -253,6 +257,7 @@ tr "\000" "\n" < /proc/$java_pid/environ |
         ContainerId = $ContainerId
         Name = $name
         Uid = $uid
+        JavaRuntime = $javaVersionOutput.Trim()
         Ip = $identity['SERVICE_IP']
         InstanceId = $identity['SERVICE_INSTANCE_ID']
         PublisherId = $identity['TRADE_OUTBOX_PUBLISHER_ID']
@@ -643,7 +648,7 @@ WHERE first_event.aggregate_type = '$aggregateType'
             MySql = 'mysql:8.4.10'
             Nacos = 'nacos/nacos-server:v3.2.2'
             RocketMq = 'apache/rocketmq:5.3.2'
-            Java = 'eclipse-temurin:17-jre-alpine'
+            Java = ($containers.JavaRuntime | Sort-Object -Unique) -join "`n"
         }
         Results = $results
     }

@@ -45,7 +45,7 @@ PlainJournal 以完整自营 B2C 交易链为业务载体，验证服务拆分�
 
 ## 3. 架构基线
 
-PlainJournal 使用 Spring Boot 3、JDK 17 和 Vue 3。后端包含 Gateway，以及 Identity、
+PlainJournal 使用 Spring Boot 3、JDK 25（Java 17 字节码目标）和 Vue 3。后端包含 Gateway，以及 Identity、
 Catalog、Inventory、Trade、Payment、Fulfillment、Marketing、Chat、Notification
 和 Analytics 十个所有者服务。
 

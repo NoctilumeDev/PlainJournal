@@ -53,8 +53,8 @@ $javaVersionLine = $javaVersionOutput -split "\r?\n" |
     Where-Object { $_ -match 'version "' } |
     Select-Object -First 1
 if ([string]::IsNullOrWhiteSpace($javaVersionLine) -or
-    $javaVersionLine -notmatch 'version "17(\.|")') {
-    throw "JDK 17 is required, but $javaExecutable reports: $javaVersionOutput"
+    $javaVersionLine -notmatch 'version "(17|25)(\.|")') {
+    throw "JDK 25 or JDK 17 is required, but $javaExecutable reports: $javaVersionOutput"
 }
 
 function Read-DotEnv {

@@ -59,7 +59,8 @@ OpenSearch Java SDK。
 
 ## 3. 已冻结应用基线
 
-以下为当前应用基线，并同步固化在 `poc/middleware-compatibility`。真实中间件验收的
+当前维护代码用 JDK 25 构建和运行，编译目标为 Java 17。以下表格保留
+`poc/middleware-compatibility` 的冻结基线。真实中间件验收的
 执行日期与证据边界以[验证摘要](verification-summary.md)为准；`v1.0.8` 将 RocketMQ
 Java Client 从 5.2.0 更新到 5.2.1，并验证 POC 可编译，但不把这次离线编译表述为
 重新执行了真实中间件批次。

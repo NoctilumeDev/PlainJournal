@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-4f7668)](LICENSE)
 
 PlainJournal 是一个单经营主体、自营 B2C 分布式电商项目。它使用 Spring Boot 3、
-JDK 17 和 Vue 3，围绕数据所有权、交易一致性、结果未知恢复、多实例竞争和故障治理
+JDK 25（Java 17 字节码目标）和 Vue 3，围绕数据所有权、交易一致性、结果未知恢复、多实例竞争和故障治理
 建立可运行实现，而不是用服务数量代替工程证据。
 
 当前仓库同时保存 16GB Windows 单机、分组与串行条件下已经闭环的 M0-M8 后端历史参考
