@@ -225,7 +225,10 @@ class MarketingFlowIntegrationTest {
         PricingLockView repeatedRelease = marketingService.release("ORDER-CANCEL");
         assertThat(released.status()).isEqualTo("RELEASED");
         assertThat(repeatedRelease.version()).isEqualTo(released.version());
-        assertThat(marketingService.listBenefits(1L).get(0).status()).isEqualTo("AVAILABLE");
+        BenefitView available = marketingService.listBenefits(1L).get(0);
+        assertThat(available.status()).isEqualTo("AVAILABLE");
+        assertThat(available.lockedOrderNo()).isNull();
+        assertNoPersistedBenefitLock(coupon.benefitNo());
 
         PricingLockView second = marketingService.lockPricing(
                 pricing("ORDER-PAID", List.of(coupon.benefitNo()), "330106"));
@@ -241,7 +244,15 @@ class MarketingFlowIntegrationTest {
         BenefitView consumed = marketingService.listBenefits(1L).get(0);
         assertThat(consumed.status()).isEqualTo("REDEEMED");
         assertThat(consumed.redeemedOrderNo()).isEqualTo("ORDER-PAID");
+        assertThat(consumed.lockedOrderNo()).isNull();
+        assertNoPersistedBenefitLock(coupon.benefitNo());
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM consumed_event", Integer.class)).isEqualTo(2);
+    }
+
+    private void assertNoPersistedBenefitLock(String benefitNo) {
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_benefit WHERE benefit_no = ? AND locked_order_no IS NULL AND locked_at IS NULL",
+                Integer.class, benefitNo)).isEqualTo(1);
     }
 
     @Test
