@@ -691,11 +691,11 @@ $javaExecutable = if (-not [string]::IsNullOrWhiteSpace($env:JAVA_HOME)) {
     $null
 }
 if (-not $javaExecutable -or -not (Test-Path -LiteralPath $javaExecutable)) {
-    throw 'JAVA_HOME must point to the JDK 17 used by the PlainJournal backend.'
+    throw 'JAVA_HOME must point to JDK 25 or the historical JDK 17 toolchain.'
 }
 $javaVersion = (& $javaExecutable -version 2>&1 | Out-String)
-if ($javaVersion -notmatch 'version "17\.') {
-    throw "PlainJournal foundation smoke requires JDK 17 from JAVA_HOME: $javaVersion"
+if ($javaVersion -notmatch 'version "(17|25)(\.|")') {
+    throw "PlainJournal foundation smoke supports JDK 25 and JDK 17: $javaVersion"
 }
 [Environment]::SetEnvironmentVariable('NACOS_USERNAME', 'nacos', 'Process')
 [Environment]::SetEnvironmentVariable('NACOS_HOST', '127.0.0.1', 'Process')

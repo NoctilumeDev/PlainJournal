@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25.0.5_8-jre-alpine
 
 LABEL org.opencontainers.image.title="PlainJournal Trade Service" \
       org.opencontainers.image.description="Trade service runtime for local multi-instance experiments"
