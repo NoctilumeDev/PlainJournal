@@ -147,7 +147,7 @@ export async function inspectProductionDeployment(frontendRoot) {
 
   requireText(
     dockerfile,
-    "FROM node:24-alpine AS workspace",
+    "FROM node:24.22.3-alpine AS workspace",
     "Frontend build runtime",
     violations,
   );
