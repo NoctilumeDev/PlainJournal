@@ -148,3 +148,86 @@ jobs:
           name: frontend-coverage
           path: frontend/coverage/
           if-no-files-found: ignore
+
+  jdk25_runtime_witness:
+    name: JDK 25 Gateway and Trade runtime witness
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'qualification/plainjournal-jdk25-linux-c8b6666'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    permissions:
+      contents: read
+    env:
+      PRODUCT_SHA: c8b66664fe0069753dc86b29bd1ce7438b71c921
+      PYTHONDONTWRITEBYTECODE: '1'
+      MAVEN_OPTS: -Xmx1024m
+      PJ_MYSQL_REF: mysql@sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6
+      PJ_NACOS_REF: nacos/nacos-server@sha256:d6b3087bc2302c2b49c875e1c5ad8c916fc10696ceb355be56cffd715e178d81
+    steps:
+      - name: Check out the witness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: witness
+          persist-credentials: false
+      - name: Check out the exact product
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: c8b66664fe0069753dc86b29bd1ce7438b71c921
+          path: product
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '25.0.5'
+      - name: Package Gateway and Trade on Java 25
+        working-directory: product/backend
+        run: |
+          test "$(git rev-parse HEAD)" = "$PRODUCT_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p "$RUNNER_TEMP/pj-inputs"
+          ./mvnw --version | tee "$RUNNER_TEMP/pj-inputs/toolchain.txt"
+          grep -F 'Java version: 25.0.5' "$RUNNER_TEMP/pj-inputs/toolchain.txt"
+          grep -F 'Apache Maven 3.9.16' "$RUNNER_TEMP/pj-inputs/toolchain.txt"
+          ./mvnw --batch-mode --no-transfer-progress -pl ecommerce-gateway,services/trade-service -am -DskipTests clean package
+      - name: Build application images and pull the fixed middleware
+        working-directory: product/backend
+        run: |
+          inputs="$RUNNER_TEMP/pj-inputs"
+          docker pull --platform linux/amd64 "$PJ_MYSQL_REF"
+          docker pull --platform linux/amd64 "$PJ_NACOS_REF"
+          docker build --label "org.opencontainers.image.revision=$PRODUCT_SHA" -f ecommerce-gateway/Dockerfile -t pj-jdk25-gateway:witness .
+          docker build --label "org.opencontainers.image.revision=$PRODUCT_SHA" -f services/trade-service/Dockerfile -t pj-jdk25-trade:witness .
+          docker image inspect --format '{{.Id}}' pj-jdk25-gateway:witness > "$inputs/jdk25-gateway-image-id.txt"
+          docker image inspect --format '{{.Id}}' pj-jdk25-trade:witness > "$inputs/jdk25-trade-image-id.txt"
+          python3 -I - "$inputs/candidate-jars.json" <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import sys
+
+          jars = (
+              "backend/ecommerce-gateway/target/ecommerce-gateway.jar",
+              "backend/services/trade-service/target/trade-service.jar",
+          )
+          hashes = {name: hashlib.sha256((Path("..") / name).read_bytes()).hexdigest() for name in jars}
+          Path(sys.argv[1]).write_text(json.dumps(hashes, indent=2) + "\n")
+          PY
+      - name: Verify MySQL Flyway and discovery over the real Gateway
+        run: |
+          export PJ_SOURCE="$GITHUB_WORKSPACE/product"
+          export PJ_WITNESS_INPUTS="$RUNNER_TEMP/pj-inputs"
+          python3 -B witness/.github/witness/plainjournal-jdk25-runtime.py --evidence "$RUNNER_TEMP/pj-runtime"
+      - name: Record scoped evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: plainjournal-jdk25-linux-runtime-c8b6666
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/pj-inputs/toolchain.txt
+            ${{ runner.temp }}/pj-inputs/*.json
+            ${{ runner.temp }}/pj-inputs/*-image-id.txt
+            ${{ runner.temp }}/pj-runtime/host-*.json
+            ${{ runner.temp }}/pj-runtime/inputs.json
+            ${{ runner.temp }}/pj-runtime/result.json
+            ${{ runner.temp }}/pj-runtime/runtime.json
+            ${{ runner.temp }}/pj-runtime/cleanup.json
