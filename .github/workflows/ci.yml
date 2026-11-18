@@ -148,3 +148,120 @@ jobs:
           name: frontend-coverage
           path: frontend/coverage/
           if-no-files-found: ignore
+
+  boot412_runtime_witness:
+    name: Boot 4 authenticated Nacos and messaging runtime witness
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'qualification/plainjournal-boot412-linux-0c4fd7c'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    permissions:
+      contents: read
+    env:
+      PRODUCT_SHA: 0c4fd7c73588bb95a6f8ecbb2debe0993e780b58
+      PYTHONDONTWRITEBYTECODE: '1'
+      MAVEN_OPTS: -Xmx1024m
+      PJ_MYSQL_REF: mysql@sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6
+      PJ_NACOS_REF: nacos/nacos-server@sha256:d6b3087bc2302c2b49c875e1c5ad8c916fc10696ceb355be56cffd715e178d81
+      PJ_JRE_REF: eclipse-temurin@sha256:e1898fd6a11fc965a994d8ace186fd3585aeb636cf8f05f47a723fcfee0b0918
+      PJ_ROCKETMQ_REF: apache/rocketmq@sha256:4a80ff5cd4b0a3d3ef6dc338ce2028a85bd995648cb3aa5c3e753746d2dbc587
+      PJ_NODE_REF: node@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+    steps:
+      - name: Check out witness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: witness
+          persist-credentials: false
+      - name: Check out exact framework candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 0c4fd7c73588bb95a6f8ecbb2debe0993e780b58
+          path: product
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '25.0.5'
+      - name: Package and bind Gateway, Trade, Payment and Inventory
+        working-directory: product/backend
+        run: |
+          test "$(git rev-parse HEAD)" = "$PRODUCT_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p "$RUNNER_TEMP/pj-inputs"
+          ./mvnw --version | tee "$RUNNER_TEMP/pj-inputs/toolchain.txt"
+          grep -F 'Java version: 25.0.5' "$RUNNER_TEMP/pj-inputs/toolchain.txt"
+          grep -F 'Apache Maven 3.9.16' "$RUNNER_TEMP/pj-inputs/toolchain.txt"
+          ./mvnw --batch-mode --no-transfer-progress -pl ecommerce-gateway,services/trade-service,services/payment-service,services/inventory-service -am -DskipTests clean package
+          python3 -I - "$RUNNER_TEMP/pj-inputs" <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import hashlib
+          import json
+          import os
+          import sys
+
+          jars = (
+              "backend/ecommerce-gateway/target/ecommerce-gateway.jar",
+              "backend/services/trade-service/target/trade-service.jar",
+              "backend/services/payment-service/target/payment-service.jar",
+              "backend/services/inventory-service/target/inventory-service.jar",
+          )
+          inputs = Path(sys.argv[1])
+          hashes = {}
+          for name in jars:
+              jar = Path("..") / name
+              hashes[name] = hashlib.sha256(jar.read_bytes()).hexdigest()
+              with ZipFile(jar) as package:
+                  product_classes = [item for item in package.namelist()
+                                     if item.startswith("BOOT-INF/classes/") and item.endswith(".class")]
+                  assert product_classes and all(int.from_bytes(package.read(item)[6:8], "big")==61 for item in product_classes)
+                  assert "BOOT-INF/lib/spring-boot-4.1.2.jar" in package.namelist()
+          (inputs/"candidate-jars.json").write_text(json.dumps(hashes, indent=2) + "\n")
+          (inputs/"coordinates.json").write_text(json.dumps({"candidate":os.environ["PRODUCT_SHA"]}) + "\n")
+          PY
+      - name: Load pinned fixture images and build runtime containers
+        working-directory: product/backend
+        run: |
+          for image in "$PJ_MYSQL_REF" "$PJ_NACOS_REF" "$PJ_JRE_REF" "$PJ_ROCKETMQ_REF" "$PJ_NODE_REF"; do
+            docker pull --platform linux/amd64 "$image"
+          done
+          inputs="$RUNNER_TEMP/pj-inputs"
+          docker build --label "org.opencontainers.image.revision=$PRODUCT_SHA" -f ecommerce-gateway/Dockerfile -t pj-boot412-gateway:witness .
+          docker build --label "org.opencontainers.image.revision=$PRODUCT_SHA" -f services/trade-service/Dockerfile -t pj-boot412-trade:witness .
+          docker image inspect --format '{{.Id}}' pj-boot412-gateway:witness > "$inputs/boot412-gateway-image-id.txt"
+          docker image inspect --format '{{.Id}}' pj-boot412-trade:witness > "$inputs/boot412-trade-image-id.txt"
+      - name: Verify authenticated configuration and Gateway discovery
+        run: |
+          export PJ_SOURCE="$GITHUB_WORKSPACE/product"
+          export PJ_WITNESS_INPUTS="$RUNNER_TEMP/pj-inputs"
+          python3 -B witness/.github/witness/boot412-gateway-trade.py --evidence "$RUNNER_TEMP/pj-gateway"
+      - name: Verify durable payment to inventory recovery
+        run: |
+          export PJ_SOURCE="$GITHUB_WORKSPACE/product"
+          export PJ_WITNESS_INPUTS="$RUNNER_TEMP/pj-inputs"
+          python3 -B witness/.github/witness/boot412-payment-inventory.py --evidence "$RUNNER_TEMP/pj-payment"
+      - name: Record limited runtime evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: plainjournal-boot412-linux-runtime-0c4fd7c
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/pj-inputs/toolchain.txt
+            ${{ runner.temp }}/pj-inputs/*.json
+            ${{ runner.temp }}/pj-inputs/*-image-id.txt
+            ${{ runner.temp }}/pj-gateway/host-*.json
+            ${{ runner.temp }}/pj-gateway/inputs.json
+            ${{ runner.temp }}/pj-gateway/nacos-config-readback.json
+            ${{ runner.temp }}/pj-gateway/result.json
+            ${{ runner.temp }}/pj-gateway/runtime.json
+            ${{ runner.temp }}/pj-gateway/cleanup.json
+            ${{ runner.temp }}/pj-payment/host-*.json
+            ${{ runner.temp }}/pj-payment/coordinates.json
+            ${{ runner.temp }}/pj-payment/*-artifact.json
+            ${{ runner.temp }}/pj-payment/result.json
+            ${{ runner.temp }}/pj-payment/cleanup.json
+            ${{ runner.temp }}/pj-payment/payment-published.json
+            ${{ runner.temp }}/pj-payment/inventory-offline-pending.json
+            ${{ runner.temp }}/pj-payment/confirmed-ledgers.json
+            ${{ runner.temp }}/pj-payment/recovery-timeout-ledgers.json
+            ${{ runner.temp }}/pj-payment/mysql-version.json
