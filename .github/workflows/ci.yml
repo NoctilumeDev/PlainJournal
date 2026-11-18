@@ -149,9 +149,9 @@ jobs:
           path: frontend/coverage/
           if-no-files-found: ignore
 
-  pressure_repricing:
-    name: Commerce repricing and ledger witness
-    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'qualification/plainjournal-repricing-53ecf62'
+  checkout_browser_time:
+    name: Commerce browser clock and timezone witness
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'qualification/plainjournal-browser-clock-53ecf62'
     runs-on: ubuntu-24.04
     timeout-minutes: 28
     permissions:
@@ -184,6 +184,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '25.0.5'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24.22.3
       - name: Package fixed SHA JARs and acquire pinned fixtures
         run: |
           test "$(git -C "$PJ_SOURCE" rev-parse HEAD)" = "$PRODUCT_SHA"
@@ -196,7 +199,7 @@ jobs:
             ./mvnw --version | tee "$PJ_WITNESS_INPUTS/toolchain.txt"
             grep -F 'Java version: 25.0.5' "$PJ_WITNESS_INPUTS/toolchain.txt"
             grep -F 'Apache Maven 3.9.16' "$PJ_WITNESS_INPUTS/toolchain.txt"
-            ./mvnw --batch-mode --no-transfer-progress -pl services/trade-service,services/payment-service,services/inventory-service,services/identity-service,services/catalog-service,services/marketing-service -am -DskipTests clean package
+            ./mvnw --batch-mode --no-transfer-progress -pl ecommerce-gateway,services/trade-service,services/payment-service,services/inventory-service,services/identity-service,services/catalog-service,services/marketing-service -am -DskipTests clean package
           )
           python3 -I - <<'PY'
           import hashlib
@@ -208,11 +211,12 @@ jobs:
           folder = Path(os.environ["PJ_WITNESS_INPUTS"])
           product = Path(os.environ["PJ_SOURCE"])
           services = ("trade", "payment", "inventory", "identity", "catalog", "marketing")
+          paths = [f"backend/services/{name}-service/target/{name}-service.jar" for name in services]
+          paths.append("backend/ecommerce-gateway/target/ecommerce-gateway.jar")
 
-          def package_hashes(root, apps):
+          def package_hashes(root, jar_paths):
               hashes = {}
-              for name in apps:
-                  path = f"backend/services/{name}-service/target/{name}-service.jar"
+              for path in jar_paths:
                   data = (root / path).read_bytes()
                   hashes[path] = hashlib.sha256(data).hexdigest()
                   with ZipFile(root / path) as jar:
@@ -223,7 +227,7 @@ jobs:
               return hashes
 
           records = {
-              "candidate-jars": package_hashes(product, services),
+              "candidate-jars": package_hashes(product, paths),
               "coordinates": {"candidate": os.environ["PRODUCT_SHA"], "baseline": os.environ["BASELINE_SHA"]},
           }
           for name, content in records.items():
@@ -232,16 +236,50 @@ jobs:
           for image in "$PJ_MYSQL_REF" "$PJ_JRE_REF" "$PJ_ROCKETMQ_REF" "$PJ_NODE_REF" "$PJ_REDIS_REF"; do
             docker pull --platform linux/amd64 "$image"
           done
-      - name: P1-03 and P1-04 checkout across a catalog price change
-        run: python3 -B witness/.github/witness/pressure/verify-p1-03-04-repricing-and-sampling.py --evidence "$RUNNER_TEMP/pj-pressure/repricing"
+      - name: Build customer and admin previews and install Chromium
+        working-directory: product/frontend
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.9.0 --activate
+          test "$(node --version)" = v24.22.3
+          test "$(pnpm --version)" = 11.9.0
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm exec playwright install --with-deps chromium
+          find storefront-web/dist admin-web/dist -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > "$PJ_WITNESS_INPUTS/frontend-assets.txt"
+      - name: P0-08 and P0-09 with real storefront and checkout services
+        run: |
+          scripts="$GITHUB_WORKSPACE/witness/.github/witness/pressure"
+          export PJ_REPRICING_SCRIPT="$scripts/verify-p1-03-04-repricing-and-sampling.py"
+          output="$RUNNER_TEMP/pj-pressure/browser-time"
+          python3 -B "$scripts/run-built-browser-clock-lab.py" --evidence "$output" --node "$(command -v node)" --hold-seconds 360 &
+          lab=$!
+          on_exit() {
+            if kill -0 "$lab" 2>/dev/null; then
+              if test -d "$output" && ! test -e "$output/browser-complete.signal"; then
+                printf '%s\n' TEST_ABORTED > "$output/browser-complete.signal"
+              fi
+              wait "$lab" || true
+            fi
+          }
+          trap on_exit EXIT
+          for i in $(seq 1 120); do
+            test ! -e "$output/workspace.json" || break
+            kill -0 "$lab" 2>/dev/null || break
+            sleep 2
+          done
+          test -s "$output/workspace.json"
+          node "$scripts/verify-browser-time-and-timezone.mjs" "$output"
+          wait "$lab"
       - name: Retain scoped outcomes and business ledgers
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: commerce-repricing-53ecf62
+          name: commerce-browser-clock-53ecf62
           if-no-files-found: error
           path: |
             ${{ runner.temp }}/pj-pressure-inputs/*.json
             ${{ runner.temp }}/pj-pressure-inputs/toolchain.txt
+            ${{ runner.temp }}/pj-pressure-inputs/frontend-assets.txt
             ${{ runner.temp }}/pj-pressure/**/*.json
             !${{ runner.temp }}/pj-pressure/**/*-stopped.json
