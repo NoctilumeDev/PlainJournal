@@ -149,11 +149,11 @@ jobs:
           path: frontend/coverage/
           if-no-files-found: ignore
 
-  checkout_browser_time:
-    name: Commerce browser clock and timezone witness
-    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'qualification/plainjournal-browser-clock-53ecf62'
+  combined_commerce:
+    name: Combined commerce pressure and four-ledger witness
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'qualification/plainjournal-combined-53ecf62'
     runs-on: ubuntu-24.04
-    timeout-minutes: 28
+    timeout-minutes: 36
     permissions:
       contents: read
     env:
@@ -199,7 +199,7 @@ jobs:
             ./mvnw --version | tee "$PJ_WITNESS_INPUTS/toolchain.txt"
             grep -F 'Java version: 25.0.5' "$PJ_WITNESS_INPUTS/toolchain.txt"
             grep -F 'Apache Maven 3.9.16' "$PJ_WITNESS_INPUTS/toolchain.txt"
-            ./mvnw --batch-mode --no-transfer-progress -pl ecommerce-gateway,services/trade-service,services/payment-service,services/inventory-service,services/identity-service,services/catalog-service,services/marketing-service -am -DskipTests clean package
+            ./mvnw --batch-mode --no-transfer-progress -pl ecommerce-gateway,services/trade-service,services/payment-service,services/inventory-service,services/identity-service,services/catalog-service,services/marketing-service,services/fulfillment-service -am -DskipTests clean package
           )
           python3 -I - <<'PY'
           import hashlib
@@ -210,7 +210,7 @@ jobs:
 
           folder = Path(os.environ["PJ_WITNESS_INPUTS"])
           product = Path(os.environ["PJ_SOURCE"])
-          services = ("trade", "payment", "inventory", "identity", "catalog", "marketing")
+          services = ("trade", "payment", "inventory", "identity", "catalog", "marketing", "fulfillment")
           paths = [f"backend/services/{name}-service/target/{name}-service.jar" for name in services]
           paths.append("backend/ecommerce-gateway/target/ecommerce-gateway.jar")
 
@@ -247,17 +247,18 @@ jobs:
           pnpm build
           pnpm exec playwright install --with-deps chromium
           find storefront-web/dist admin-web/dist -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > "$PJ_WITNESS_INPUTS/frontend-assets.txt"
-      - name: P0-08 and P0-09 with real storefront and checkout services
+      - name: Same order across disconnect, midnight, cancellation, refund and reordering
         run: |
           scripts="$GITHUB_WORKSPACE/witness/.github/witness/pressure"
           export PJ_REPRICING_SCRIPT="$scripts/verify-p1-03-04-repricing-and-sampling.py"
-          output="$RUNNER_TEMP/pj-pressure/browser-time"
-          python3 -B "$scripts/run-built-browser-clock-lab.py" --evidence "$output" --node "$(command -v node)" --hold-seconds 360 &
+          export PJ_BROWSER_LAB_SCRIPT="$scripts/run-built-browser-clock-lab.py"
+          output="$RUNNER_TEMP/pj-pressure/combined"
+          python3 -B "$scripts/run-combined-commerce-lab.py" --evidence "$output" --node "$(command -v node)" --hold-seconds 480 &
           lab=$!
           on_exit() {
             if kill -0 "$lab" 2>/dev/null; then
-              if test -d "$output" && ! test -e "$output/browser-complete.signal"; then
-                printf '%s\n' TEST_ABORTED > "$output/browser-complete.signal"
+              if test -d "$output" && ! test -e "$output/combination-browser-failure.json"; then
+                printf '{"source":"%s","reason":"runner-exited"}\n' "$PRODUCT_SHA" > "$output/combination-browser-failure.json"
               fi
               wait "$lab" || true
             fi
@@ -269,13 +270,13 @@ jobs:
             sleep 2
           done
           test -s "$output/workspace.json"
-          node "$scripts/verify-browser-time-and-timezone.mjs" "$output"
+          node "$scripts/verify-combined-browser-commerce.mjs" "$output"
           wait "$lab"
       - name: Retain scoped outcomes and business ledgers
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: commerce-browser-clock-53ecf62
+          name: commerce-combined-pressure-53ecf62
           if-no-files-found: error
           path: |
             ${{ runner.temp }}/pj-pressure-inputs/*.json
