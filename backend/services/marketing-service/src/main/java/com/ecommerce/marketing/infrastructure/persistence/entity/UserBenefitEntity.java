@@ -1,5 +1,7 @@
 package com.ecommerce.marketing.infrastructure.persistence.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
@@ -21,7 +23,9 @@ public class UserBenefitEntity {
     private Long ruleId;
     private Long userId;
     private String status;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String lockedOrderNo;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Instant lockedAt;
     private String redeemedOrderNo;
     private Instant redeemedAt;
