@@ -44,6 +44,9 @@ PAYMENT_SETTINGS = {
 
 
 class PriceCase(refund.RefundCase):
+    def fixture_network_options(self):
+        return []
+
     def put(self, app, path, body, headers):
         request = {"url": f"http://{app}:{APPS[app]}{path}", "method": "PUT",
                    "body": body, "headers": headers}
@@ -63,7 +66,8 @@ class PriceCase(refund.RefundCase):
         self.save("coordinates.json", {"source": sha, "images": images, "jars": self.jars,
                                        "runner": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()})
         self.host_check("host-before.json")
-        self.docker("network", "create", "--internal", "--label", "codex.task=" + self.ident, self.ident)
+        self.docker("network", "create", "--internal", "--label", "codex.task=" + self.ident,
+                    *self.fixture_network_options(), self.ident)
         self.network_created = True
         self.mysql = self.container("mysql", images["MYSQL"], [
             "--network-alias", "mysql", "--memory", "760m", "--cpus", "1.5",

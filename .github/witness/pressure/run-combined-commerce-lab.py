@@ -19,9 +19,20 @@ price = browser.price
 base = price.base
 BEFORE = datetime(2030, 1, 1, 15, 59, 59, tzinfo=timezone.utc)
 AFTER = datetime(2030, 1, 1, 16, 0, 1, tzinfo=timezone.utc)
+NETWORK_PREFIX = "172.31.251."
+ROLLOVER_HOSTS = {"trade": 23, "inventory": 21, "payment": 24, "marketing": 22}
 
 
 class Combined(browser.BrowserLab):
+    def fixture_network_options(self):
+        return ["--subnet", NETWORK_PREFIX + "0/24"]
+
+    def container(self, suffix, image, options, command):
+        app = suffix.split("-", 1)[0]
+        if app in ROLLOVER_HOSTS:
+            options = [*options, "--ip", NETWORK_PREFIX + str(ROLLOVER_HOSTS[app])]
+        return super().container(suffix, image, options, command)
+
     def service(self, app, settings, fixture_name=None):
         if app in {"trade", "inventory", "payment", "marketing", "fulfillment"}:
             settings = {**settings, "spring.datasource.hikari.connection-init-sql":
@@ -43,8 +54,13 @@ class Combined(browser.BrowserLab):
         raise TimeoutError(name)
 
     def rollover(self):
-        for app in ("trade", "inventory", "payment", "marketing"):
-            self.stop(self.apps[app])
+        for app in ROLLOVER_HOSTS:
+            container = self.apps[app]
+            owner = self.docker("inspect", "--format", '{{index .Config.Labels "codex.task"}}', container)
+            assert owner == self.ident
+            self.stop(container)
+            self.docker("rm", container)
+            self.containers.remove(container)
         self.phase_timestamp = AFTER
         self.start_broker(self.broker_image)
         for topic in ("ecommerce-order-events",):
@@ -161,6 +177,12 @@ class Combined(browser.BrowserLab):
         self.stage = "midnight-rollover-and-cancellation"
         self.rollover()
         self.topology("after-midnight")
+        earlier = json.loads((self.directory / "before-midnight-network.json").read_text())
+        later = json.loads((self.directory / "after-midnight-network.json").read_text())
+        for app, host in ROLLOVER_HOSTS.items():
+            assert earlier[app]["id"] != later[app]["id"]
+            assert earlier[app]["ip"] == later[app]["ip"] == NETWORK_PREFIX + str(host)
+        assert earlier["gateway"] == later["gateway"]
         canceled = self.data("compound-cancel-result", self.cancel(order))
         assert canceled["status"] == "CANCELED"
         assert self.states(order)["reservation"] == "RELEASED"
