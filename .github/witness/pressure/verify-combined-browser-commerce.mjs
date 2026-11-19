@@ -18,6 +18,7 @@ const browser = await chromium.launch();
 const paymentPath = "/api/v1/payment/payments";
 const orderPath = "/api/v1/trade/orders";
 const order = workspace.order;
+const checks = [];
 
 async function save(name, payload) {
   const destination = path(name);
@@ -49,9 +50,19 @@ async function session(timezoneId) {
   const response = page.waitForResponse(reply => new URL(reply.url()).pathname === "/api/v1/identity/auth/login");
   await page.getByRole("button", { name: "登录 →" }).click();
   const reply = await response;
-  assert.equal(reply.status(), 200);
+  const login = await checked("login-" + timezoneId, reply);
   await expect(page).toHaveURL(/\/account$/);
-  return { context, page, token: (await reply.json()).data.accessToken };
+  return { context, page, token: login.data.accessToken };
+}
+
+async function checked(label, reply) {
+  let body;
+  try { body = await reply.json(); } catch { body = {}; }
+  checks.push({ label, status: reply.status(), code: body.code ?? null });
+  await save("combined-browser-http-checks", { checks });
+  assert.equal(reply.status(), 200, label);
+  assert.equal(body.code, "OK", label);
+  return body;
 }
 
 async function paymentIntent(customer, key) {
@@ -110,11 +121,9 @@ try {
   assert.equal(timezone, "America/New_York");
   const headers = { authorization: "Bearer " + later.token };
   const old = await later.context.request.get(orderPath + "/" + order, { headers });
-  assert.equal(old.status(), 200);
-  assert.equal((await old.json()).data.status, "CLOSED");
+  assert.equal((await checked("read-closed-order", old)).data.status, "CLOSED");
   const payment = await later.context.request.get(paymentPath + "/by-order/" + order, { headers });
-  assert.equal(payment.status(), 200);
-  const paid = (await payment.json()).data;
+  const paid = (await checked("read-original-payment", payment)).data;
   assert.equal(paid.paymentNo, paymentNo);
   assert.equal(paid.status, "SUCCESS");
   assert.equal(paid.amount, 39.8);
@@ -123,8 +132,7 @@ try {
     data: { addressId: workspace.address, benefitNos: [],
             items: [{ productId: workspace.product, skuId: workspace.sku, quantity: 1 }] },
   });
-  assert.equal(newer.status(), 200);
-  const next = (await newer.json()).data;
+  const next = (await checked("create-new-order", newer)).data;
   assert.notEqual(next.orderNo, order);
   assert.equal(next.status, "PENDING_PAYMENT");
   assert.equal(next.totalAmount, 39.8);

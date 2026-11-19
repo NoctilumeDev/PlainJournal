@@ -7,6 +7,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import time
 
@@ -69,6 +70,37 @@ class Combined(browser.BrowserLab):
                 base.PORTS[app] = 18106
             self.service(app, settings, app + "-after")
 
+    def topology(self, label):
+        nodes = {"gateway": self.gateway_id, **self.apps}
+        readback = {}
+        for name, container in nodes.items():
+            raw = json.loads(self.docker("inspect", container))[0]
+            network = raw["NetworkSettings"]["Networks"][self.ident]
+            readback[name] = {"id": container, "ip": network["IPAddress"], "running": raw["State"]["Running"]}
+        self.save(label + "-network.json", readback)
+
+    def post_close_diagnostics(self, order):
+        probes = {}
+        for name, app, path in (
+            ("closed-order", "trade", "/api/v1/trade/orders/" + order),
+            ("original-payment", "payment", "/api/v1/payment/payments/by-order/" + order),
+        ):
+            try:
+                result = self.get(app, path, headers=self.customer)
+                probes[name] = {"status": result["status"], "code": result["body"].get("code")}
+            except Exception as exc:
+                probes[name] = {"error": type(exc).__name__}
+        probes["reorder_persisted"] = self.sql(
+            "SELECT order_no,status FROM b1_trade.trade_order WHERE idempotency_key='COMPOUND-NEXT-ORDER';")
+        for label, container in (("gateway", self.gateway_id), ("trade", self.apps["trade"]),
+                                 ("marketing", self.apps["marketing"]), ("payment", self.apps["payment"])):
+            logs = self.docker("logs", "--tail", "240", container, check=False)
+            probes[label + "_exception_classes"] = sorted(set(re.findall(r"\b[\w.]+(?:Exception|Error)\b", logs)))
+            probes[label + "_network_messages"] = sorted(set(re.findall(
+                r"(?:Connection refused|Connection reset|No route to host|Name or service not known)[^\r\n]{0,95}",
+                logs)))
+        self.save("post-close-diagnostics.json", probes)
+
     def mock_payment_callback(self, payment_no, label):
         stamp = int(AFTER.timestamp())
         response = self.get("payment", "/api/v1/payment/callbacks/mock", self.signed({
@@ -115,6 +147,7 @@ class Combined(browser.BrowserLab):
         self.gateway()
         storefront = self.preview("storefront-web")
         self.host_check("host-before-browser.json")
+        self.topology("before-midnight")
         self.save("workspace.json", {"url": storefront, "source": self.result["source"], "order": order,
                                     "product": self.product_id, "sku": self.sku_id, "address": self.address})
         self.stage = "two-authenticated-sessions-and-lost-response"
@@ -127,6 +160,7 @@ class Combined(browser.BrowserLab):
 
         self.stage = "midnight-rollover-and-cancellation"
         self.rollover()
+        self.topology("after-midnight")
         canceled = self.data("compound-cancel-result", self.cancel(order))
         assert canceled["status"] == "CANCELED"
         assert self.states(order)["reservation"] == "RELEASED"
@@ -156,7 +190,11 @@ WHERE p.order_no='{order}';
         })
         self.stage = "zone-change-and-fresh-order"
         self.save("browser-readback-request.json", {"source": self.result["source"], "order": order, "paymentNo": number})
-        followup = self.owned_signal("browser-new-order")
+        try:
+            followup = self.owned_signal("browser-new-order")
+        except Exception:
+            self.post_close_diagnostics(order)
+            raise
         new = followup["newOrder"]
         assert new != order and new.startswith("ORD") and new[3:].isascii() and new[3:].isdigit()
         new_view = self.data("compound-new-order", self.order_state(new))
